@@ -2,6 +2,7 @@
 # =============================
 # IMPORTANT: Keep all documentation local only
 !README.md
+!AGENTS.md
 *.md
 !README.md.example
 *.markdown
@@ -336,6 +337,7 @@ coral_*
 
 # Keep important example files
 !README.md
+!AGENTS.md
 !requirements.txt
 !detections.conf
 
