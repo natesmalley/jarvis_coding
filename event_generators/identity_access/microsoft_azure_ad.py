@@ -55,5 +55,7 @@ def microsoft_azure_ad_log():
 
 if __name__ == "__main__":
     # Generate and print sample event
-    event = microsoft_azure_ad_log()
-    print(json.dumps(event, indent=2))
+    for i in range(100):
+        event = json.dumps(microsoft_azure_ad_log())
+        print(event)
+    

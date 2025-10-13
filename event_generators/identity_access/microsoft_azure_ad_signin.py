@@ -356,8 +356,10 @@ def microsoft_azure_ad_signin_log(overrides: dict | None = None) -> Dict:
 
 if __name__ == "__main__":
     # Generate sample logs
-    print("Sample Microsoft Azure AD Sign-in events:")
-    for result in [0, 50126, 50074]:  # Success, invalid password, MFA required
-        print(f"\nResult Type {result}:")
-        print(microsoft_azure_ad_signin_log({"resultType": str(result)}))
-        print()
+    #print("Sample Microsoft Azure AD Sign-in events:")
+    for i in range(50):
+        for result in [0, 50126, 50074]:  # Success, invalid password, MFA required
+            #print(f"\nResult Type {result}:")
+            event = json.dumps(microsoft_azure_ad_signin_log({"resultType": str(result)}))
+            print(event)
+            #print()

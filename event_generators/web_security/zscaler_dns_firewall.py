@@ -118,8 +118,11 @@ def zscaler_dns_firewall_log() -> Dict:
 
 if __name__ == "__main__":
     # Generate sample events
-    print("Sample Zscaler DNS Firewall Events:")
-    print("=" * 50)
-    for i in range(3):
-        print(f"\nEvent {i+1}:")
-        print(zscaler_dns_firewall_log())
+    #print("Sample Zscaler DNS Firewall Events:")
+    #print("=" * 50)
+    for i in range(100):
+        #print(f"\nEvent {i+1}:")
+        event_string = json.dumps(zscaler_dns_firewall_log())
+        #perfect_event_string = event_string.replace("'",'"')
+        print(event_string)
+        #print(perfect_event_string)

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
+
+#dataSource.name = 'Zscaler Internet Access' and threatname contains 'cobaltstrike' and not (action contains ('Drop', 'IPS Reset', 'Blocked'))
+#dataSource.name = 'Zscaler Internet Access' and (threatcat contains 'ransom' or threatname contains ('8base', 'abyss', 'akira', 'alphv', 'babuk', 'bashe', 'bianlian', 'blackbasta', 'blackout', 'blacksuit', 'braincipher', 'cactus', 'ciphbit', 'clop', 'everest', 'hunters', 'kairos', 'killsecurity', 'lockbit', 'lynx', 'medusa', 'moneymessage', 'nitrogen', 'ragroup', 'revil', 'ransom', 'rhysida', 'qilin', 'spacebears', 'termite')) and not (action contains ('Drop', 'IPS Reset', 'Blocked'))
+
 """
-Zscaler Firewall event generator  
 Generates synthetic Zscaler firewall and security events
 """
 import json
@@ -10,7 +13,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict
 
 # Actions taken by firewall
-ACTIONS = ["Allow", "Block", "Drop", "Redirect"]
+ACTIONS = ["Allow"]
 
 # Protocols
 PROTOCOLS = ["TCP", "UDP", "ICMP", "GRE", "ESP"]
@@ -24,16 +27,9 @@ APPLICATIONS = [
 
 # Threat categories
 THREAT_CATEGORIES = [
-    "Malware",
-    "Phishing", 
-    "Botnet",
     "Command & Control",
-    "Cryptocurrency Mining",
-    "Adware",
-    "Spyware",
     "Ransomware",
-    "Data Theft",
-    "DNS Tunneling"
+
 ]
 
 # Countries
@@ -99,18 +95,43 @@ def zscaler_firewall_log() -> str:
     }
     
     # Add threat detection fields for blocked traffic
-    if action in ["Block", "Drop"]:
+    if action in ["Allow"]:
         if random.choice([True, False]):  # 50% chance of threat detection
             event.update({
-                "threat_category": random.choice(THREAT_CATEGORIES),
-                "threat_name": random.choice([
-                    "Trojan.GenKryptik",
-                    "Adware.Bundler",
-                    "Phishing.Generic",
-                    "Botnet.Zeus",
-                    "Ransomware.WannaCry",
-                    "Cryptominer.Generic"
-                ]),
+                "threatcat": random.choice(THREAT_CATEGORIES),
+                "threatname": random.choice([
+                    "cobaltstrike",
+                    "8base",
+                    "abyss",
+                    "akira",
+                    "alphv",
+                    "babuk",
+                    "bashe",
+                    "bianlian",
+                    "blackbasta",
+                    "blackout",
+                    "blacksuit",
+                    "braincipher",
+                    "cactus",
+                    "ciphbit",
+                    "clop",
+                    "everest",
+                    "hunters",
+                    "kairos",
+                    "killsecurity",
+                    "lockbit",
+                    "lynx",
+                    "medusa",
+                    "moneymessage",
+                    "nitrogen",
+                    "ragroup",
+                    "revil",
+                    "ransom",
+                    "rhysida",
+                    "qilin",
+                    "spacebears",
+                    "termite"  
+                    ]),
                 "threat_score": random.randint(1, 100),
                 "file_hash": f"{''.join(random.choices('abcdef0123456789', k=64))}",
                 "file_name": random.choice([
@@ -170,8 +191,8 @@ def zscaler_firewall_log() -> str:
 
 if __name__ == "__main__":
     # Generate sample events
-   # print("Sample Zscaler Firewall Events:")
-    #print("=" * 50)
-    for i in range(100):
-       #print(f"\nEvent {i+1}:")
+    print("Sample Zscaler Firewall Events:")
+    print("=" * 50)
+    for i in range(5):
+        print(f"\nEvent {i+1}:")
         print(zscaler_firewall_log())
