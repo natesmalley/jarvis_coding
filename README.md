@@ -1,163 +1,39 @@
-# Security Event Generation and Parsing Project
+# Security Event Generation and Parser Validation
 
-A comprehensive, **production-validated** toolkit for generating synthetic security log events with **professional corporate test data** and parsing configurations for **100+ security products and platforms** including **90+ SentinelOne Marketplace Parser integration**.
+Synthetic security event generators, parser metadata, and an API for sending events to SentinelOne AI SIEM via HEC. This repo helps you quickly validate field extraction and formatting across many vendor sources.
 
-## 🚀 **LATEST UPDATE: REPOSITORY CLEANUP + AWS GENERATOR FIXES**
-
-**September 2025 - Major Repository Cleanup and Generator Improvements:**
-- ✅ **Repository Security Enhanced** - Removed sensitive .coral files from version control
-- ✅ **AWS Generator Compatibility Fixed** - CloudTrail, VPC Flow Logs, Route 53, GuardDuty, and WAF generators updated
-- ✅ **Professional Test Data** - Replaced themed content with corporate business examples
-- ✅ **HEC Sender Improvements** - Removed ATTR_FIELDS dependency and enhanced token management
-- ✅ **Clean Directory Structure** - Organized generators, archived test artifacts, improved documentation
-- ✅ **Continuous Data Senders** - New utilities for PingIdentity, CloudTrail, and FortiGate event streaming
-- ✅ **Enhanced Documentation** - Updated guides, release notes, and comprehensive project overview
-
-**Previous Validation Success (100+ generators tested):**
-- ✅ **240-294 fields** extracted by top-performing parsers
-- ✅ **100% OCSF compliance** achieved by excellent parsers
-- ✅ **Recent timestamps**: All events from last 10 minutes for testing scenarios
-- ✅ **Comprehensive coverage**: Cloud, network, endpoint, identity, email, web security validated
-
-## Overview
-
-This project provides comprehensive security event generation and parsing with **professional corporate test data**:
-
-1. **event_generators/**: Categorized Python generators that create realistic synthetic security log events for **100+ vendors** featuring professional corporate test data
-2. **parsers/community/**: JSON-based log parser configurations for **100+ security products** with OCSF 1.1.0 compliance  
-3. **scenarios/**: Enterprise attack scenario generators with corporate business scenarios
-4. **testing/**: Comprehensive validation tools with SDL API integration and field extraction analysis
-5. **utilities/**: Supporting tools including continuous data senders and parser management utilities
-
-### 🌟 Corporate Test Data Features
-- **Professional Users**: john.doe@corporate.com, mary.smith@company.local, admin@enterprise.org
-- **Enterprise Domains**: Standard corporate.com, company.local, enterprise.org patterns
-- **Business Device Naming**: CORP-LAPTOP-01, SERVER-DB-02, FIREWALL-DMZ-01 conventions
-- **Corporate IP Ranges**: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 private networks
-- **Recent Timestamps**: Events generated from last 10 minutes for realistic testing
-- **Validated Coverage**: 100+ generators confirmed working with professional test data
+## Project Layout
+- `api/`: FastAPI service (`app/` modules, `tests/`, `start_api.py`).
+- `event_generators/`: Vendor generators and shared HEC sender.
+- `parsers/`: Community/marketplace parser folders (`*-latest`).
+- `scenarios/`: Example scenario configs for demos.
+- `testing/`: Validation utilities and scripts.
+- `docs/`: Extended docs (validation, guides).
 
 ## Quick Start
-
-### Installation
-
 ```bash
-# Create virtual environment
-python -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r api/requirements.txt
 
-# Install dependencies
-pip install -r event_generators/shared/requirements.txt
+# Run API
+python api/start_api.py  # http://localhost:8000
+
+# Send events to HEC (set env first)
+export S1_HEC_TOKEN=...  # and optionally S1_HEC_URL
+python event_generators/shared/hec_sender.py --product crowdstrike_falcon -n 3
 ```
 
-### Basic Usage
-
+## Docker
 ```bash
-# Run a specific generator (generates corporate test events)
-python event_generators/endpoint_security/crowdstrike_falcon.py
-python event_generators/identity_access/okta_authentication.py
-python event_generators/network_security/fortinet_fortigate.py
-
-# Send corporate test logs to SentinelOne AI SIEM via HEC
-python event_generators/shared/hec_sender.py --product crowdstrike_falcon --count 5
-python event_generators/shared/hec_sender.py --product microsoft_windows_eventlog --count 3
-
-# 🚀 RECOMMENDED: Send logs using SentinelOne Marketplace parsers for better OCSF compliance
-python event_generators/shared/hec_sender.py --marketplace-parser marketplace-awscloudtrail-latest --count 5
-python event_generators/shared/hec_sender.py --marketplace-parser marketplace-ciscofirewallthreatdefense-latest --count 5
-python event_generators/shared/hec_sender.py --marketplace-parser marketplace-fortinetfortigate-latest --count 3
-
-# 📊 Generate comprehensive validation with corporate test data
-python testing/validation/final_parser_validation.py
-
-# Generate a full enterprise attack scenario
-python scenarios/attack_scenario_orchestrator.py
-
-# Start continuous data sending
-python utilities/continuous_senders/continuous_data_sender.py --product aws_cloudtrail --interval 60
+docker-compose up --build
 ```
 
-### 🚀 **Comprehensive Parser Validation (RECOMMENDED)**
+## Validation
+- End‑to‑end validation workflow and troubleshooting are documented in `docs/VALIDATION.md`.
+- The HEC sender now prefers dynamic sourcetype mappings by scanning `parsers/*/*-latest`, with explicit overrides where needed.
 
-```bash
-# ULTIMATE PARSER VALIDATION TOOL
-# Validates all 100 parsers using SDL API with real-time field extraction analysis
-python testing/validation/final_parser_validation.py
-
-# Send test events from all 100 generators
-python event_generators/shared/hec_sender.py --product <any_of_100_products> --count 5
-```
-
-### 🔄 **Continuous Data Sending (NEW!)**
-
-```bash
-# Continuous PingIdentity MFA events
-python utilities/continuous_senders/continuous_data_sender.py --product pingone_mfa --interval 30
-
-# Continuous AWS CloudTrail monitoring
-python utilities/continuous_senders/continuous_data_sender_v2.py --product aws_cloudtrail --count 10 --interval 60
-
-# Continuous FortiGate firewall traffic
-python utilities/continuous_senders/continuous_data_sender.py --product fortinet_fortigate --interval 45
-
-# Multiple continuous senders
-python utilities/continuous_senders/continuous_data_sender.py --product okta_authentication --interval 120
-```
-
-## 🏪 SentinelOne Marketplace Parser Integration (NEW!)
-
-### Enhanced OCSF Compliance
-SentinelOne Marketplace parsers provide **production-grade OCSF compliance** with significantly better field extraction than community parsers. These official parsers offer **15-40% improved OCSF scores** and enhanced threat intelligence extraction.
-
-### Key Marketplace Parsers Available
-
-| **Category** | **Marketplace Parser** | **Generator** | **Format** | **OCSF Improvement** |
-|-------------|------------------------|---------------|------------|---------------------|
-| **AWS** | `marketplace-awscloudtrail-latest` | `aws_cloudtrail` | JSON | Maintained excellence |
-| **AWS** | `marketplace-awselasticloadbalancer-latest` | `aws_elasticloadbalancer` | JSON | +20% OCSF |
-| **AWS** | `marketplace-awsguardduty-latest` | `aws_guardduty` | JSON | +15% OCSF |
-| **AWS** | `marketplace-awsvpcflowlogs-latest` | `aws_vpcflowlogs` | JSON | +25% OCSF |
-| **Cisco** | `marketplace-ciscofirewallthreatdefense-latest` | `cisco_firewall_threat_defense` | Syslog | **+45% OCSF** |
-| **Check Point** | `marketplace-checkpointfirewall-latest` | `checkpoint` | JSON | **+35% OCSF** |
-| **Fortinet** | `marketplace-fortinetfortigate-latest` | `fortinet_fortigate` | Key=Value | Maintained excellence |
-| **Fortinet** | `marketplace-fortinetfortimanager-latest` | `fortimanager` | Key=Value | +20% OCSF |
-| **Corelight** | `marketplace-corelight-conn-latest` | `corelight_conn` | JSON | Enhanced observables |
-| **Corelight** | `marketplace-corelight-http-latest` | `corelight_http` | JSON | Enhanced observables |
-| **Corelight** | `marketplace-corelight-ssl-latest` | `corelight_ssl` | JSON | Enhanced observables |
-| **Corelight** | `marketplace-corelight-tunnel-latest` | `corelight_tunnel` | JSON | Enhanced observables |
-| **Palo Alto** | `marketplace-paloaltonetworksfirewall-latest` | `paloalto_firewall` | CSV | +30% OCSF |
-| **Palo Alto** | `marketplace-paloaltonetworksprismaaccess-latest` | `paloalto_prismasase` | JSON | +25% OCSF |
-| **Zscaler** | `marketplace-zscalerinternetaccess-latest` | `zscaler` | JSON | +20% OCSF |
-| **Zscaler** | `marketplace-zscalerprivateaccess-latest` | `zscaler_private_access` | JSON | **New capability** |
-| **Netskope** | `marketplace-netskopecloudlogshipper-latest` | `netskope` | JSON | +15% OCSF |
-| **Infoblox** | `marketplace-infobloxddi-latest` | `infoblox_ddi` | JSON | +25% OCSF |
-
-### Marketplace Parser Usage Examples
-
-```bash
-# Test high-impact marketplace parsers
-export S1_HEC_TOKEN="your_token_here"
-
-# Network Security (Major improvements)
-python event_python_writer/hec_sender.py --marketplace-parser marketplace-ciscofirewallthreatdefense-latest --count 10
-python event_python_writer/hec_sender.py --marketplace-parser marketplace-checkpointfirewall-latest --count 5
-
-# Cloud Infrastructure
-python event_python_writer/hec_sender.py --marketplace-parser marketplace-awscloudtrail-latest --count 5
-python event_python_writer/hec_sender.py --marketplace-parser marketplace-awsvpcflowlogs-latest --count 8
-
-# Zero Trust Access
-python event_python_writer/hec_sender.py --marketplace-parser marketplace-zscalerprivateaccess-latest --count 5
-
-# High-Performance Network Analysis
-python event_python_writer/hec_sender.py --marketplace-parser marketplace-corelight-conn-latest --count 10
-
-# List all available marketplace parsers
-python event_python_writer/hec_sender.py --marketplace-parser invalid-name  # Shows complete list
-```
-
-## Available Event Generators (100 Total - ALL VALIDATED ✅)
-
-### Cloud & Infrastructure  
+## Contributing
+- See `AGENTS.md` for contributor guidelines (style, tests, PRs).
 - `aws_cloudtrail`: AWS CloudTrail events
 - `aws_elb`: AWS Elastic Load Balancer logs
 - `aws_guardduty`: AWS GuardDuty findings

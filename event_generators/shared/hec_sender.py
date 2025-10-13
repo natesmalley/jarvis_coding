@@ -11,6 +11,16 @@ generator_root = os.path.dirname(current_dir)
 for category in ['cloud_infrastructure', 'network_security', 'endpoint_security', 
                  'identity_access', 'email_security', 'web_security', 'infrastructure']:
     sys.path.insert(0, os.path.join(generator_root, category))
+sys.path.insert(0, current_dir)  # for local imports like parser_map
+
+try:
+    # Prefer dynamic sourcetype discovery from the parsers directory
+    from parser_map import load_sourcetypes  # type: ignore
+    _REPO_ROOT = os.path.dirname(generator_root)
+    _PARSERS_DIR = os.path.join(_REPO_ROOT, 'parsers')
+    _LOADED_SOURCETYPE_MAP = load_sourcetypes(_PARSERS_DIR)
+except Exception:
+    _LOADED_SOURCETYPE_MAP = {}
 
 
 # Marketplace parser mappings to generators
@@ -590,7 +600,7 @@ DEFAULT_TLS_LOW = bool(os.getenv("S1_HEC_TLS_LOW"))
 ALLOW_INSECURE_FALLBACK = os.getenv("S1_HEC_AUTO_INSECURE", "false").lower() in ("true", "1", "yes")
 DEBUG = os.getenv("S1_HEC_DEBUG")
 
-SOURCETYPE_MAP = {
+SOURCETYPE_MAP_OVERRIDES = {
     # ===== FIXED PARSER MAPPINGS (Based on actual parser discovery) =====
     # Marketplace parsers (official) - Working parsers
     "fortinet_fortigate": "marketplace-fortinetfortigate-latest",
@@ -716,6 +726,10 @@ SOURCETYPE_MAP = {
     "isc_dhcp": "community-iscdhcp-latest",
     "jamf_protect": "community-jamfprotect-latest",
 }
+
+# Merge dynamically discovered sourcetypes with explicit overrides.
+# Overrides win to preserve intentional non-standard mappings.
+SOURCETYPE_MAP = {**_LOADED_SOURCETYPE_MAP, **SOURCETYPE_MAP_OVERRIDES}
 
 # Generators that already emit structured JSON events; these must be sent to /event
 JSON_PRODUCTS = {
