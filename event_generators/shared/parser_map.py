@@ -51,10 +51,10 @@ def load_sourcetypes(parsers_dir: str) -> Dict[str, str]:
         "community",
         "marketplace",
         "community_new",
+        "sentinelone",  # marketplace and official bundles under sentinelone/
     ):
         if os.path.isdir(os.path.join(parsers_dir, name)):
             subdirs.append(name)
 
     mapping = _scan_root(parsers_dir, subdirs)
     return mapping
-
