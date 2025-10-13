@@ -16,11 +16,20 @@ else
 fi
 
 python -m venv .venv && source .venv/bin/activate
-#python /home/ubuntu/jarvis_coding/event_generators/web_security/zscaler_private_access.py --count 100 >> /home/ubuntu/sample-logs/zscaler-private-access.log
-#python /home/ubuntu/jarvis_coding/event_generators/web_security/zscaler_dns_firewall.py --count 100 >> /home/ubuntu/sample-logs/zscaler-dns-firewall.log
-#python /home/ubuntu/jarvis_coding/event_generators/web_security/zscaler_firewall.py --count 100 >> /home/ubuntu/sample-logs/zscaler-firewall.log
-#python /home/ubuntu/jarvis_coding/event_generators/identity_access/microsoft_azure_ad_signin.py >> /home/ubuntu/sample-logs/azure_ad_signin.log
-#python /home/ubuntu/jarvis_coding/event_generators/identity_access/microsoft_azure_ad.py >> /home/ubuntu/sample-logs/azure_ad.log
+
+#generate ZS events
+python /home/ubuntu/jarvis_coding/event_generators/web_security/zscaler_private_access.py >> /home/ubuntu/sample-logs/web_security/zscaler_private_access.log
+python /home/ubuntu/jarvis_coding/event_generators/web_security/zscaler_dns_firewall.py --count 100 >> /home/ubuntu/sample-logs/web_security/zscaler-dns-firewall.log
+python /home/ubuntu/jarvis_coding/event_generators/web_security/zscaler_firewall.py --count 100 >> /home/ubuntu/sample-logs/web_security/zscaler-firewall.log
+python /home/ubuntu/jarvis_coding/event_generators/web_security/zscaler_dns.py >> /home/ubuntu/sample-logs/web_security/zscaler-dns.log
+
+#generate AzureAD events
+python /home/ubuntu/jarvis_coding/event_generators/identity_access/microsoft_azure_ad_signin.py >> /home/ubuntu/sample-logs/identity_access/azure_ad_signin.log
+python /home/ubuntu/jarvis_coding/event_generators/identity_access/microsoft_azure_ad.py >> /home/ubuntu/sample-logs/identity_access/azure_ad.log
+
+
+# trigger alerts for Zscaler Internet Access
+# python /home/ubuntu/jarvis_coding/event_generators/web_security/zscaler-trigger-detections.py >> /home/ubuntu/sample-logs/web_security/zscaler-firewall.log
 # --- Cleanup ---
 # Deactivate the virtual environment (optional, but good practice)
 deactivate
