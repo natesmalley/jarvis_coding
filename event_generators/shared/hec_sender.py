@@ -11,6 +11,16 @@ generator_root = os.path.dirname(current_dir)
 for category in ['cloud_infrastructure', 'network_security', 'endpoint_security', 
                  'identity_access', 'email_security', 'web_security', 'infrastructure']:
     sys.path.insert(0, os.path.join(generator_root, category))
+sys.path.insert(0, current_dir)  # for local imports like parser_map
+
+try:
+    # Prefer dynamic sourcetype discovery from the parsers directory
+    from parser_map import load_sourcetypes  # type: ignore
+    _REPO_ROOT = os.path.dirname(generator_root)
+    _PARSERS_DIR = os.path.join(_REPO_ROOT, 'parsers')
+    _LOADED_SOURCETYPE_MAP = load_sourcetypes(_PARSERS_DIR)
+except Exception:
+    _LOADED_SOURCETYPE_MAP = {}
 
 
 # Marketplace parser mappings to generators
@@ -543,9 +553,7 @@ if not HEC_TOKEN:
 
 # Allow switching between Splunk and Bearer auth schemes
 AUTH_SCHEME = os.getenv("S1_HEC_AUTH_SCHEME", "Splunk")
-HEADERS = {
-    "Authorization": f"{AUTH_SCHEME} {HEC_TOKEN}",
-}
+HEADERS = {"Authorization": f"{AUTH_SCHEME} {HEC_TOKEN}"}
 
 def _make_poster(verify: bool, tls_low: bool) -> Callable:
     """Create a requests.post-like function with desired TLS settings."""
@@ -590,7 +598,7 @@ DEFAULT_TLS_LOW = bool(os.getenv("S1_HEC_TLS_LOW"))
 ALLOW_INSECURE_FALLBACK = os.getenv("S1_HEC_AUTO_INSECURE", "false").lower() in ("true", "1", "yes")
 DEBUG = os.getenv("S1_HEC_DEBUG")
 
-SOURCETYPE_MAP = {
+SOURCETYPE_MAP_OVERRIDES = {
     # ===== FIXED PARSER MAPPINGS (Based on actual parser discovery) =====
     # Marketplace parsers (official) - Working parsers
     "fortinet_fortigate": "marketplace-fortinetfortigate-latest",
@@ -717,6 +725,25 @@ SOURCETYPE_MAP = {
     "jamf_protect": "community-jamfprotect-latest",
 }
 
+# Merge dynamically discovered sourcetypes with explicit overrides.
+# Overrides win to preserve intentional non-standard mappings.
+SOURCETYPE_MAP = {**_LOADED_SOURCETYPE_MAP, **SOURCETYPE_MAP_OVERRIDES}
+
+# Optional envelope/query hints
+ENV_SOURCE = os.getenv("S1_HEC_SOURCE")
+ENV_HOST = os.getenv("S1_HEC_HOST")
+ENV_INDEX = os.getenv("S1_HEC_INDEX")
+
+def _build_qs(product: str) -> str:
+    parts = [f"sourcetype={SOURCETYPE_MAP.get(product, product)}"]
+    if ENV_SOURCE:
+        parts.append(f"source={ENV_SOURCE}")
+    if ENV_HOST:
+        parts.append(f"host={ENV_HOST}")
+    if ENV_INDEX:
+        parts.append(f"index={ENV_INDEX}")
+    return "&".join(parts)
+
 # Generators that already emit structured JSON events; these must be sent to /event
 JSON_PRODUCTS = {
     "aws_cloudtrail",
@@ -835,12 +862,17 @@ def _envelope(line, product: str, attr_fields: dict) -> dict:
     else:
         event_data = line  # Use string for raw products
     
-    return {
-        "time": round(time.time()),
-        "event": event_data,
-        "sourcetype": SOURCETYPE_MAP[product],
-        "fields": attr_fields
-    }
+    env = {"time": round(time.time()),
+           "event": event_data,
+           "sourcetype": SOURCETYPE_MAP.get(product, product),
+           "fields": attr_fields}
+    if ENV_SOURCE:
+        env["source"] = ENV_SOURCE
+    if ENV_HOST:
+        env["host"] = ENV_HOST
+    if ENV_INDEX:
+        env["index"] = ENV_INDEX
+    return env
 
 def send_one(line, product: str, attr_fields: dict):
     """
@@ -850,6 +882,20 @@ def send_one(line, product: str, attr_fields: dict):
     # Build endpoint bases to try (env override → us1 → usea1 → global)
     env_event = os.getenv("S1_HEC_EVENT_URL_BASE")
     env_raw = os.getenv("S1_HEC_RAW_URL_BASE")
+    # Backward-compat: single URL variable (may point to /raw or /event)
+    single = os.getenv("S1_HEC_URL")
+    if single and not (env_event and env_raw):
+        if single.rstrip("/").endswith("/raw"):
+            env_raw = single.rstrip("/")
+            env_event = single.rstrip("/").rsplit("/", 1)[0] + "/event"
+        elif single.rstrip("/").endswith("/event"):
+            env_event = single.rstrip("/")
+            env_raw = single.rstrip("/").rsplit("/", 1)[0] + "/raw"
+        else:
+            # Default to /event, derive /raw sibling
+            base = single.rstrip("/")
+            env_event = base + "/event"
+            env_raw = base + "/raw"
     bases = []
     if env_event and env_raw:
         bases.append((env_event, env_raw))
@@ -892,7 +938,7 @@ def send_one(line, product: str, attr_fields: dict):
                         resp = POST(url, headers=headers, json=payload, timeout=10)
                     else:
                         # Raw payload → /raw
-                        url = f"{raw_base}?sourcetype={SOURCETYPE_MAP[product]}"
+                        url = f"{raw_base}?{_build_qs(product)}"
                         payload = line
                         headers = {**headers_auth, "Content-Type": "text/plain"}
                         resp = POST(url, headers=headers, data=payload, timeout=10)

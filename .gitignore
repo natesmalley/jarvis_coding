@@ -29,6 +29,10 @@ phase*_*.py
 api_validation_report.py
 comprehensive_*.py
 comprehensive_*.json
+*.log
+api/*.log
+api/*.html
+testing/results/
 
 # Security and Sensitive Data
 # ==========================
