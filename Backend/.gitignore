@@ -1,0 +1,347 @@
+# Markdown Documentation Files
+# =============================
+# IMPORTANT: Keep all documentation local only
+!README.md
+!AGENTS.md
+*.md
+!README.md.example
+*.markdown
+*.mdown
+*.mkd
+
+# Testing Directories and Files
+# =============================
+# Keep ALL testing local only - don't push to remote
+testing/
+tests/
+test/
+*test*.py
+*test*.json
+*validation*.py
+*validation*.json
+verify_*.py
+debug_*.py
+remove_*.py
+sdl_*.py
+simulated_*.py
+quick_*.py
+focused_*.py
+phase*_*.py
+api_validation_report.py
+comprehensive_*.py
+comprehensive_*.json
+*.log
+api/*.log
+api/*.html
+testing/results/
+
+# Security and Sensitive Data
+# ==========================
+*.key
+*.pem
+*.p12
+*.pfx
+*.cert
+*.crt
+*.csr
+.env
+.env.*
+!.env.example
+config.json
+secrets.json
+credentials.json
+*.token
+*.secret
+
+# HEC and API Tokens
+hec_token.txt
+api_keys.txt
+auth_tokens.txt
+
+# Generated Attack Scenarios
+# ==========================
+# Keep example scenarios but ignore generated ones
+attack_scenario_op_*.json
+attack_scenario_*.json
+!attack_scenario_example.json
+scenario_*.json
+!scenario_example.json
+
+# Generated Event Files
+# ====================
+events_*.json
+logs_*.json
+generated_events/
+output_events/
+temp_events/
+
+# Detection and Testing Reports
+# ============================
+detection_test_report_*.json
+test_report_*.json
+coverage_report_*.json
+performance_report_*.json
+parser_validation_*.md
+parser_comprehensive_test_*.md
+parser_test_*.json
+
+# Python Environment and Dependencies
+# ===================================
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.virtualenv/
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# IDE and Editor Files
+# ===================
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+*.ipr
+__pycache__/
+
+# Sublime Text
+*.sublime-*
+
+# Vim
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# System Files
+# ============
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Logs and Temporary Files
+# ========================
+*.log
+*.out
+*.err
+logs/
+log/
+temp/
+tmp/
+.tmp/
+
+# Database Files
+# ==============
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# Archive Files
+# =============
+*.zip
+*.tar.gz
+*.tar.bz2
+*.rar
+*.7z
+
+# Large Data Files
+# ================
+# Ignore large generated datasets
+*.csv
+!example.csv
+!sample.csv
+large_datasets/
+bulk_events/
+
+# API Documentation Files
+# =======================
+# Ignore large swagger/OpenAPI files
+swagger*.json
+openapi*.json
+api_spec*.json
+*_swagger.json
+*_openapi.json
+
+# Docker
+# ======
+.dockerignore
+Dockerfile.*
+docker-compose.override.yml
+
+# Node.js (if any JS tools are added)
+# ===================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn-integrity
+
+# Documentation Build
+# ===================
+docs/_build/
+site/
+
+# Backup Files
+# ============
+*.bak
+*.backup
+*.old
+*_backup
+*_old
+backups/
+backup/
+
+# Custom Ignore Patterns
+# ======================
+# Add project-specific patterns here
+
+# Claude Code Settings and AI-related files
+# ==========================================
+# IMPORTANT: Keep all AI-related data local only
+.claude/
+.claude*
+*.claude
+*claude.json
+claude_*
+.claudecode/
+.claudecode*
+CLAUDE.md
+.claude.md
+claude.md
+*_claude.md
+*claude*.md
+ai_instructions.md
+ai_context.md
+.ai/
+.anthropic/
+anthropic_*
+.openai/
+openai_*
+.gemini/
+gemini_*
+.llm/
+llm_*
+ai_*
+assistant_*
+copilot_*
+
+# Agent Force - Keep local only
+agent_force/
+*agent_force*
+.agent_force/
+
+# Coral Collective - Keep local only
+.coral/
+.coral*
+*coral*
+coral_*
+
+# Keep important example files
+!README.md
+!AGENTS.md
+!requirements.txt
+!detections.conf
+
+# Ignore specific vendor test files that might contain sensitive data
+*_test_output.json
+*_validation_results.json
+vendor_config_*.json

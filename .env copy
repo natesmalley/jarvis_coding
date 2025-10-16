@@ -1,0 +1,33 @@
+# Runtime
+HOST=0.0.0.0
+PORT=8000
+LOG_LEVEL=info
+
+# Auth (disable for local dev)
+DISABLE_AUTH=true
+SECRET_KEY=change-me-in-development
+
+# API keys (only used if DISABLE_AUTH=false)
+API_KEYS_ADMIN=
+API_KEYS_READ_ONLY=
+API_KEYS_WRITE=
+
+# Integrations
+S1_SDL_API_TOKEN=
+
+# Frontend -> Backend API key (optional; required if backend auth enabled)
+BACKEND_API_KEY=
+
+# HEC batching (used by Frontend -> hec_sender.py)
+S1_HEC_BATCH=true
+S1_HEC_BATCH_MAX_BYTES=1048576
+S1_HEC_BATCH_FLUSH_MS=500
+# Optional debug for HEC sender
+S1_HEC_DEBUG=0
+# Optional TLS/auth tweaks
+# S1_HEC_VERIFY=true
+# S1_HEC_AUTH_SCHEME=Splunk
+
+# Keyring (frontend) - encrypted file backend
+KEYRING_CRYPTFILE_PASSWORD=change-this-strong-password
+KEYRING_CRYPTFILE_PATH=/app/Frontend/.keyring.cfg

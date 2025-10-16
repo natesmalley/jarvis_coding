@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: jarvis-api
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - LOG_LEVEL=info
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      # Authentication settings
+      - DISABLE_AUTH=${DISABLE_AUTH:-false}
+      - API_KEYS_ADMIN=${API_KEYS_ADMIN}
+      - API_KEYS_READ_ONLY=${API_KEYS_READ_ONLY}
+      - API_KEYS_WRITE=${API_KEYS_WRITE}
+      # SentinelOne integration
+      - S1_HEC_TOKEN=${S1_HEC_TOKEN}
+      - S1_SDL_API_TOKEN=${S1_SDL_API_TOKEN}
+      # Database
+      - DATABASE_URL=sqlite+aiosqlite:///./data/jarvis_coding.db
+    volumes:
+      - ./event_generators:/app/event_generators:ro
+      - ./parsers:/app/parsers:ro
+      - ./scenarios:/app/scenarios:ro
+      - ./api/data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - jarvis-network
+
+  # Future: Add database service
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: jarvis-db
+  #   environment:
+  #     - POSTGRES_DB=jarvis_coding
+  #     - POSTGRES_USER=jarvis
+  #     - POSTGRES_PASSWORD=${DB_PASSWORD:-change-me}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   networks:
+  #     - jarvis-network
+
+  # Future: Add Redis for caching
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: jarvis-cache
+  #   command: redis-server --appendonly yes
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     - jarvis-network
+
+networks:
+  jarvis-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

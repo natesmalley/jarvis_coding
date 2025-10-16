@@ -1,0 +1,72 @@
+[
+  {
+    "generator": "aws_route53",
+    "category": "cloud_infrastructure",
+    "format_correct": true,
+    "star_trek_integrated": false,
+    "recent_timestamp": true,
+    "override_support": false,
+    "sample_output": "{'timestamp': '2025-10-15T21:05:48Z', 'source': 'Route53', 'queryName': 'stackoverflow.com', 'queryType': 'SRV', 'clientIp': '7.8.91.21', 'edgeLocation': 'SEA19-P4', 'responseCode': 'REFUSED', 'resolverEndpointId': 'rslvr-endpt-2471', 'version': '1.0', 'account': '123456789012', 'region': 'us-east-1', '_raw': '2025-10-15T21:05:48Z Route53 queryName=\"stackoverflow.com\" queryType=\"SRV\" clientIp=\"7.8.91.21\" edgeLocation=\"SEA19-P4\" responseCode=\"REFUSED\" resolverEndpointId=\"rslvr-endpt-2471\"'}",
+    "errors": []
+  },
+  {
+    "generator": "aws_vpc_dns",
+    "category": "cloud_infrastructure",
+    "format_correct": true,
+    "star_trek_integrated": true,
+    "recent_timestamp": false,
+    "override_support": false,
+    "sample_output": "{'version': '1.100000', 'account_id': '301523843766', 'interface_id': 'eni-04b0e344', 'srcaddr': '10.171.247.227', 'dstaddr': '169.254.169.253', 'srcport': 60030, 'dstport': 53, 'protocol': 17, 'packets': 1, 'bytes': 277, 'windowstart': 1760544648, 'windowend': 1760544708, 'action': 'ACCEPT', 'flowlogstatus': 'OK', 'query_name': 'cloudflare.com', 'query_type': 'SOA', 'query_class': 'IN', 'rcode': 'REFUSED', 'rdata': '', 'answers': 0, 'transport': 'UDP', 'vpc_id': 'vpc-04a14175', 'subnet_id': 'su",
+    "errors": []
+  },
+  {
+    "generator": "microsoft_365_collaboration",
+    "category": "identity_access",
+    "format_correct": true,
+    "star_trek_integrated": true,
+    "recent_timestamp": true,
+    "override_support": true,
+    "sample_output": "{'TimeStamp': '2025-10-15T21:05:48Z', 'UserId': 'leonard.mccoy@starfleet.corp', 'Operation': 'AccessRequestCreated', 'SiteUrl': 'https://starfleet-my.sharepoint.com/sites/Medical', 'ObjectId': '/Command/WarpCoreSpecs.txt', 'FileName': 'WarpCoreSpecs.txt', 'Details': 'User leonard.mccoy@starfleet.corp accessrequestcreated for WarpCoreSpecs.txt', 'UserAgent': 'Microsoft Office/16.0 (Microsoft OneDrive for Business)', 'ClientIP': '211.239.75.217', 'Workload': 'SharePoint', 'RecordType': 25, 'Versio",
+    "errors": []
+  },
+  {
+    "generator": "microsoft_365_defender",
+    "category": "identity_access",
+    "format_correct": true,
+    "star_trek_integrated": true,
+    "recent_timestamp": true,
+    "override_support": true,
+    "sample_output": "{'Timestamp': '2025-10-15T21:08:48Z', 'DeviceName': 'ENTERPRISE-BRIDGE-01', 'DeviceId': '000D0E2C01100842', 'AccountName': 'william.riker', 'AccountDomain': 'NT AUTHORITY', 'ActionType': 'MalwareDetected', 'FileName': 'borg-malware.exe', 'FolderPath': 'C:\\\\Users\\\\picard\\\\Downloads', 'SHA1': '222ec011fd01b88e7f0a7928c3891244bd5a8e4e', 'MD5': '671f9e766fbcb1bd084bd68cf98337b8', 'DetectionId': 'Trojan:Romulan/Cloak', 'AdditionalFields': {'ThreatName': 'Ransomware:Orion/Cryptor', 'Severity': 'Critic",
+    "errors": []
+  },
+  {
+    "generator": "cisco_duo",
+    "category": "network_security",
+    "format_correct": true,
+    "star_trek_integrated": true,
+    "recent_timestamp": true,
+    "override_support": false,
+    "sample_output": "{'timestamp': '2025-10-15T21:10:48Z', 'time': 1760562648267, 'class_uid': 3002, 'class_name': 'Authentication', 'category_uid': 3, 'category_name': 'Identity & Access Management', 'activity_id': 1, 'activity_name': 'Logon', 'type_uid': 300201, 'severity_id': 1, 'status_id': 1, 'user': {'name': 'spock.science', 'account_uid': 'spock.science', 'account_type': 'User'}, 'src_endpoint': {'ip': '192.0.2.160', 'location': {'desc': 'Seattle, US', 'city': 'Seattle', 'country': 'US'}}, 'auth_protocol': 't",
+    "errors": []
+  },
+  {
+    "generator": "cisco_fmc",
+    "category": "network_security",
+    "format_correct": true,
+    "star_trek_integrated": true,
+    "recent_timestamp": true,
+    "override_support": true,
+    "sample_output": "{'timestamp': '2025-10-15T21:06:48.268418+00:00', 'event_id': 1632220, 'event_type': 'Malware', 'event_subtype': 'MALWARE_EVENT', 'severity': 'Critical', 'action': 'Log', 'device_name': 'ENTERPRISE-FTD-MEDICAL-5', 'device_ip': '161.89.7.179', 'policy_name': 'StarfleetSecurityPolicy_4', 'rule_name': 'Directive_12', 'source_ip': '161.12.20.206', 'destination_ip': '42.143.105.202', 'source_port': 57815, 'destination_port': 443, 'protocol': 'TCP', 'source_country': 'DE', 'destination_country': 'GB',",
+    "errors": []
+  },
+  {
+    "generator": "google_workspace",
+    "category": "cloud_infrastructure",
+    "format_correct": true,
+    "star_trek_integrated": true,
+    "recent_timestamp": false,
+    "override_support": false,
+    "sample_output": "{'kind': 'admin#reports#activity', 'id': {'time': '2025-10-15T21:08:48.270121+00:00', 'uniqueQualifier': '7485549804461701462', 'applicationName': 'drive', 'customerId': 'C01NCC1701'}, 'etag': '\"1fa95401c5e444e7bd2cdc2a1881e9bb\"', 'actor': {'email': 'beverly.crusher@starfleet.corp', 'profileId': '174955900966384141'}, 'ipAddress': '37.62.67.73', 'events': [{'type': 'access', 'name': 'view', 'parameters': [{'name': 'doc_id', 'value': 'ebeb0859409847a5a099b359c6d9fa27'}, {'name': 'doc_title', 'val",
+    "errors": []
+  }
+]

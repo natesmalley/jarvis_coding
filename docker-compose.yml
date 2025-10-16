@@ -4,7 +4,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: api/Dockerfile
+      dockerfile: Backend/api/Dockerfile
     container_name: jarvis-api
     ports:
       - "8000:8000"
@@ -24,42 +24,39 @@ services:
       # Database
       - DATABASE_URL=sqlite+aiosqlite:///./data/jarvis_coding.db
     volumes:
-      - ./event_generators:/app/event_generators:ro
-      - ./parsers:/app/parsers:ro
-      - ./scenarios:/app/scenarios:ro
-      - ./api/data:/app/data
+      - ./Backend/event_generators:/app/event_generators:ro
+      - ./Backend/parsers:/app/parsers:ro
+      - ./Backend/scenarios:/app/scenarios:ro
+      - ./Backend/api/data:/app/data
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
     networks:
       - jarvis-network
 
-  # Future: Add database service
-  # postgres:
-  #   image: postgres:15-alpine
-  #   container_name: jarvis-db
-  #   environment:
-  #     - POSTGRES_DB=jarvis_coding
-  #     - POSTGRES_USER=jarvis
-  #     - POSTGRES_PASSWORD=${DB_PASSWORD:-change-me}
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #   networks:
-  #     - jarvis-network
-
-  # Future: Add Redis for caching
-  # redis:
-  #   image: redis:7-alpine
-  #   container_name: jarvis-cache
-  #   command: redis-server --appendonly yes
-  #   volumes:
-  #     - redis_data:/data
-  #   networks:
-  #     - jarvis-network
+  frontend:
+    build:
+      context: .
+      dockerfile: Frontend/Dockerfile
+    container_name: jarvis-frontend
+    ports:
+      - "9001:8000"
+    environment:
+      - API_BASE_URL=http://api:8000
+      - BACKEND_API_KEY=${BACKEND_API_KEY}
+      - S1_HEC_BATCH=${S1_HEC_BATCH}
+      - S1_HEC_BATCH_MAX_BYTES=${S1_HEC_BATCH_MAX_BYTES}
+      - S1_HEC_BATCH_FLUSH_MS=${S1_HEC_BATCH_FLUSH_MS}
+      - S1_HEC_DEBUG=${S1_HEC_DEBUG}
+      - PYTHON_KEYRING_BACKEND=keyrings.alt.file.EncryptedKeyring
+      - KEYRING_CRYPTFILE_PASSWORD=${KEYRING_CRYPTFILE_PASSWORD}
+      - KEYRING_CRYPTFILE_PATH=${KEYRING_CRYPTFILE_PATH}
+    volumes:
+      - ./Frontend:/app/Frontend
+      - ./Backend:/app/Backend:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - jarvis-network
 
 networks:
   jarvis-network:
