@@ -5,9 +5,18 @@ python-multipart
 pydantic
 pydantic-settings
 
+# Database
+sqlalchemy
+aiosqlite
+greenlet
+
 # Utilities
 httpx
 python-dotenv
+cryptography
+
+# Frontend
+flask
 
 # Testing
 pytest

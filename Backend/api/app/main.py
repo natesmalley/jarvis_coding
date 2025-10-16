@@ -16,9 +16,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from app.core.config import settings
-from app.routers import generators, parsers, validation, health, scenarios, export, metrics, search, categories, destinations
+from app.routers import generators, parsers, health, scenarios, export, metrics, search, categories, destinations
 from app.utils.logging import setup_logging
 from app.core.simple_auth import validate_api_keys_config
+from app.services.destination_service import init_db
 
 # Setup logging
 setup_logging()
@@ -32,6 +33,9 @@ async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.PROJECT_NAME} v{settings.PROJECT_VERSION}")
     logger.info(f"Generators path: {settings.GENERATORS_PATH}")
     logger.info(f"Parsers path: {settings.PARSERS_PATH}")
+    
+    # Initialize database
+    await init_db()
     
     # Initialize and validate authentication
     auth_config = validate_api_keys_config()
@@ -176,12 +180,6 @@ app.include_router(
     parsers.router,
     prefix=f"{settings.API_V1_STR}/parsers",
     tags=["parsers"]
-)
-
-app.include_router(
-    validation.router,
-    prefix=f"{settings.API_V1_STR}/validation",
-    tags=["validation"]
 )
 
 app.include_router(
