@@ -19,16 +19,26 @@ If you're new to Docker, think of images as "apps" you build, and containers as 
 - `docker-compose.yml`: Orchestrates API and UI
 - `.env`: Environment variables loaded by Compose
 
-## One-Command Quick Start
-This builds the images (the first time) and starts both services in the background.
+## Quick Start
+
+### 1. Create Environment File
+First time setup - copy the template to create your `.env` file:
 ```bash
-# From the repository root
+cp ".env copy" .env
+```
+
+The default configuration has authentication disabled for easy local development (`DISABLE_AUTH=true`). This is perfect for getting started!
+
+### 2. Start Services
+Build and start both services:
+```bash
 docker compose up -d --build
 ```
-- API: http://localhost:8000
-- Frontend UI: http://localhost:9001
+- **API**: http://localhost:8000
+- **Frontend UI**: http://localhost:9001
+- **API Docs**: http://localhost:8000/docs
 
-To stop everything:
+### 3. Stop Services
 ```bash
 docker compose down
 ```
@@ -63,18 +73,34 @@ open http://localhost:9001
 ```
 
 ## Configuration (.env)
-Compose automatically loads environment variables from the root `.env` file. Safe defaults are already provided. You can edit `.env` to change behavior.
 
-Key variables:
-- `DISABLE_AUTH=true` for local development convenience
-- `BACKEND_API_KEY` (optional) if auth is enabled
-- HEC batching (used by the UI when sending to HEC via `hec_sender.py`):
+The `.env` file controls both services. Copy from `.env copy` if you haven't already:
+```bash
+cp ".env copy" .env
+```
+
+### Authentication Settings
+By default, authentication is **disabled** for local development:
+- `DISABLE_AUTH=true` - No API keys required (recommended for local dev)
+- `BACKEND_API_KEY` - Not needed when auth is disabled
+
+For production, enable authentication:
+```bash
+DISABLE_AUTH=false
+API_KEYS_ADMIN=your-secure-admin-key
+BACKEND_API_KEY=your-secure-admin-key  # Frontend uses this to talk to backend
+```
+
+### Other Key Variables
+- **HEC Batching** (used by UI when sending to HEC):
   - `S1_HEC_BATCH=true`
   - `S1_HEC_BATCH_MAX_BYTES=1048576`
   - `S1_HEC_BATCH_FLUSH_MS=500`
   - `S1_HEC_DEBUG=0`
+- **Secret Key**: `SECRET_KEY` - Change for production deployments
 
-After changing `.env`, restart containers to apply:
+### Applying Configuration Changes
+After editing `.env`, restart containers:
 ```bash
 docker compose down && docker compose up -d
 ```
@@ -98,14 +124,29 @@ docker logs -f jarvis-api
 ```
 
 ## Troubleshooting
-- "port already in use":
-  - Another process is using that port. The UI maps `9001:8000`. Either stop the other app or change the left number in `docker-compose.yml`.
-- API keeps restarting with missing modules:
-  - Rebuild the API image: `docker compose build api --no-cache && docker compose up -d`
-- API health is failing with missing `/event_generators` or `/parsers`:
-  - The image includes symlinks for these paths; ensure you rebuilt after recent changes.
-- Frontend can’t reach backend:
-  - Inside containers, the UI uses `API_BASE_URL=http://api:8000`. From your host, use `http://localhost:8000` for the API and `http://localhost:9001` for the UI.
+### "Missing API key" or "API key required" errors
+**Symptom**: Frontend shows "Failed to save destination" with 403 errors about missing API key.
+
+**Solution**: Create the `.env` file with `DISABLE_AUTH=true`:
+```bash
+cp ".env copy" .env
+docker compose down && docker compose up -d
+```
+
+### "port already in use"
+Another process is using that port. The UI maps `9001:8000`. Either stop the other app or change the left number in `docker-compose.yml`.
+
+### API keeps restarting with missing modules
+Rebuild the API image: 
+```bash
+docker compose build api --no-cache && docker compose up -d
+```
+
+### API health is failing with missing `/event_generators` or `/parsers`
+The image includes symlinks for these paths; ensure you rebuilt after recent changes.
+
+### Frontend can’t reach backend
+Inside containers, the UI uses `API_BASE_URL=http://api:8000`. From your host, use `http://localhost:8000` for the API and `http://localhost:9001` for the UI.
 
 ## Development Tips
 - Live code mounting is enabled for the UI and backend content in Compose (read-only) to keep container images small and consistent. Rebuild images when you change Dockerfiles or dependencies.

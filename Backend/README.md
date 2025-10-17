@@ -11,6 +11,25 @@ Synthetic security event generators, parser metadata, and an API for sending eve
 - `docs/`: Extended docs (validation, guides).
 
 ## Quick Start
+
+### Docker (Recommended)
+1. **Create environment file** (first time only):
+```bash
+# From the repository root
+cp ".env copy" .env
+```
+
+2. **Start services**:
+```bash
+docker-compose up --build
+```
+- API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
+- Frontend UI: http://localhost:9001
+
+**Note**: The default `.env` has `DISABLE_AUTH=true` for easy local development. No API keys needed!
+
+### Local Python Development
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r api/requirements.txt
@@ -23,9 +42,34 @@ export S1_HEC_TOKEN=...  # and optionally S1_HEC_URL
 python event_generators/shared/hec_sender.py --product crowdstrike_falcon -n 3
 ```
 
-## Docker
+## Configuration
+
+### Environment Setup (.env)
+The project uses a `.env` file for configuration. Copy the template to get started:
 ```bash
-docker-compose up --build
+cp ".env copy" .env
+```
+
+### Authentication
+By default, authentication is **disabled** for local development:
+- `DISABLE_AUTH=true` - No API keys required (great for getting started!)
+- `BACKEND_API_KEY` - Not needed when auth is disabled
+
+For production environments, enable authentication:
+```bash
+DISABLE_AUTH=false
+API_KEYS_ADMIN=your-secure-api-key-here
+BACKEND_API_KEY=your-secure-api-key-here  # Used by frontend
+```
+
+Generate secure API keys using:
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+After changing `.env`, restart services:
+```bash
+docker-compose down && docker-compose up -d
 ```
 
 ## Validation
