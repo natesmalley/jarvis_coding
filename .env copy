@@ -15,7 +15,7 @@ API_KEYS_WRITE=
 # Integrations
 S1_SDL_API_TOKEN=
 
-# Frontend -> Backend API key (optional; required if backend auth enabled)
+# Frontend -> Backend API key (not needed when DISABLE_AUTH=true)
 BACKEND_API_KEY=
 
 # HEC batching (used by Frontend -> hec_sender.py)
