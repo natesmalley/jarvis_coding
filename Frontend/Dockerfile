@@ -10,9 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy only requirements first for better caching
-COPY Frontend/requirments.txt Frontend/requirments.txt
-RUN pip install --no-cache-dir -r Frontend/requirments.txt \
-    && pip install --no-cache-dir flask
+COPY Frontend/requirements.txt Frontend/requirements.txt
+RUN pip install --no-cache-dir -r Frontend/requirements.txt
 
 # Copy source code (both Frontend and Backend to maintain expected relative paths)
 COPY Frontend/ Frontend/
