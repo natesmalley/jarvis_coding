@@ -10,10 +10,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements
-COPY Backend/api/requirements_simple.txt .
+COPY Backend/api/requirements.txt .
 
 # Install Python dependencies into system site-packages
-RUN pip install --no-cache-dir -r requirements_simple.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Production stage
 FROM python:3.11-slim
