@@ -18,6 +18,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Production stage
 FROM python:3.11-slim
 
+# Install gosu for user switching in entrypoint
+RUN apt-get update && apt-get install -y gosu && rm -rf /var/lib/apt/lists/*
+
 # Set working directory
 WORKDIR /app
 
@@ -27,6 +30,7 @@ COPY --from=builder /usr/local /usr/local
 # Copy application code
 COPY Backend/api/app/ ./app/
 COPY Backend/api/start_api.py .
+COPY Backend/api/entrypoint.sh .
 
 # Copy event generators and parsers from parent directory
 COPY Backend/event_generators ./event_generators
@@ -41,12 +45,13 @@ RUN ln -s /app/event_generators /event_generators \
  && ln -s /app/parsers /parsers \
  && ln -s /app/scenarios /scenarios
 
+# Create data directory for ephemeral database
+RUN mkdir -p /app/data
+
 # Create non-root user
 RUN useradd -m -u 1000 jarvis && \
-    chown -R jarvis:jarvis /app
-
-# Switch to non-root user
-USER jarvis
+    chown -R jarvis:jarvis /app && \
+    chmod +x /app/entrypoint.sh
 
 # Expose port
 EXPOSE 8000
@@ -55,5 +60,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD python -c "import requests; requests.get('http://localhost:8000/api/v1/health')" || exit 1
 
-# Run the application
-CMD ["python", "start_api.py"]
+# Use entrypoint script to handle directory permissions
+ENTRYPOINT ["/app/entrypoint.sh"]
