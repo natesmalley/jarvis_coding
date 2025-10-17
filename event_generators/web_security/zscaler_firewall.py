@@ -103,8 +103,8 @@ def zscaler_firewall_log() -> str:
     if action in ["Block", "Drop"]:
         if random.choice([True, False]):  # 50% chance of threat detection
             event.update({
-                "threat_category": random.choice(THREAT_CATEGORIES),
-                "threat_name": random.choice([
+                "threatcat": random.choice(THREAT_CATEGORIES),
+                "threatnam": random.choice([
                     "Trojan.GenKryptik",
                     "Adware.Bundler",
                     "Phishing.Generic",
