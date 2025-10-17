@@ -86,7 +86,7 @@ def zscaler_firewall_log() -> str:
         "srv_dport":"53",
         "durationms":"2",
         "clt_sip":f"10.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(1, 254)}",
-        "srv_dip":f"{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}"
+        "srv_dip":f"{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}",
         "category": category,
         "respipcategory":"Professional Services",
         "deviceowner":"test_owner",
