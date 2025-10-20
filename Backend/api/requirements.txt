@@ -1,0 +1,42 @@
+# Core API dependencies
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+pydantic-settings
+
+# Authentication
+python-jose[cryptography]
+passlib[bcrypt]
+python-dotenv
+cryptography
+
+# Database
+sqlalchemy
+alembic
+databases
+asyncpg
+aiosqlite
+
+# Utilities
+httpx
+aiofiles
+python-json-logger
+requests
+
+# CORS and security
+python-multipart
+email-validator
+
+# Testing
+pytest
+pytest-asyncio
+pytest-cov
+
+# Development
+black
+flake8
+mypy
+
+# Monitoring
+prometheus-client

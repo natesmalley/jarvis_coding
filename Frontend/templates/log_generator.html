@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synthetic Log Generator</title>
+    <script src="https://cdn.tailwindcss.com/3.4.1"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #110e19;
+            color: #d1b8e8;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            flex-grow: 1;
+        }
+        .top-nav {
+            background: rgba(26, 22, 41, 0.6);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+            margin-bottom: 2rem;
+            padding: 0.75rem 0;
+            position: relative;
+        }
+        .nav-toggle {
+            background: transparent;
+            border: none;
+            color: #a78bfa;
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0 auto;
+            transition: all 0.3s ease;
+        }
+        .nav-toggle:hover {
+            color: #c4b5fd;
+            transform: scale(1.05);
+        }
+        .nav-toggle-icon {
+            transition: transform 0.3s ease;
+        }
+        .nav-toggle.active .nav-toggle-icon {
+            transform: rotate(180deg);
+        }
+        .nav-toggle-text {
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .nav-tabs {
+            display: none;
+            justify-content: center;
+            align-items: center;
+            gap: 2rem;
+            max-width: 600px;
+            margin: 1rem auto 0;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(139, 92, 246, 0.1);
+        }
+        .nav-tabs.active {
+            display: flex;
+        }
+        .nav-tab {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1.5rem;
+            border-radius: 1rem;
+            min-width: 100px;
+        }
+        .nav-tab:hover {
+            background: rgba(139, 92, 246, 0.1);
+            transform: translateY(-2px);
+        }
+        .nav-tab.active {
+            background: rgba(139, 92, 246, 0.15);
+        }
+        .nav-tab-icon {
+            font-size: 1.75rem;
+            transition: all 0.3s ease;
+            filter: grayscale(0.7) opacity(0.6);
+        }
+        .nav-tab.active .nav-tab-icon {
+            filter: grayscale(0) opacity(1);
+            transform: scale(1.1);
+        }
+        .nav-tab:hover .nav-tab-icon {
+            filter: grayscale(0) opacity(0.9);
+        }
+        .nav-tab-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #8b7a9f;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .nav-tab.active .nav-tab-label {
+            color: #a78bfa;
+        }
+        .nav-tab:hover .nav-tab-label {
+            color: #b8a0d2;
+        }
+        .flow-panel {
+            background: linear-gradient(135deg, #2a2342, #1f1a30);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            border: 2px solid #3c325c;
+            height: 100%;
+        }
+        .flow-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #8b5cf6;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            display: block;
+        }
+        .card {
+            background: linear-gradient(135deg, #2a2342, #1f1a30);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border: 2px solid #3c325c;
+        }
+        .input-group select,
+        .input-group input {
+            background-color: #3c325c;
+            color: #f3e8ff;
+            border: none;
+            border-radius: 0.75rem;
+            padding: 0.75rem 1rem;
+            transition: all 0.3s ease-in-out;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+            width: 100%;
+        }
+        .input-group label { display: block; margin-bottom: 0.25rem; }
+        .input-group { min-width: 0; }
+        .input-group select:focus,
+        .input-group input:focus {
+            outline: none;
+            background-color: #4a416e;
+            box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.4);
+        }
+        .btn {
+            background: linear-gradient(45deg, #a78bfa, #8b5cf6);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 0.75rem;
+            font-weight: 700;
+            transition: all 0.3s ease-in-out;
+            cursor: pointer;
+            width: 100%;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+            border: none;
+        }
+        .btn:hover:not(:disabled) {
+            background: linear-gradient(45deg, #8b5cf6, #a78bfa);
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.6);
+            transform: translateY(-2px);
+        }
+        .btn:disabled {
+            background-color: #3c325c;
+            color: #6c5f87;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        #output-box, #scenario-output-box {
+            background-color: #1a1629;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            min-height: 200px;
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #3c325c;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        .footer {
+            margin-top: auto;
+            text-align: center;
+            padding: 1rem;
+            color: #6c5f87;
+        }
+        .footer .heart-icon {
+            color: #a78bfa;
+            font-size: 1.25rem;
+        }
+        h1, h2, p {
+            color: #f3e8ff;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container py-6">
+    <!-- Top Navigation -->
+    <nav class="top-nav">
+        <button class="nav-toggle" id="nav-toggle">
+            <span class="nav-toggle-icon">☰</span>
+            <span class="nav-toggle-text">Menu</span>
+        </button>
+        <div class="nav-tabs" id="nav-tabs">
+            <button type="button" data-target="generate-section" class="nav-tab active">
+                <div class="nav-tab-icon">📊</div>
+                <div class="nav-tab-label">Generate</div>
+            </button>
+            <button type="button" data-target="scenarios-section" class="nav-tab">
+                <div class="nav-tab-icon">🎯</div>
+                <div class="nav-tab-label">Scenarios</div>
+            </button>
+            <button type="button" data-target="settings-section" class="nav-tab">
+                <div class="nav-tab-icon">⚙️</div>
+                <div class="nav-tab-label">Settings</div>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Three Column Flow Layout -->
+    <div id="generate-section" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- LEFT: Source Selection -->
+        <div class="lg:col-span-3">
+            <div class="flow-panel space-y-4">
+                <span class="flow-label">① Source</span>
+                <div class="input-group">
+                    <label for="script" class="text-sm font-semibold text-[#c8b3e8]">Log Source</label>
+                    <select id="script" name="script" required>
+                        <option value="" disabled selected>Loading scripts...</option>
+                    </select>
+                </div>
+                <p class="text-xs text-[#b8a0d2] mt-2">Select the security product to generate events from</p>
+            </div>
+        </div>
+
+        <!-- MIDDLE: Data Options & Output -->
+        <div class="lg:col-span-6">
+            <div class="flow-panel space-y-6">
+                <span class="flow-label">② Data Options & Output</span>
+                
+                <form id="log-form" class="space-y-6">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="input-group">
+                            <label for="log-count" class="text-sm font-semibold text-[#c8b3e8]">Number of Events</label>
+                            <input type="number" id="log-count" name="log-count" value="10" min="1" required>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="eps" class="text-sm font-semibold text-[#c8b3e8]">Events Per Second (EPS)</label>
+                            <input type="number" id="eps" name="eps" value="10" min="0.1" step="0.1" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="start-btn" class="btn">
+                        Start Log Generation
+                    </button>
+                </form>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 text-[#f3e8ff]">Log Output</h3>
+                    <div id="output-box">
+                        <!-- Log messages will be streamed here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Destination -->
+        <div class="lg:col-span-3">
+            <div class="flow-panel space-y-4" id="events-destination-panel">
+                <span class="flow-label">③ Destination</span>
+                <div id="destination-selector-container">
+                    <div class="input-group">
+                        <label for="destination-select" class="text-sm font-semibold text-[#c8b3e8]">Select Destination</label>
+                        <select id="destination-select" name="destination-select">
+                            <option value="" disabled selected>Loading...</option>
+                        </select>
+                    </div>
+                    <p class="text-xs text-[#b8a0d2] mt-2">Add or manage destinations in Settings</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="scenarios-section" class="grid grid-cols-1 lg:grid-cols-12 gap-6" style="display:none;">
+        <!-- LEFT: Scenario Selection -->
+        <div class="lg:col-span-3">
+            <div class="flow-panel space-y-4">
+                <span class="flow-label">① Scenario</span>
+                <div class="input-group">
+                    <label for="scenario-select" class="text-sm font-semibold text-[#c8b3e8]">Select Attack Scenario</label>
+                    <select id="scenario-select" name="scenario-select" required>
+                        <option value="" disabled selected>Loading scenarios...</option>
+                    </select>
+                </div>
+                
+                <div id="scenario-details" class="space-y-3" style="display:none;">
+                    <h4 class="text-base font-bold text-[#f3e8ff]" id="scenario-name"></h4>
+                    <p class="text-xs text-[#b8a0d2]" id="scenario-description"></p>
+                    <div class="space-y-2 text-xs">
+                        <div>
+                            <span class="font-semibold text-[#c8b3e8]">Events:</span>
+                            <span class="text-[#f3e8ff]" id="scenario-events"></span>
+                        </div>
+                        <div>
+                            <span class="font-semibold text-[#c8b3e8]">Duration:</span>
+                            <span class="text-[#f3e8ff]" id="scenario-duration"></span>
+                        </div>
+                        <div>
+                            <span class="font-semibold text-[#c8b3e8] block mb-1">Attack Phases:</span>
+                            <ul id="scenario-phases" class="list-disc list-inside text-[#b8a0d2]"></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MIDDLE: Options & Output -->
+        <div class="lg:col-span-6">
+            <div class="flow-panel space-y-6">
+                <span class="flow-label">② Options & Output</span>
+                
+                <form id="scenario-form" class="space-y-6">
+                    <div class="input-group">
+                        <label for="worker-count" class="text-sm font-semibold text-[#c8b3e8]">Parallel Workers (EPS Boost)</label>
+                        <input type="number" id="worker-count" name="worker-count" value="10" min="1" max="50" required>
+                        <p class="text-xs text-[#b8a0d2] mt-1">More workers = Higher throughput (default: 10)</p>
+                    </div>
+
+                    <button type="submit" id="run-scenario-btn" class="btn">
+                        Run Scenario
+                    </button>
+                </form>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 text-[#f3e8ff]">Scenario Output</h3>
+                    <div id="scenario-output-box">
+                        <!-- Scenario progress will be streamed here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Destination (shared selector) -->
+        <div class="lg:col-span-3">
+            <div class="flow-panel space-y-4" id="scenario-destination-panel">
+                <span class="flow-label">③ Destination</span>
+                <!-- Destination selector will be moved here dynamically -->
+            </div>
+        </div>
+    </div>
+
+            <div id="settings-section" class="card space-y-4" style="display:none;">
+                <h2 class="text-2xl font-bold text-[#f3e8ff]">Settings</h2>
+                <div class="space-y-3">
+                    <h3 class="text-xl font-bold text-[#f3e8ff]">Destinations</h3>
+                    <form id="destinations-form" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="input-group">
+                            <label for="dest-type" class="text-sm font-semibold text-[#c8b3e8]">Type</label>
+                            <select id="dest-type" name="dest-type" required>
+                                <option value="hec" selected>HEC</option>
+                                <option value="syslog">Syslog</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="dest-name" class="text-sm font-semibold text-[#c8b3e8]">Name</label>
+                            <input type="text" id="dest-name" name="dest-name" placeholder="US1 Ingest" maxlength="40" required>
+                        </div>
+                        <div id="hec-config" class="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="input-group md:col-span-2">
+                                <label for="dest-url" class="text-sm font-semibold text-[#c8b3e8]">HEC URL</label>
+                                <input type="text" id="dest-url" name="dest-url" placeholder="https://ingest.us1.sentinelone.net" value="https://ingest.us1.sentinelone.net" required>
+                            </div>
+                            <div class="input-group md:col-span-3">
+                                <label for="dest-token" class="text-sm font-semibold text-[#c8b3e8]">HEC API Key</label>
+                                <input type="password" id="dest-token" name="dest-token" autocomplete="off" placeholder="Paste token here" required>
+                            </div>
+                        </div>
+                        <div id="syslog-config" class="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4" style="display:none;">
+                            <div class="input-group">
+                                <label for="dest-syslog-ip" class="text-sm font-semibold text-[#c8b3e8]">Syslog IP</label>
+                                <input type="text" id="dest-syslog-ip" name="dest-syslog-ip" placeholder="127.0.0.1">
+                            </div>
+                            <div class="input-group">
+                                <label for="dest-syslog-port" class="text-sm font-semibold text-[#c8b3e8]">Port</label>
+                                <input type="number" id="dest-syslog-port" name="dest-syslog-port" placeholder="514" min="1" max="65535">
+                            </div>
+                            <div class="input-group">
+                                <label for="dest-syslog-protocol" class="text-sm font-semibold text-[#c8b3e8]">Protocol</label>
+                                <select id="dest-syslog-protocol" name="dest-syslog-protocol">
+                                    <option value="UDP">UDP</option>
+                                    <option value="TCP">TCP</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="md:col-span-3">
+                            <button type="submit" class="btn">Save Destination</button>
+                        </div>
+                    </form>
+                    <div>
+                        <h4 class="text-lg font-semibold text-[#f3e8ff] mb-2">Saved Destinations</h4>
+                        <ul id="destinations-list" class="space-y-2"></ul>
+                        <template id="destination-item-template">
+                            <li class="card p-3 flex items-center justify-between gap-3">
+                                <span class="truncate dest-label"></span>
+                                <button type="button" class="delete-dest" aria-label="Delete" title="Delete" style="background: transparent; border: none; padding: 4px; cursor: pointer; color: #f3e8ff;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="3 6 5 6 21 6" />
+                                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                        <path d="M10 11v6" />
+                                        <path d="M14 11v6" />
+                                        <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                                    </svg>
+                                </button>
+                            </li>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<footer class="footer">
+    Made with <span class="heart-icon">♡</span> by the RoarinPenguin
+</footer>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        (async () => {
+        // Navigation toggle
+        const navToggle = document.getElementById('nav-toggle');
+        const navTabs = document.getElementById('nav-tabs');
+        
+        navToggle.addEventListener('click', () => {
+            navTabs.classList.toggle('active');
+            navToggle.classList.toggle('active');
+        });
+
+        // Navigation tab switching
+        const tabButtons = Array.from(document.querySelectorAll('.nav-tab'));
+        const sections = {
+            'generate-section': document.getElementById('generate-section'),
+            'scenarios-section': document.getElementById('scenarios-section'),
+            'settings-section': document.getElementById('settings-section')
+        };
+        
+        tabButtons.forEach(btn => btn.addEventListener('click', () => {
+            tabButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const target = btn.dataset.target;
+            Object.entries(sections).forEach(([id, el]) => {
+                el.style.display = (id === target) ? '' : 'none';
+            });
+            
+            // Auto-collapse menu after selection
+            navTabs.classList.remove('active');
+            navToggle.classList.remove('active');
+            
+            // Move destination selector to appropriate panel
+            const destContainer = document.getElementById('destination-selector-container');
+            const eventsPanel = document.getElementById('events-destination-panel');
+            const scenarioPanel = document.getElementById('scenario-destination-panel');
+            
+            if (target === 'scenarios-section' && destContainer && scenarioPanel) {
+                // Move to scenarios panel
+                scenarioPanel.appendChild(destContainer);
+            } else if (target === 'generate-section' && destContainer && eventsPanel) {
+                // Move back to events panel
+                eventsPanel.appendChild(destContainer);
+            }
+        }));
+
+        const form = document.getElementById('log-form');
+        const scriptSelect = document.getElementById('script');
+        const startBtn = document.getElementById('start-btn');
+        const outputBox = document.getElementById('output-box');
+
+        async function fetchScripts() {
+            try {
+                const response = await fetch('/get-generators');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const payload = await response.json();
+                const gens = payload.generators || [];
+
+                // Group by category
+                const byCategory = gens.reduce((acc, g) => {
+                    const cat = g.category || 'Uncategorized';
+                    if (!acc[cat]) acc[cat] = [];
+                    acc[cat].push(g);
+                    return acc;
+                }, {});
+
+                scriptSelect.innerHTML = '';
+
+                Object.keys(byCategory).sort().forEach(category => {
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = category;
+                    byCategory[category]
+                        .sort((a,b) => a.name.localeCompare(b.name))
+                        .forEach(g => {
+                            const option = document.createElement('option');
+                            // Use backend file_path for syslog; attach product id for HEC
+                            option.value = g.file_path || g.id;
+                            option.dataset.productId = g.id;
+                            option.textContent = g.name || g.id;
+                            optgroup.appendChild(option);
+                        });
+                    scriptSelect.appendChild(optgroup);
+                });
+
+                scriptSelect.disabled = gens.length === 0;
+                if (gens.length === 0) {
+                    const option = document.createElement('option');
+                    option.textContent = 'No generators available';
+                    option.disabled = true;
+                    scriptSelect.appendChild(option);
+                }
+            } catch (error) {
+                console.error('Error fetching generators:', error);
+                scriptSelect.innerHTML = '';
+                const option = document.createElement('option');
+                option.textContent = 'Error loading generators.';
+                option.disabled = true;
+                scriptSelect.appendChild(option);
+            }
+        }
+        
+        await fetchScripts();
+
+        const destSelect = document.getElementById('destination-select');
+
+        // Destinations management
+        async function refreshDestinations() {
+            try {
+                const res = await fetch('/destinations');
+                const data = await res.json();
+                const items = (data.destinations || []);
+                // Populate unified selector
+                destSelect.innerHTML = '';
+                if (items.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.value = '';
+                    opt.textContent = 'No destinations. Add in Settings.';
+                    destSelect.appendChild(opt);
+                } else {
+                    // Group by type for readability
+                    const grouped = items.reduce((acc, d) => {
+                        (acc[d.type] = acc[d.type] || []).push(d);
+                        return acc;
+                    }, {});
+                    ['hec', 'syslog'].forEach(type => {
+                        if (!grouped[type] || grouped[type].length === 0) return;
+                        const og = document.createElement('optgroup');
+                        og.label = type.toUpperCase();
+                        grouped[type].forEach((d, idx) => {
+                            const opt = document.createElement('option');
+                            opt.value = d.id;
+                            opt.textContent = d.name;
+                            opt.dataset.type = d.type;
+                            if (destSelect.options.length === 0 && idx === 0) opt.selected = true;
+                            og.appendChild(opt);
+                        });
+                        destSelect.appendChild(og);
+                    });
+                }
+                // Populate list in settings
+                const list = document.getElementById('destinations-list');
+                if (list) {
+                    list.innerHTML = '';
+                    const tpl = document.getElementById('destination-item-template');
+                    items.forEach(d => {
+                        const node = tpl.content.firstElementChild.cloneNode(true);
+                        node.querySelector('.dest-label').textContent = d.name;
+                        const delBtn = node.querySelector('.delete-dest');
+                        delBtn.addEventListener('click', async () => {
+                            if (!confirm(`Delete destination "${d.name}"?`)) return;
+                            try {
+                                const r = await fetch(`/destinations/${encodeURIComponent(d.id)}`, { method: 'DELETE' });
+                                if (r.status !== 204) {
+                                    const txt = await r.text();
+                                    throw new Error(`Failed to delete (${r.status}): ${txt}`);
+                                }
+                                await refreshDestinations();
+                            } catch (err) {
+                                alert('Failed to delete destination. See console.');
+                                console.error(err);
+                            }
+                        });
+                        list.appendChild(node);
+                    });
+                }
+            } catch (e) {
+                console.error('Failed to load destinations', e);
+            }
+        }
+        // Load destinations
+        await refreshDestinations();
+
+        const destForm = document.getElementById('destinations-form');
+        const destTypeSel = document.getElementById('dest-type');
+        const hecConfig = document.getElementById('hec-config');
+        const syslogConfig = document.getElementById('syslog-config');
+        function toggleDestConfig() {
+            if (destTypeSel.value === 'hec') {
+                hecConfig.style.display = '';
+                syslogConfig.style.display = 'none';
+                document.getElementById('dest-url').required = true;
+                document.getElementById('dest-token').required = true;
+                document.getElementById('dest-syslog-ip').required = false;
+                document.getElementById('dest-syslog-port').required = false;
+            } else {
+                hecConfig.style.display = 'none';
+                syslogConfig.style.display = '';
+                document.getElementById('dest-url').required = false;
+                document.getElementById('dest-token').required = false;
+                document.getElementById('dest-syslog-ip').required = true;
+                document.getElementById('dest-syslog-port').required = true;
+            }
+        }
+        destTypeSel.addEventListener('change', toggleDestConfig);
+        toggleDestConfig();
+        if (destForm) {
+            destForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const name = document.getElementById('dest-name').value.trim();
+                const type = destTypeSel.value;
+                try {
+                    const payload = { type, name };
+                    if (type === 'hec') {
+                        payload.url = document.getElementById('dest-url').value.trim();
+                        payload.token = document.getElementById('dest-token').value;
+                    } else {
+                        payload.ip = document.getElementById('dest-syslog-ip').value.trim();
+                        payload.port = parseInt(document.getElementById('dest-syslog-port').value, 10);
+                        payload.protocol = document.getElementById('dest-syslog-protocol').value;
+                    }
+                    const r = await fetch('/destinations', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!r.ok) throw new Error(`Failed to save destination (${r.status})`);
+                    // Clear token field
+                    const tokenEl = document.getElementById('dest-token'); if (tokenEl) tokenEl.value = '';
+                    await refreshDestinations();
+                    // Switch to Generate tab to use it
+                    const genBtn = document.querySelector('.nav-tab[data-target="generate-section"]');
+                    if (genBtn) genBtn.click();
+                } catch (err) {
+                    alert('Failed to save destination. See console.');
+                    console.error(err);
+                }
+            });
+        }
+        
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            startBtn.disabled = true;
+            startBtn.innerText = 'Generating...';
+            outputBox.innerText = '';
+            
+            const scriptPath = scriptSelect.value; // for syslog mode
+            const productId = scriptSelect.selectedOptions[0]?.dataset?.productId; // for HEC mode
+            const logCount = parseInt(document.getElementById('log-count').value, 10);
+            const eps = parseFloat(document.getElementById('eps').value);
+            const selectedOpt = destSelect.options[destSelect.selectedIndex];
+            const destinationId = selectedOpt ? selectedOpt.value : '';
+            const destinationType = selectedOpt ? selectedOpt.dataset.type : '';
+            
+            const destinationMessage = destinationType === 'hec'
+              ? `Sending ${logCount} logs to selected HEC destination...`
+              : `Streaming ${logCount} logs to saved syslog destination...`;
+            outputBox.innerText = destinationMessage + '\n\n';
+
+            try {
+                const response = await fetch('/generate-logs', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(destinationType === 'hec' ? {
+                        destination: 'hec',
+                        product: productId,
+                        count: logCount,
+                        eps: eps,
+                        destination_id: destinationId
+                    } : {
+                        destination: 'syslog',
+                        script: scriptPath,
+                        count: logCount,
+                        eps: eps,
+                        destination_id: destinationId
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    outputBox.innerText += chunk;
+                    outputBox.scrollTop = outputBox.scrollHeight;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                outputBox.innerText += `\n--- Generation failed! Error: ${error.message} ---`;
+            } finally {
+                startBtn.disabled = false;
+                startBtn.innerText = 'Start Log Generation';
+            }
+        });
+
+        // Scenarios functionality
+        const scenarioSelect = document.getElementById('scenario-select');
+        const scenarioDetails = document.getElementById('scenario-details');
+        const scenarioForm = document.getElementById('scenario-form');
+        const runScenarioBtn = document.getElementById('run-scenario-btn');
+        const scenarioOutputBox = document.getElementById('scenario-output-box');
+        let scenariosData = [];
+
+        async function fetchScenarios() {
+            try {
+                const response = await fetch('/scenarios');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+                scenariosData = data.scenarios || [];
+                
+                scenarioSelect.innerHTML = '';
+                if (scenariosData.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.textContent = 'No scenarios available';
+                    opt.disabled = true;
+                    scenarioSelect.appendChild(opt);
+                } else {
+                    const placeholder = document.createElement('option');
+                    placeholder.value = '';
+                    placeholder.textContent = 'Select a scenario...';
+                    placeholder.disabled = true;
+                    placeholder.selected = true;
+                    scenarioSelect.appendChild(placeholder);
+                    
+                    scenariosData.forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s.id;
+                        opt.textContent = s.name;
+                        scenarioSelect.appendChild(opt);
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching scenarios:', error);
+            }
+        }
+
+        scenarioSelect.addEventListener('change', () => {
+            const selectedId = scenarioSelect.value;
+            const scenario = scenariosData.find(s => s.id === selectedId);
+            if (scenario) {
+                document.getElementById('scenario-name').textContent = scenario.name;
+                document.getElementById('scenario-description').textContent = scenario.description;
+                document.getElementById('scenario-events').textContent = scenario.total_events;
+                
+                let duration = '';
+                if (scenario.duration_days) {
+                    duration = `${scenario.duration_days} days`;
+                } else if (scenario.duration_minutes) {
+                    duration = `${scenario.duration_minutes} minutes`;
+                }
+                document.getElementById('scenario-duration').textContent = duration;
+                
+                const phasesList = document.getElementById('scenario-phases');
+                phasesList.innerHTML = '';
+                (scenario.phases || []).forEach(phase => {
+                    const li = document.createElement('li');
+                    li.textContent = phase;
+                    phasesList.appendChild(li);
+                });
+                
+                scenarioDetails.style.display = '';
+            } else {
+                scenarioDetails.style.display = 'none';
+            }
+        });
+
+        scenarioForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const selectedId = scenarioSelect.value;
+            if (!selectedId) return;
+            
+            const selectedOpt = destSelect.options[destSelect.selectedIndex];
+            const destinationId = selectedOpt ? selectedOpt.value : '';
+            const workerCount = parseInt(document.getElementById('worker-count').value, 10);
+            
+            if (!destinationId) {
+                alert('Please select a destination in the sidebar.');
+                return;
+            }
+            
+            runScenarioBtn.disabled = true;
+            runScenarioBtn.innerText = 'Running Scenario...';
+            scenarioOutputBox.innerText = '';
+            
+            try {
+                const response = await fetch('/scenarios/run', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        scenario_id: selectedId,
+                        destination_id: destinationId,
+                        workers: workerCount
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    scenarioOutputBox.innerText += chunk;
+                    scenarioOutputBox.scrollTop = scenarioOutputBox.scrollHeight;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                scenarioOutputBox.innerText += `\n--- Scenario execution failed! Error: ${error.message} ---`;
+            } finally {
+                runScenarioBtn.disabled = false;
+                runScenarioBtn.innerText = 'Run Scenario';
+            }
+        });
+
+        fetchScenarios();
+        })();
+    });
+</script>
+
+</body>
+</html>
+
