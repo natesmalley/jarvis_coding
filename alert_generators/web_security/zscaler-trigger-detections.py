@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 
-#dataSource.name = 'Zscaler Internet Access' and threatname contains 'cobaltstrike' and not (action contains ('Drop', 'IPS Reset', 'Blocked'))
-#dataSource.name = 'Zscaler Internet Access' and (threatcat contains 'ransom' or threatname contains ('8base', 'abyss', 'akira', 'alphv', 'babuk', 'bashe', 'bianlian', 'blackbasta', 'blackout', 'blacksuit', 'braincipher', 'cactus', 'ciphbit', 'clop', 'everest', 'hunters', 'kairos', 'killsecurity', 'lockbit', 'lynx', 'medusa', 'moneymessage', 'nitrogen', 'ragroup', 'revil', 'ransom', 'rhysida', 'qilin', 'spacebears', 'termite')) and not (action contains ('Drop', 'IPS Reset', 'Blocked'))
-
 """
 Generates synthetic Zscaler firewall and security events
 """
@@ -191,8 +188,8 @@ def zscaler_firewall_log() -> str:
 
 if __name__ == "__main__":
     # Generate sample events
-    print("Sample Zscaler Firewall Events:")
+    #print("Sample Zscaler Firewall Events:")
     print("=" * 50)
     for i in range(5):
-        print(f"\nEvent {i+1}:")
+        #print(f"\nEvent {i+1}:")
         print(zscaler_firewall_log())
