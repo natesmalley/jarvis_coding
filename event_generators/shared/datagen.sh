@@ -22,6 +22,7 @@ python /home/ubuntu/jarvis_coding/event_generators/web_security/zscaler_private_
 python /home/ubuntu/jarvis_coding/event_generators/web_security/zscaler_dns_firewall.py --count 100 >> /home/ubuntu/sample-logs/web_security/zscaler-internet-access.log
 python /home/ubuntu/jarvis_coding/event_generators/web_security/zscaler_firewall.py --count 100 >> /home/ubuntu/sample-logs/web_security/zscaler-internet-access.log
 python /home/ubuntu/jarvis_coding/event_generators/web_security/zscaler_dns.py >> /home/ubuntu/sample-logs/web_security/zscaler-internet-access.log
+python /home/ubuntu/jarvis_coding/event_generators/web_security/zscaler_web.py >> /home/ubuntu/sample-logs/web_security/zscaler-internet-access.log
 
 #generate AzureAD events
 python /home/ubuntu/jarvis_coding/event_generators/identity_access/microsoft_azure_ad_signin.py >> /home/ubuntu/sample-logs/identity_access/azure_ad_signin.log
