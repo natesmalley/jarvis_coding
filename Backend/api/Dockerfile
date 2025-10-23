@@ -48,6 +48,13 @@ RUN ln -s /app/event_generators /event_generators \
 # Create data directory for ephemeral database
 RUN mkdir -p /app/data
 
+# Fix Windows line endings for shell script
+RUN apt-get update && apt-get install -y dos2unix && \
+    dos2unix /app/entrypoint.sh && \
+    apt-get remove -y dos2unix && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
 # Create non-root user
 RUN useradd -m -u 1000 jarvis && \
     chown -R jarvis:jarvis /app && \
