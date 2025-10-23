@@ -691,15 +691,18 @@ def _send_batch(lines: list, is_json: bool, product: str):
     headers_auth = {**HEADERS}
     headers_auth["Authorization"] = f"{_CONNECTION_CACHE['auth_scheme']} {HEC_TOKEN}"
     if is_json:
+        # JSON products to /event endpoint with gzip compression
         url = _CONNECTION_CACHE['event_base']
-        headers = {**headers_auth, "Content-Type": "application/json", "Content-Encoding": "gzip"}
-        body = "\n".join(lines).encode('utf-8')
-    else:
-        url = f"{_CONNECTION_CACHE['raw_base']}?{_build_qs(product)}"
         headers = {**headers_auth, "Content-Type": "text/plain", "Content-Encoding": "gzip"}
-        body = ("\n".join(lines)).encode('utf-8')
-    gz = gzip.compress(body)
-    resp = POST(url, headers=headers, data=gz, timeout=30)
+        body = "\n".join(lines).encode('utf-8')
+        gz = gzip.compress(body)
+        resp = POST(url, headers=headers, data=gz, timeout=30)
+    else:
+        # Raw/syslog products to /raw endpoint without compression
+        url = f"{_CONNECTION_CACHE['raw_base']}?{_build_qs(product)}"
+        headers = {**headers_auth, "Content-Type": "text/plain"}
+        body = "\n".join(lines).encode('utf-8')
+        resp = POST(url, headers=headers, data=body, timeout=30)
     resp.raise_for_status()
 
 SOURCETYPE_MAP_OVERRIDES = {
