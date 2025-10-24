@@ -347,7 +347,13 @@ def run_scenario():
             # Prepare environment for HEC sender used by scenario scripts
             env = os.environ.copy()
             env['S1_HEC_TOKEN'] = hec_token
-            env['S1_HEC_URL'] = hec_url.rstrip('/')
+            # Set both EVENT and RAW base URLs to prevent fallback to defaults
+            hec_base = hec_url.rstrip('/')
+            if not hec_base.endswith('/services/collector'):
+                hec_base = hec_base + '/services/collector'
+            env['S1_HEC_EVENT_URL_BASE'] = hec_base + '/event'
+            env['S1_HEC_RAW_URL_BASE'] = hec_base + '/raw'
+            env['S1_HEC_URL'] = hec_base  # Keep for backward compatibility
             env['S1_HEC_WORKERS'] = str(worker_count)  # Pass worker count to scripts
             env['S1_HEC_BATCH'] = '0'  # Disable batch mode for immediate responses
             
@@ -607,7 +613,10 @@ def generate_logs():
 
                 env = os.environ.copy()
                 env['S1_HEC_TOKEN'] = hec_token
-                env['S1_HEC_URL'] = normalized_hec_url
+                # Set both EVENT and RAW base URLs to prevent fallback to defaults
+                env['S1_HEC_EVENT_URL_BASE'] = normalized_hec_url + '/event'
+                env['S1_HEC_RAW_URL_BASE'] = normalized_hec_url + '/raw'
+                env['S1_HEC_URL'] = normalized_hec_url  # Keep for backward compatibility
                 # Disable batch mode to get immediate HTTP responses
                 env['S1_HEC_BATCH'] = '0'
                 # Enable debug output to see exact payloads
