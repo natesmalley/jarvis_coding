@@ -1015,14 +1015,17 @@ def send_one(line, product: str, attr_fields: dict):
     bases = []
     if env_event and env_raw:
         bases.append((env_event, env_raw))
-    bases.extend([
-        ("https://ingest.us1.sentinelone.net/services/collector/event",
-         "https://ingest.us1.sentinelone.net/services/collector/raw"),
-        ("https://ingest.usea1.sentinelone.net/services/collector/event",
-         "https://ingest.usea1.sentinelone.net/services/collector/raw"),
-        ("https://ingest.sentinelone.net/services/collector/event",
-         "https://ingest.sentinelone.net/services/collector/raw"),
-    ])
+        # If explicit URLs are provided, don't add fallbacks
+    else:
+        # Only add default fallbacks if no explicit URLs provided
+        bases.extend([
+            ("https://ingest.us1.sentinelone.net/services/collector/event",
+             "https://ingest.us1.sentinelone.net/services/collector/raw"),
+            ("https://ingest.usea1.sentinelone.net/services/collector/event",
+             "https://ingest.usea1.sentinelone.net/services/collector/raw"),
+            ("https://ingest.sentinelone.net/services/collector/event",
+             "https://ingest.sentinelone.net/services/collector/raw"),
+        ])
 
     # Try verification/TLS combinations (secure → low TLS → insecure as last resort)
     combos = [

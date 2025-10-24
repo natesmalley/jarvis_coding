@@ -621,6 +621,10 @@ def generate_logs():
                 env['S1_HEC_BATCH'] = '0'
                 # Enable debug output to see exact payloads
                 env['S1_HEC_DEBUG'] = '1'
+                
+                # Debug log the environment variables
+                logger.info(f"Setting S1_HEC_EVENT_URL_BASE={env['S1_HEC_EVENT_URL_BASE']}")
+                logger.info(f"Setting S1_HEC_RAW_URL_BASE={env['S1_HEC_RAW_URL_BASE']}")
 
                 # Calculate delay from EPS: delay = 1 / eps
                 delay = 1.0 / eps if eps > 0 else 1.0
