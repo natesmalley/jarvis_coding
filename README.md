@@ -24,7 +24,7 @@ If you're new to Docker, think of images as "apps" you build, and containers as 
 ### 1. Create Environment File
 First time setup - copy the template to create your `.env` file:
 ```bash
-cp ".env copy" .env
+cp .env.example .env
 ```
 
 The default configuration has authentication disabled for easy local development (`DISABLE_AUTH=true`). This is perfect for getting started!
@@ -74,9 +74,9 @@ open http://localhost:9001
 
 ## Configuration (.env)
 
-The `.env` file controls both services. Copy from `.env copy` if you haven't already:
+The `.env` file controls both services. Copy from `.env.example` if you haven't already:
 ```bash
-cp ".env copy" .env
+cp .env.example .env
 ```
 
 ### Authentication Settings
@@ -129,7 +129,7 @@ docker logs -f jarvis-api
 
 **Solution**: Create the `.env` file with `DISABLE_AUTH=true`:
 ```bash
-cp ".env copy" .env
+cp .env.example .env
 docker compose down && docker compose up -d
 ```
 

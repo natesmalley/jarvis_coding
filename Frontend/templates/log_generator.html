@@ -387,9 +387,35 @@
                             <input type="text" id="dest-name" name="dest-name" placeholder="US1 Ingest" maxlength="40" required>
                         </div>
                         <div id="hec-config" class="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div class="input-group md:col-span-2">
-                                <label for="dest-url" class="text-sm font-semibold text-[#c8b3e8]">HEC URL</label>
-                                <input type="text" id="dest-url" name="dest-url" placeholder="https://ingest.us1.sentinelone.net" value="https://ingest.us1.sentinelone.net" required>
+                            <div class="input-group">
+                                <label for="hec-format" class="text-sm font-semibold text-[#c8b3e8]">Endpoint Format</label>
+                                <select id="hec-format" name="hec-format">
+                                    <option value="full_url">Full URL</option>
+                                    <option value="ip_port">IP:Port (Pipeline)</option>
+                                </select>
+                            </div>
+                            <div id="hec-url-config" class="md:col-span-2">
+                                <div class="input-group">
+                                    <label for="dest-url" class="text-sm font-semibold text-[#c8b3e8]">HEC URL</label>
+                                    <input type="text" id="dest-url" name="dest-url" placeholder="https://ingest.us1.sentinelone.net" value="https://ingest.us1.sentinelone.net">
+                                </div>
+                            </div>
+                            <div id="hec-pipeline-config" class="md:col-span-2 grid grid-cols-2 gap-4" style="display:none;">
+                                <div class="input-group">
+                                    <label for="dest-host" class="text-sm font-semibold text-[#c8b3e8]">Host/IP</label>
+                                    <input type="text" id="dest-host" name="dest-host" placeholder="104.197.40.197">
+                                </div>
+                                <div class="input-group">
+                                    <label for="dest-hec-port" class="text-sm font-semibold text-[#c8b3e8]">Port</label>
+                                    <input type="number" id="dest-hec-port" name="dest-hec-port" placeholder="8018" min="1" max="65535">
+                                </div>
+                                <div class="input-group">
+                                    <label for="dest-use-https" class="text-sm font-semibold text-[#c8b3e8]">Protocol</label>
+                                    <select id="dest-use-https" name="dest-use-https">
+                                        <option value="true">HTTPS</option>
+                                        <option value="false">HTTP</option>
+                                    </select>
+                                </div>
                             </div>
                             <div class="input-group md:col-span-3">
                                 <label for="dest-token" class="text-sm font-semibold text-[#c8b3e8]">HEC API Key</label>
@@ -623,24 +649,48 @@
         const destTypeSel = document.getElementById('dest-type');
         const hecConfig = document.getElementById('hec-config');
         const syslogConfig = document.getElementById('syslog-config');
+        const hecFormatSel = document.getElementById('hec-format');
+        const hecUrlConfig = document.getElementById('hec-url-config');
+        const hecPipelineConfig = document.getElementById('hec-pipeline-config');
+        
+        function toggleHecFormat() {
+            if (hecFormatSel.value === 'ip_port') {
+                hecUrlConfig.style.display = 'none';
+                hecPipelineConfig.style.display = '';
+                document.getElementById('dest-url').required = false;
+                document.getElementById('dest-host').required = true;
+                document.getElementById('dest-hec-port').required = true;
+            } else {
+                hecUrlConfig.style.display = '';
+                hecPipelineConfig.style.display = 'none';
+                document.getElementById('dest-url').required = true;
+                document.getElementById('dest-host').required = false;
+                document.getElementById('dest-hec-port').required = false;
+            }
+        }
+        
         function toggleDestConfig() {
             if (destTypeSel.value === 'hec') {
                 hecConfig.style.display = '';
                 syslogConfig.style.display = 'none';
-                document.getElementById('dest-url').required = true;
                 document.getElementById('dest-token').required = true;
                 document.getElementById('dest-syslog-ip').required = false;
                 document.getElementById('dest-syslog-port').required = false;
+                toggleHecFormat(); // Apply HEC format-specific logic
             } else {
                 hecConfig.style.display = 'none';
                 syslogConfig.style.display = '';
                 document.getElementById('dest-url').required = false;
                 document.getElementById('dest-token').required = false;
+                document.getElementById('dest-host').required = false;
+                document.getElementById('dest-hec-port').required = false;
                 document.getElementById('dest-syslog-ip').required = true;
                 document.getElementById('dest-syslog-port').required = true;
             }
         }
+        
         destTypeSel.addEventListener('change', toggleDestConfig);
+        hecFormatSel.addEventListener('change', toggleHecFormat);
         toggleDestConfig();
         if (destForm) {
             destForm.addEventListener('submit', async (e) => {
@@ -650,8 +700,15 @@
                 try {
                     const payload = { type, name };
                     if (type === 'hec') {
-                        payload.url = document.getElementById('dest-url').value.trim();
                         payload.token = document.getElementById('dest-token').value;
+                        payload.endpoint_format = document.getElementById('hec-format').value;
+                        if (payload.endpoint_format === 'ip_port') {
+                            payload.host = document.getElementById('dest-host').value.trim();
+                            payload.port = parseInt(document.getElementById('dest-hec-port').value, 10);
+                            payload.use_https = document.getElementById('dest-use-https').value === 'true';
+                        } else {
+                            payload.url = document.getElementById('dest-url').value.trim();
+                        }
                     } else {
                         payload.ip = document.getElementById('dest-syslog-ip').value.trim();
                         payload.port = parseInt(document.getElementById('dest-syslog-port').value, 10);

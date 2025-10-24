@@ -20,12 +20,17 @@ class DestinationCreate(BaseModel):
     type: str = Field(..., description="Destination type: 'hec' or 'syslog'")
     
     # HEC fields
-    url: Optional[str] = Field(None, description="HEC URL (required for HEC destinations)")
+    url: Optional[str] = Field(None, description="HEC URL (for full_url format)")
     token: Optional[str] = Field(None, description="HEC token (required for HEC destinations)")
     
-    # Syslog fields
+    # HEC Pipeline fields (for IP:port format)
+    endpoint_format: Optional[str] = Field('full_url', description="'full_url' or 'ip_port'")
+    host: Optional[str] = Field(None, description="Host/IP for pipeline endpoints")
+    use_https: Optional[bool] = Field(True, description="Use HTTPS for pipeline endpoints")
+    
+    # Syslog fields (port is shared with pipeline)
     ip: Optional[str] = Field(None, description="Syslog IP (required for syslog destinations)")
-    port: Optional[int] = Field(None, description="Syslog port (required for syslog destinations)")
+    port: Optional[int] = Field(None, description="Port for syslog or pipeline destinations")
     protocol: Optional[str] = Field(None, description="Syslog protocol: 'UDP' or 'TCP'")
 
 
@@ -34,6 +39,9 @@ class DestinationUpdate(BaseModel):
     name: Optional[str] = None
     url: Optional[str] = None
     token: Optional[str] = None
+    endpoint_format: Optional[str] = None
+    host: Optional[str] = None
+    use_https: Optional[bool] = None
     ip: Optional[str] = None
     port: Optional[int] = None
     protocol: Optional[str] = None
@@ -45,6 +53,9 @@ class DestinationResponse(BaseModel):
     name: str
     type: str
     url: Optional[str] = None
+    endpoint_format: Optional[str] = None
+    host: Optional[str] = None
+    use_https: Optional[bool] = None
     ip: Optional[str] = None
     port: Optional[int] = None
     protocol: Optional[str] = None
@@ -74,23 +85,37 @@ async def create_destination(
     
     - **name**: Unique destination name
     - **type**: 'hec' or 'syslog'
-    - For HEC: provide **url** and **token**
+    - For HEC with full_url: provide **url** and **token**
+    - For HEC with ip_port: provide **host**, **port**, **use_https**, and **token**
     - For Syslog: provide **ip**, **port**, and **protocol** (UDP/TCP)
     """
     service = DestinationService(session)
     
     # Validate required fields based on type
     if destination.type == 'hec':
-        if not destination.url or not destination.token:
+        if not destination.token:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="HEC destinations require 'url' and 'token'"
+                detail="HEC destinations require 'token'"
             )
-        # Normalize URL
-        base_url = destination.url.rstrip('/')
-        if not (base_url.endswith('/event') or base_url.endswith('/raw') or '/services/collector' in base_url):
-            base_url = base_url + '/services/collector'
-        destination.url = base_url
+        
+        if destination.endpoint_format == 'ip_port':
+            if not destination.host or not destination.port:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Pipeline destinations require 'host' and 'port'"
+                )
+        else:
+            if not destination.url:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="HEC destinations with full_url format require 'url'"
+                )
+            # Normalize URL
+            base_url = destination.url.rstrip('/')
+            if not (base_url.endswith('/event') or base_url.endswith('/raw') or '/services/collector' in base_url):
+                base_url = base_url + '/services/collector'
+            destination.url = base_url
     elif destination.type == 'syslog':
         if not destination.ip or not destination.port or not destination.protocol:
             raise HTTPException(
@@ -126,7 +151,10 @@ async def create_destination(
             token=destination.token,
             ip=destination.ip,
             port=destination.port,
-            protocol=destination.protocol
+            protocol=destination.protocol,
+            endpoint_format=destination.endpoint_format,
+            host=destination.host,
+            use_https=destination.use_https
         )
         logger.info(f"Successfully created destination: {dest.id}")
         return dest.to_dict()

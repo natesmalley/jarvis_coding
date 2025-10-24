@@ -52,7 +52,10 @@ class DestinationService:
         token: Optional[str] = None,
         ip: Optional[str] = None,
         port: Optional[int] = None,
-        protocol: Optional[str] = None
+        protocol: Optional[str] = None,
+        endpoint_format: Optional[str] = 'full_url',
+        host: Optional[str] = None,
+        use_https: Optional[bool] = True
     ) -> Destination:
         """
         Create a new destination
@@ -60,11 +63,14 @@ class DestinationService:
         Args:
             name: Destination name (must be unique)
             dest_type: 'hec' or 'syslog'
-            url: HEC URL (for HEC destinations)
+            url: HEC URL (for HEC destinations with full_url format)
             token: HEC token (for HEC destinations, will be encrypted)
             ip: Syslog IP (for syslog destinations)
-            port: Syslog port (for syslog destinations)
+            port: Port number (for syslog or pipeline destinations)
             protocol: 'UDP' or 'TCP' (for syslog destinations)
+            endpoint_format: 'full_url' or 'ip_port' (for HEC destinations)
+            host: Host/IP for pipeline endpoints (when endpoint_format='ip_port')
+            use_https: Whether to use HTTPS for pipeline endpoints
             
         Returns:
             Created Destination object
@@ -82,7 +88,13 @@ class DestinationService:
         )
         
         if dest_type == 'hec':
-            destination.url = url
+            destination.endpoint_format = endpoint_format
+            if endpoint_format == 'ip_port':
+                destination.host = host
+                destination.port = port
+                destination.use_https = use_https
+            else:
+                destination.url = url
             if token:
                 destination.token_encrypted = self.encryption.encrypt(token)
         elif dest_type == 'syslog':
@@ -165,6 +177,22 @@ class DestinationService:
         if deleted:
             logger.info(f"Deleted destination: {dest_id}")
         return deleted
+    
+    def get_hec_url(self, destination: Destination) -> Optional[str]:
+        """
+        Get the complete HEC URL for a destination.
+        Handles both full_url and ip_port formats.
+        """
+        if destination.type != 'hec':
+            return None
+        
+        if destination.endpoint_format == 'ip_port':
+            # Build URL from components
+            protocol = 'https' if destination.use_https else 'http'
+            return f"{protocol}://{destination.host}:{destination.port}/services/collector"
+        else:
+            # Use the stored URL
+            return destination.url
     
     def decrypt_token(self, encrypted_token: str) -> str:
         """Decrypt a token"""

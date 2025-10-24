@@ -16,7 +16,7 @@ Synthetic security event generators, parser metadata, and an API for sending eve
 1. **Create environment file** (first time only):
 ```bash
 # From the repository root
-cp ".env copy" .env
+cp .env.example .env
 ```
 
 2. **Start services**:
@@ -47,7 +47,7 @@ python event_generators/shared/hec_sender.py --product crowdstrike_falcon -n 3
 ### Environment Setup (.env)
 The project uses a `.env` file for configuration. Copy the template to get started:
 ```bash
-cp ".env copy" .env
+cp .env.example .env
 ```
 
 ### Authentication
