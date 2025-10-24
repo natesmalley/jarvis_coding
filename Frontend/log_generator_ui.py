@@ -291,7 +291,16 @@ def run_scenario():
         if chosen.get('type') != 'hec':
             return jsonify({'error': 'Scenarios currently only support HEC destinations'}), 400
         
-        hec_url = chosen.get('url')
+        # Build HEC URL based on destination format
+        endpoint_format = chosen.get('endpoint_format', 'full_url')
+        if endpoint_format == 'ip_port':
+            host = chosen.get('host')
+            port = chosen.get('port')
+            use_https = chosen.get('use_https', True)
+            protocol = 'https' if use_https else 'http'
+            hec_url = f"{protocol}://{host}:{port}/services/collector"
+        else:
+            hec_url = chosen.get('url')
         
         # Fetch decrypted token from backend
         token_resp = requests.get(
@@ -338,7 +347,13 @@ def run_scenario():
             # Prepare environment for HEC sender used by scenario scripts
             env = os.environ.copy()
             env['S1_HEC_TOKEN'] = hec_token
-            env['S1_HEC_URL'] = hec_url.rstrip('/')
+            # Set both EVENT and RAW base URLs to prevent fallback to defaults
+            hec_base = hec_url.rstrip('/')
+            if not hec_base.endswith('/services/collector'):
+                hec_base = hec_base + '/services/collector'
+            env['S1_HEC_EVENT_URL_BASE'] = hec_base + '/event'
+            env['S1_HEC_RAW_URL_BASE'] = hec_base + '/raw'
+            env['S1_HEC_URL'] = hec_base  # Keep for backward compatibility
             env['S1_HEC_WORKERS'] = str(worker_count)  # Pass worker count to scripts
             env['S1_HEC_BATCH'] = '0'  # Disable batch mode for immediate responses
             
@@ -535,7 +550,17 @@ def generate_logs():
                             return
                         chosen = hec_dests[0]
                     
-                    hec_url = chosen.get('url')
+                    # Build HEC URL based on destination format
+                    endpoint_format = chosen.get('endpoint_format', 'full_url')
+                    if endpoint_format == 'ip_port':
+                        host = chosen.get('host')
+                        port = chosen.get('port')
+                        use_https = chosen.get('use_https', True)
+                        protocol = 'https' if use_https else 'http'
+                        hec_url = f"{protocol}://{host}:{port}/services/collector"
+                    else:
+                        hec_url = chosen.get('url')
+                    
                     dest_id = chosen.get('id')
                     
                     # Fetch decrypted token from backend
@@ -588,11 +613,18 @@ def generate_logs():
 
                 env = os.environ.copy()
                 env['S1_HEC_TOKEN'] = hec_token
-                env['S1_HEC_URL'] = normalized_hec_url
+                # Set both EVENT and RAW base URLs to prevent fallback to defaults
+                env['S1_HEC_EVENT_URL_BASE'] = normalized_hec_url + '/event'
+                env['S1_HEC_RAW_URL_BASE'] = normalized_hec_url + '/raw'
+                env['S1_HEC_URL'] = normalized_hec_url  # Keep for backward compatibility
                 # Disable batch mode to get immediate HTTP responses
                 env['S1_HEC_BATCH'] = '0'
                 # Enable debug output to see exact payloads
                 env['S1_HEC_DEBUG'] = '1'
+                
+                # Debug log the environment variables
+                logger.info(f"Setting S1_HEC_EVENT_URL_BASE={env['S1_HEC_EVENT_URL_BASE']}")
+                logger.info(f"Setting S1_HEC_RAW_URL_BASE={env['S1_HEC_RAW_URL_BASE']}")
 
                 # Calculate delay from EPS: delay = 1 / eps
                 delay = 1.0 / eps if eps > 0 else 1.0

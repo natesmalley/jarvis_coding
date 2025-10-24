@@ -1,5 +1,5 @@
 """Database models for destinations"""
-from sqlalchemy import Column, String, Integer, DateTime, Text
+from sqlalchemy import Column, String, Integer, DateTime, Text, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 
@@ -18,10 +18,15 @@ class Destination(Base):
     url = Column(String, nullable=True)
     token_encrypted = Column(Text, nullable=True)  # Encrypted HEC token
     
-    # Syslog fields
+    # HEC Pipeline fields (for IP:port format)
+    endpoint_format = Column(String, nullable=True, default='full_url')  # 'full_url' or 'ip_port'
+    host = Column(String, nullable=True)  # IP address or hostname for pipeline endpoints
+    use_https = Column(Boolean, nullable=True, default=True)  # Whether to use HTTPS for pipeline
+    
+    # Syslog fields (also reused port for pipeline)
     ip = Column(String, nullable=True)
     port = Column(Integer, nullable=True)
-    protocol = Column(String, nullable=True)  # 'UDP' or 'TCP'
+    protocol = Column(String, nullable=True)  # 'UDP' or 'TCP' for syslog, 'HTTP' or 'HTTPS' for pipeline
     
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -38,7 +43,13 @@ class Destination(Base):
         }
         
         if self.type == 'hec':
-            result['url'] = self.url
+            result['endpoint_format'] = self.endpoint_format or 'full_url'
+            if self.endpoint_format == 'ip_port':
+                result['host'] = self.host
+                result['port'] = self.port
+                result['use_https'] = self.use_https
+            else:
+                result['url'] = self.url
             if include_token:
                 result['token_encrypted'] = self.token_encrypted
         elif self.type == 'syslog':
