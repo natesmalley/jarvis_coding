@@ -291,7 +291,16 @@ def run_scenario():
         if chosen.get('type') != 'hec':
             return jsonify({'error': 'Scenarios currently only support HEC destinations'}), 400
         
-        hec_url = chosen.get('url')
+        # Build HEC URL based on destination format
+        endpoint_format = chosen.get('endpoint_format', 'full_url')
+        if endpoint_format == 'ip_port':
+            host = chosen.get('host')
+            port = chosen.get('port')
+            use_https = chosen.get('use_https', True)
+            protocol = 'https' if use_https else 'http'
+            hec_url = f"{protocol}://{host}:{port}/services/collector"
+        else:
+            hec_url = chosen.get('url')
         
         # Fetch decrypted token from backend
         token_resp = requests.get(
@@ -535,7 +544,17 @@ def generate_logs():
                             return
                         chosen = hec_dests[0]
                     
-                    hec_url = chosen.get('url')
+                    # Build HEC URL based on destination format
+                    endpoint_format = chosen.get('endpoint_format', 'full_url')
+                    if endpoint_format == 'ip_port':
+                        host = chosen.get('host')
+                        port = chosen.get('port')
+                        use_https = chosen.get('use_https', True)
+                        protocol = 'https' if use_https else 'http'
+                        hec_url = f"{protocol}://{host}:{port}/services/collector"
+                    else:
+                        hec_url = chosen.get('url')
+                    
                     dest_id = chosen.get('id')
                     
                     # Fetch decrypted token from backend
