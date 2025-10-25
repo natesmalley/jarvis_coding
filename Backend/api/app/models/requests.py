@@ -8,10 +8,20 @@ import re
 
 class GeneratorExecuteRequest(BaseModel):
     """Generator execution request with strict validation"""
-    count: int = Field(..., ge=1, le=1000, description="Number of events to generate")
+    count: Optional[int] = Field(None, ge=1, le=10000, description="Number of events to generate (ignored if continuous=True)")
     format: str = Field(..., pattern="^(json|csv|syslog|key_value)$", description="Output format")
     star_trek_theme: bool = Field(default=True, description="Use Star Trek themed data")
+    continuous: bool = Field(default=False, description="Run indefinitely (ignores count)")
+    eps: Optional[float] = Field(None, ge=0.1, le=10000, description="Events per second rate")
+    speed_mode: bool = Field(False, description="Pre-generate 1K events and loop for max throughput (auto-enabled for EPS > 1000)")
     options: Dict[str, Any] = Field(default_factory=dict, description="Generator-specific options")
+    
+    @validator('count')
+    def validate_count(cls, v, values):
+        continuous = values.get('continuous', False)
+        if not continuous and v is None:
+            raise ValueError('count is required when continuous=False')
+        return v
     
     class Config:
         validate_assignment = True

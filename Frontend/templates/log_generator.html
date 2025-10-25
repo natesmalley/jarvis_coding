@@ -259,6 +259,18 @@
                 <span class="flow-label">② Data Options & Output</span>
                 
                 <form id="log-form" class="space-y-6">
+                    <div class="input-group">
+                        <label style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
+                        <input type="checkbox" id="continuous-mode" style="width: auto;">
+                        <span>Continuous Mode (run until stopped)</span>
+                    </label>
+                    <label id="speed-mode-container" style="display: none; align-items: center; gap: 8px; margin-top: 8px; margin-left: 24px;">
+                        <input type="checkbox" id="speed-mode" style="width: auto;">
+                        <span>Speed Mode (pre-generate 1K events, loop for max throughput)</span>
+                    </label>
+                    <p class="text-xs text-[#b8a0d2] mt-1">When enabled, logs will generate continuously until stopped</p>
+                    </div>
+
                     <div class="grid grid-cols-2 gap-4">
                         <div class="input-group">
                             <label for="log-count" class="text-sm font-semibold text-[#c8b3e8]">Number of Events</label>
@@ -271,9 +283,14 @@
                         </div>
                     </div>
 
-                    <button type="submit" id="start-btn" class="btn">
-                        Start Log Generation
-                    </button>
+                    <div class="flex gap-3">
+                        <button type="submit" id="start-btn" class="btn flex-1">
+                            Start Log Generation
+                        </button>
+                        <button type="button" id="stop-btn" class="btn bg-red-600 hover:bg-red-700" style="display: none;">
+                            Stop Generation
+                        </button>
+                    </div>
                 </form>
 
                 <div>
@@ -676,6 +693,53 @@
             });
         }
         
+        // Handle continuous mode toggle
+        const continuousModeCheckbox = document.getElementById('continuous-mode');
+        const speedModeContainer = document.getElementById('speed-mode-container');
+        const speedModeCheckbox = document.getElementById('speed-mode');
+        const logCountInput = document.getElementById('log-count');
+        const epsInput = document.getElementById('eps');
+        const stopBtn = document.getElementById('stop-btn');
+        let currentAbortController = null;
+
+        continuousModeCheckbox.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                logCountInput.disabled = true;
+                logCountInput.required = false;
+                logCountInput.style.opacity = '0.5';
+                speedModeContainer.style.display = 'flex';
+            } else {
+                logCountInput.disabled = false;
+                logCountInput.required = true;
+                logCountInput.style.opacity = '1';
+                speedModeContainer.style.display = 'none';
+                speedModeCheckbox.checked = false;
+            }
+        });
+        
+        // Auto-enable speed mode for high EPS
+        epsInput.addEventListener('change', (e) => {
+            const eps = parseFloat(e.target.value);
+            if (continuousModeCheckbox.checked && eps > 1000) {
+                speedModeCheckbox.checked = true;
+                speedModeCheckbox.disabled = true;
+            } else {
+                speedModeCheckbox.disabled = false;
+            }
+        });
+
+        // Stop button handler
+        stopBtn.addEventListener('click', () => {
+            if (currentAbortController) {
+                currentAbortController.abort();
+                outputBox.innerText += '\n\n--- Stopped by user ---\n';
+                startBtn.disabled = false;
+                startBtn.innerText = 'Start Log Generation';
+                stopBtn.style.display = 'none';
+                currentAbortController = null;
+            }
+        });
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
@@ -687,32 +751,49 @@
             const productId = scriptSelect.selectedOptions[0]?.dataset?.productId; // for HEC mode
             const logCount = parseInt(document.getElementById('log-count').value, 10);
             const eps = parseFloat(document.getElementById('eps').value);
+            const continuousMode = continuousModeCheckbox.checked;
+            const speedMode = speedModeCheckbox.checked;
             const selectedOpt = destSelect.options[destSelect.selectedIndex];
             const destinationId = selectedOpt ? selectedOpt.value : '';
             const destinationType = selectedOpt ? selectedOpt.dataset.type : '';
             
-            const destinationMessage = destinationType === 'hec'
-              ? `Sending ${logCount} logs to selected HEC destination...`
-              : `Streaming ${logCount} logs to saved syslog destination...`;
+            const destinationMessage = continuousMode 
+              ? `Starting continuous log generation at ${eps} EPS${speedMode ? ' (SPEED MODE)' : ''}...`
+              : (destinationType === 'hec'
+                  ? `Sending ${logCount} logs to selected HEC destination...`
+                  : `Streaming ${logCount} logs to saved syslog destination...`);
             outputBox.innerText = destinationMessage + '\n\n';
 
+            // Show stop button for continuous mode
+            if (continuousMode) {
+                stopBtn.style.display = 'block';
+            }
+
             try {
+                // Create abort controller for stopping
+                currentAbortController = new AbortController();
+
                 const response = await fetch('/generate-logs', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
+                    signal: currentAbortController.signal,
                     body: JSON.stringify(destinationType === 'hec' ? {
                         destination: 'hec',
                         product: productId,
-                        count: logCount,
+                        count: continuousMode ? null : logCount,
                         eps: eps,
+                        continuous: continuousMode,
+                        speed_mode: speedMode,
                         destination_id: destinationId
                     } : {
                         destination: 'syslog',
                         script: scriptPath,
-                        count: logCount,
+                        count: continuousMode ? null : logCount,
                         eps: eps,
+                        continuous: continuousMode,
+                        speed_mode: speedMode,
                         destination_id: destinationId
                     })
                 });
@@ -733,11 +814,17 @@
                     outputBox.scrollTop = outputBox.scrollHeight;
                 }
             } catch (error) {
-                console.error('Error:', error);
-                outputBox.innerText += `\n--- Generation failed! Error: ${error.message} ---`;
+                if (error.name === 'AbortError') {
+                    console.log('Generation stopped by user');
+                } else {
+                    console.error('Error:', error);
+                    outputBox.innerText += `\n--- Generation failed! Error: ${error.message} ---`;
+                }
             } finally {
                 startBtn.disabled = false;
                 startBtn.innerText = 'Start Log Generation';
+                stopBtn.style.display = 'none';
+                currentAbortController = null;
             }
         });
 

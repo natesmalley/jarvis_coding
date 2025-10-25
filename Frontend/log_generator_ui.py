@@ -56,8 +56,23 @@ def fetch_generators():
     try:
         headers = {'X-API-Key': BACKEND_API_KEY} if BACKEND_API_KEY else None
         all_items = []
-        # First try to request a large page to avoid pagination
-        resp = requests.get(base_url, params={'page': 1, 'per_page': 500}, headers=headers, timeout=20)
+        
+        # Retry logic for API startup
+        max_retries = 5
+        retry_delay = 2
+        for attempt in range(max_retries):
+            try:
+                # First try to request a large page to avoid pagination
+                resp = requests.get(base_url, params={'page': 1, 'per_page': 500}, headers=headers, timeout=10)
+                break  # Success, exit retry loop
+            except requests.exceptions.RequestException as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"API not ready (attempt {attempt + 1}/{max_retries}), retrying in {retry_delay}s...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 1.5  # Exponential backoff
+                else:
+                    raise  # Re-raise on final attempt
+        
         if resp.status_code == 200:
             payload = resp.json()
             data = payload.get('data', {})
@@ -404,8 +419,10 @@ def generate_logs():
     data = request.json
     destination = data.get('destination', 'syslog')
     script_path = data.get('script')
-    log_count = int(data.get('count', 3))
+    log_count = int(data.get('count', 3)) if data.get('count') is not None else None
     eps = float(data.get('eps', 1.0))
+    continuous = data.get('continuous', False)
+    speed_mode = data.get('speed_mode', False)
     syslog_ip = data.get('ip')
     syslog_port = int(data.get('port')) if data.get('port') is not None else None
     syslog_protocol = data.get('protocol')
@@ -415,6 +432,15 @@ def generate_logs():
     # Back-compat fields
     hec_dest_id = data.get('hec_destination_id')
     syslog_dest_id = data.get('syslog_destination_id')
+    
+    # Auto-enable speed mode for high EPS
+    if continuous and eps > 1000 and not speed_mode:
+        speed_mode = True
+        logger.info("Auto-enabling Speed Mode for high throughput (>1000 EPS)")
+    
+    # Set log_count to a large number for continuous mode
+    if continuous:
+        log_count = 999999999  # Effectively infinite
     
     if destination == 'syslog':
         full_script_path = os.path.join(EVENT_GENERATORS_DIR, script_path)
@@ -561,15 +587,22 @@ def generate_logs():
                     return
 
                 yield f"INFO: Starting HEC send to {hec_url}...\n"
-                yield f"INFO: Sending {log_count} events for product '{product_id}' at {eps} EPS\n"
+                if continuous:
+                    speed_indicator = " (SPEED MODE)" if speed_mode else ""
+                    yield f"INFO: Running in CONTINUOUS mode for product '{product_id}' at {eps} EPS{speed_indicator} (press Stop to end)\n"
+                else:
+                    yield f"INFO: Sending {log_count} events for product '{product_id}' at {eps} EPS\n"
 
                 # Build path to hec_sender.py (Frontend/../Backend/event_generators/shared/hec_sender.py)
                 hec_sender_path = os.path.normpath(
                     os.path.join(os.path.dirname(__file__), '..', 'Backend', 'event_generators', 'shared', 'hec_sender.py')
                 )
                 if not os.path.exists(hec_sender_path):
-                    yield "ERROR: HEC sender not found.\n"
+                    yield f"ERROR: HEC sender not found at {hec_sender_path}\n"
                     return
+                
+                yield f"DEBUG: Using HEC sender at {hec_sender_path}\n"
+                yield f"DEBUG: Product: {product_id}, Count: {log_count}, EPS: {eps}, Continuous: {continuous}, Speed Mode: {speed_mode}\n"
 
                 # Normalize HEC URL: accept bare domain and append collector path
                 def _normalize_hec_url(u: str) -> str:
@@ -589,53 +622,137 @@ def generate_logs():
                 env = os.environ.copy()
                 env['S1_HEC_TOKEN'] = hec_token
                 env['S1_HEC_URL'] = normalized_hec_url
-                # Disable batch mode to get immediate HTTP responses
-                env['S1_HEC_BATCH'] = '0'
-                # Enable debug output to see exact payloads
+                
+                if continuous:
+                    # Batch mode for continuous
+                    env['S1_HEC_BATCH'] = '1'
+                    # Optimize batch size based on EPS
+                    if eps >= 10000:
+                        # High EPS: larger batches, faster flush
+                        env['S1_HEC_BATCH_MAX_BYTES'] = str(2 * 1024 * 1024)  # 2MB batches for high throughput
+                        env['S1_HEC_BATCH_FLUSH_MS'] = '200'  # Flush every 0.2 seconds (5x per second)
+                    elif eps >= 1000:
+                        # Medium EPS: balanced batches
+                        env['S1_HEC_BATCH_MAX_BYTES'] = str(512 * 1024)  # 512KB batches
+                        env['S1_HEC_BATCH_FLUSH_MS'] = '300'  # Flush every 0.3 seconds
+                    else:
+                        # Low EPS: smaller batches for visibility
+                        env['S1_HEC_BATCH_MAX_BYTES'] = str(256 * 1024)  # 256KB batches
+                        env['S1_HEC_BATCH_FLUSH_MS'] = '500'  # Flush every 0.5 seconds
+                else:
+                    # Single-send mode for small counts
+                    env['S1_HEC_BATCH'] = '0'
+                
+                # Enable debug output to see batch flushes and responses
                 env['S1_HEC_DEBUG'] = '1'
+                # Disable Python output buffering
+                env['PYTHONUNBUFFERED'] = '1'
 
                 # Calculate delay from EPS: delay = 1 / eps
                 delay = 1.0 / eps if eps > 0 else 1.0
-                command = ['python3', hec_sender_path, '--product', product_id, '-n', str(log_count), 
-                           '--min-delay', str(delay), '--max-delay', str(delay), '--print-responses']
-                logger.info(f"Executing HEC sender: {' '.join(command)}")
-                process = subprocess.Popen(
-                    command,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    env=env
-                )
+                # Use -u flag for unbuffered Python output
+                # Use --verbosity info for periodic status updates instead of per-event output
+                command = ['python3', '-u', hec_sender_path, '--product', product_id, '-n', str(log_count), 
+                           '--min-delay', str(delay), '--max-delay', str(delay), '--verbosity', 'info']
+                
+                # Add speed mode flag
+                if speed_mode:
+                    command.append('--speed-mode')
+                
+                command_str = ' '.join(command)
+                logger.info(f"Executing HEC sender: {command_str}")
+                yield f"DEBUG: Running command: {command_str}\n"
+                yield f"DEBUG: Environment vars: S1_HEC_BATCH={env.get('S1_HEC_BATCH')}, S1_HEC_DEBUG={env.get('S1_HEC_DEBUG')}\n"
+                
+                try:
+                    process = subprocess.Popen(
+                        command,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,  # Merge stderr into stdout for better debugging
+                        text=True,
+                        bufsize=1,  # Line buffered
+                        env=env
+                    )
+                    yield f"DEBUG: Process started with PID {process.pid}\n"
+                except Exception as e:
+                    yield f"ERROR: Failed to start process: {e}\n"
+                    logger.error(f"Failed to start HEC sender process: {e}", exc_info=True)
+                    return
 
                 # Stream sanitized output
                 line_count = 0
-                for line in iter(process.stdout.readline, ''):
-                    if not line:
-                        break
-                    line_count += 1
-                    # Redact token from output
-                    sanitized = line.replace(hec_token, '***REDACTED***')
-                    yield sanitized
-                    logger.debug(f"HEC sender output line {line_count}: {sanitized.strip()}")
+                event_count = 0
+                import select
+                
+                yield "DEBUG: Starting to read output...\n"
+                
+                try:
+                    # Check if process exits immediately
+                    import time
+                    time.sleep(0.5)
+                    poll_result = process.poll()
+                    if poll_result is not None:
+                        # Process exited immediately
+                        remaining_output = process.stdout.read()
+                        yield f"ERROR: Process exited immediately with code {poll_result}\n"
+                        if remaining_output:
+                            sanitized = remaining_output.replace(hec_token, '***REDACTED***')
+                            yield f"Output:\n{sanitized}\n"
+                        return
+                    
+                    yield "DEBUG: Process is running, reading output lines...\n"
+                    
+                    for line in iter(process.stdout.readline, ''):
+                        if not line:
+                            # Check if process has exited
+                            if process.poll() is not None:
+                                yield f"DEBUG: Process exited with code {process.returncode}\n"
+                                break
+                            continue
+                        
+                        # Check if client disconnected (for continuous mode)
+                        if request.environ.get('werkzeug.socket'):
+                            try:
+                                # This will fail if client disconnected
+                                request.environ.get('werkzeug.socket').getpeername()
+                            except:
+                                logger.info("Client disconnected, terminating process")
+                                process.terminate()
+                                yield "INFO: Stopped by client disconnect\n"
+                                break
+                        
+                        line_count += 1
+                        # Redact token from output
+                        sanitized = line.replace(hec_token, '***REDACTED***')
+                        yield sanitized
+                        logger.debug(f"HEC sender output line {line_count}: {sanitized.strip()}")
+                        
+                        # Count successful events for continuous mode progress
+                        if continuous:
+                            # Count based on status messages (QUEUED for batch, OK for non-batch)
+                            if 'queued' in sanitized.lower() or ('status' in sanitized.lower() and 'ok' in sanitized.lower()):
+                                event_count += 1
+                                if event_count % 100 == 0:
+                                    yield f"INFO: {event_count} events queued/sent so far...\n"
+                except (GeneratorExit, BrokenPipeError):
+                    # Client disconnected
+                    logger.info("Client disconnected (broken pipe), terminating process")
+                    process.terminate()
+                    return
 
-                # Capture any errors or additional output
+                # Wait for process completion
                 process.wait()
-                stderr_output = process.stderr.read() if process.stderr else ""
                 logger.info(f"HEC sender process completed with return code: {process.returncode}")
                 
-                if stderr_output:
-                    sanitized_stderr = stderr_output.replace(hec_token, '***REDACTED***')
-                    logger.info(f"HEC sender stderr: {sanitized_stderr}")
-                    # Show stderr output (may contain debug info)
-                    if sanitized_stderr.strip():
-                        yield f"DEBUG: {sanitized_stderr}\n"
-                
-                if process.returncode != 0:
+                # -15 is SIGTERM from our terminate() call
+                if process.returncode != 0 and process.returncode != -15:
                     logger.error(f"HEC send failed with return code {process.returncode}")
                     yield f"ERROR: HEC send failed with code {process.returncode}\n"
+                elif continuous and event_count > 0:
+                    yield f"INFO: Stopped after sending {event_count} events\n"
                 else:
-                    yield f"INFO: Successfully sent {log_count} events to HEC\n"
-                    logger.info(f"Successfully sent {log_count} events")
+                    yield f"INFO: Successfully sent {log_count if not continuous else event_count} events to HEC\n"
+                    logger.info(f"Successfully sent {log_count if not continuous else event_count} events")
 
         except FileNotFoundError:
             yield f"ERROR: Python executable not found. Please ensure Python is in your system's PATH.\n"
