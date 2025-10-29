@@ -278,10 +278,21 @@ def generate_showcase_attack_scenario():
 
 def save_scenario(scenario, filename="showcase_attack_scenario.json"):
     """Save scenario to file"""
-    with open(filename, 'w') as f:
+    # Use /app/data directory which is writable in the container
+    data_dir = "/app/data"
+    if not os.path.exists(data_dir):
+        # Fallback to current directory if /app/data doesn't exist (local dev)
+        data_dir = "."
+    
+    filepath = os.path.join(data_dir, filename)
+    
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(filepath) if os.path.dirname(filepath) else data_dir, exist_ok=True)
+    
+    with open(filepath, 'w') as f:
         json.dump(scenario, f, indent=2, default=str)
-    print(f"\n📁 Scenario saved to: {filename}")
-    return filename
+    print(f"\n📁 Scenario saved to: {filepath}")
+    return filepath
 
 if __name__ == "__main__":
     print("🏢 ENTERPRISE SHOWCASE ATTACK SCENARIO GENERATOR")
