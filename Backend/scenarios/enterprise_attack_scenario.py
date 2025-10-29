@@ -634,10 +634,18 @@ def generate_enhanced_attack_scenario():
 
 def save_scenario(scenario, filename="enterprise_attack_scenario.json"):
     """Save scenario to file"""
-    with open(filename, 'w') as f:
+    # Use /app/data directory which is writable in the container
+    data_dir = "/app/data"
+    
+    # Create the directory if it doesn't exist
+    os.makedirs(data_dir, exist_ok=True)
+    
+    filepath = os.path.join(data_dir, filename)
+    
+    with open(filepath, 'w') as f:
         json.dump(scenario, f, indent=2, default=str)
-    print(f"\n📁 Scenario saved to: {filename}")
-    return filename
+    print(f"\n📁 Scenario saved to: {filepath}")
+    return filepath
 
 if __name__ == "__main__":
     scenario = generate_enhanced_attack_scenario()
