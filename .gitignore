@@ -234,6 +234,15 @@ tmp/
 *.sqlite3
 *.db-journal
 
+# API Data Directory
+# ==================
+# Ignore uploaded files and database files in data directory
+Backend/api/data/
+api/data/
+data/uploads/
+data/*.db
+data/*.sqlite
+
 # Archive Files
 # =============
 *.zip
@@ -250,6 +259,8 @@ tmp/
 !sample.csv
 large_datasets/
 bulk_events/
+uploads/
+uploaded_files/
 
 # API Documentation Files
 # =======================
