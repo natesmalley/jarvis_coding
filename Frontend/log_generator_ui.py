@@ -1,6 +1,7 @@
 import os
 import subprocess
 import json
+import csv
 import socket
 import requests
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context
@@ -406,6 +407,282 @@ def run_scenario():
             yield f"ERROR: Scenario execution failed: {e}\n"
     
     return Response(stream_with_context(generate_and_stream()), mimetype='text/plain')
+
+@app.route('/uploads', methods=['POST'])
+def upload_file():
+    """Upload a CSV or JSON file"""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    # Validate file extension
+    allowed_extensions = {'.csv', '.json'}
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in allowed_extensions:
+        return jsonify({'error': f'Invalid file type. Only CSV and JSON files are allowed'}), 400
+    
+    try:
+        # Forward to backend API
+        files = {'file': (file.filename, file.stream, file.content_type)}
+        resp = requests.post(
+            f"{API_BASE_URL}/api/v1/uploads/upload",
+            files=files,
+            headers=_get_api_headers(),
+            timeout=300  # 5 min timeout for large files
+        )
+        
+        if resp.status_code == 201:
+            return jsonify(resp.json()), 201
+        else:
+            error_detail = resp.json().get('detail', resp.text) if resp.headers.get('content-type') == 'application/json' else resp.text
+            return jsonify({'error': error_detail}), resp.status_code
+    except Exception as e:
+        logger.error(f"Failed to upload file: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/uploads', methods=['GET'])
+def list_uploads():
+    """List uploaded files"""
+    try:
+        resp = requests.get(
+            f"{API_BASE_URL}/api/v1/uploads/uploads",
+            headers=_get_api_headers(),
+            timeout=10
+        )
+        if resp.status_code == 200:
+            return jsonify({'uploads': resp.json()})
+        else:
+            return jsonify({'error': f'Backend error: {resp.status_code}'}), resp.status_code
+    except Exception as e:
+        logger.error(f"Failed to list uploads: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/uploads/<upload_id>', methods=['DELETE'])
+def delete_upload(upload_id: str):
+    """Delete an uploaded file"""
+    try:
+        resp = requests.delete(
+            f"{API_BASE_URL}/api/v1/uploads/uploads/{upload_id}",
+            headers=_get_api_headers(),
+            timeout=10
+        )
+        if resp.status_code == 204:
+            return ('', 204)
+        else:
+            error_detail = resp.json().get('detail', resp.text) if resp.headers.get('content-type') == 'application/json' else resp.text
+            return jsonify({'error': error_detail}), resp.status_code
+    except Exception as e:
+        logger.error(f"Failed to delete upload: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/uploads/process', methods=['POST'])
+def process_upload():
+    """Process an uploaded file through HEC"""
+    data = request.json
+    upload_id = data.get('upload_id')
+    destination_id = data.get('destination_id')
+    batch_size = int(data.get('batch_size', 100))
+    eps = float(data.get('eps', 10.0))
+    sourcetype = data.get('sourcetype', '').strip()
+    endpoint = data.get('endpoint', 'event')  # 'event' or 'raw'
+    
+    if not upload_id:
+        return jsonify({'error': 'upload_id is required'}), 400
+    if not destination_id:
+        return jsonify({'error': 'destination_id is required'}), 400
+    if not sourcetype:
+        return jsonify({'error': 'sourcetype is required'}), 400
+    
+    def generate_and_stream():
+        try:
+            # Get upload metadata from backend
+            upload_resp = requests.get(
+                f"{API_BASE_URL}/api/v1/uploads/uploads/{upload_id}",
+                headers=_get_api_headers(),
+                timeout=10
+            )
+            if upload_resp.status_code != 200:
+                yield "ERROR: Upload not found\n"
+                return
+            
+            upload_info = upload_resp.json()
+            file_type = upload_info.get('file_type')
+            line_count = upload_info.get('line_count', 0)
+            
+            # Get destination info
+            dest_resp = requests.get(
+                f"{API_BASE_URL}/api/v1/destinations/{destination_id}",
+                headers=_get_api_headers(),
+                timeout=10
+            )
+            if dest_resp.status_code != 200:
+                yield "ERROR: Destination not found\n"
+                return
+            
+            destination = dest_resp.json()
+            if destination.get('type') != 'hec':
+                yield "ERROR: Only HEC destinations are supported for file uploads\n"
+                return
+            
+            hec_url = destination.get('url')
+            
+            # Get decrypted token
+            token_resp = requests.get(
+                f"{API_BASE_URL}/api/v1/destinations/{destination_id}/token",
+                headers=_get_api_headers(),
+                timeout=10
+            )
+            if token_resp.status_code != 200:
+                yield "ERROR: Failed to retrieve HEC token\n"
+                return
+            
+            hec_token = token_resp.json().get('token')
+            
+            yield f"INFO: Processing {file_type.upper()} file with {line_count} records\n"
+            yield f"INFO: Sending to {hec_url} at {eps} EPS\n"
+            yield f"INFO: Using sourcetype: {sourcetype}\n"
+            yield f"INFO: HEC Endpoint: /{endpoint}\n"
+            
+            # Read the uploaded file from backend data directory
+            # Since we're in Flask, we need to read from the backend's upload directory
+            backend_upload_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Backend', 'api', 'data', 'uploads'))
+            safe_filename = upload_info.get('id') + '_' + upload_info.get('filename')
+            file_path = os.path.join(backend_upload_dir, safe_filename)
+            
+            if not os.path.exists(file_path):
+                yield f"ERROR: File not found at {file_path}\n"
+                return
+            
+            # Process file and send to HEC
+            import time as time_module
+            delay = 1.0 / eps if eps > 0 else 0.1
+            sent_count = 0
+            
+            # Build path to hec_sender.py
+            hec_sender_path = os.path.normpath(
+                os.path.join(os.path.dirname(__file__), '..', 'Backend', 'event_generators', 'shared', 'hec_sender.py')
+            )
+            
+            # Build HEC URL with endpoint
+            base_hec_url = hec_url.rstrip('/')
+            if not base_hec_url.endswith('/services/collector'):
+                base_hec_url += '/services/collector'
+            
+            if endpoint == 'event':
+                hec_endpoint_url = f"{base_hec_url}/event"
+            else:
+                hec_endpoint_url = f"{base_hec_url}/raw?sourcetype={sourcetype}"
+            
+            if file_type == 'json':
+                with open(file_path, 'r') as f:
+                    data_content = json.load(f)
+                    records = data_content if isinstance(data_content, list) else [data_content]
+                    
+                    for record in records:
+                        try:
+                            if endpoint == 'event':
+                                # Send to HEC /event endpoint with sourcetype in payload
+                                headers_local = {
+                                    'Authorization': f'Splunk {hec_token}',
+                                    'Content-Type': 'application/json'
+                                }
+                                payload = {
+                                    'event': record,
+                                    'sourcetype': sourcetype
+                                }
+                                resp = requests.post(
+                                    hec_endpoint_url,
+                                    json=payload,
+                                    headers=headers_local,
+                                    verify=True,
+                                    timeout=10
+                                )
+                            else:
+                                # Send to HEC /raw endpoint (sourcetype in URL)
+                                headers_local = {
+                                    'Authorization': f'Splunk {hec_token}',
+                                    'Content-Type': 'text/plain'
+                                }
+                                # Convert JSON to string for raw endpoint
+                                raw_data = json.dumps(record) if isinstance(record, dict) else str(record)
+                                resp = requests.post(
+                                    hec_endpoint_url,
+                                    data=raw_data,
+                                    headers=headers_local,
+                                    verify=True,
+                                    timeout=10
+                                )
+                            
+                            resp.raise_for_status()
+                            sent_count += 1
+                            if sent_count % 10 == 0:
+                                yield f"INFO: Sent {sent_count}/{len(records)} events\n"
+                            time_module.sleep(delay)
+                        except Exception as e:
+                            yield f"ERROR: Failed to send event: {e}\n"
+                            
+            elif file_type == 'csv':
+                with open(file_path, 'r') as f:
+                    reader = csv.DictReader(f)
+                    records = list(reader)
+                    
+                    for record in records:
+                        try:
+                            if endpoint == 'event':
+                                # Send to HEC /event endpoint as JSON with sourcetype
+                                headers_local = {
+                                    'Authorization': f'Splunk {hec_token}',
+                                    'Content-Type': 'application/json'
+                                }
+                                payload = {
+                                    'event': record,
+                                    'sourcetype': sourcetype
+                                }
+                                resp = requests.post(
+                                    hec_endpoint_url,
+                                    json=payload,
+                                    headers=headers_local,
+                                    verify=True,
+                                    timeout=10
+                                )
+                            else:
+                                # Send to HEC /raw endpoint (sourcetype in URL)
+                                headers_local = {
+                                    'Authorization': f'Splunk {hec_token}',
+                                    'Content-Type': 'text/plain'
+                                }
+                                # Convert CSV row to key=value format for raw endpoint
+                                raw_data = ' '.join([f'{k}={v}' for k, v in record.items()])
+                                resp = requests.post(
+                                    hec_endpoint_url,
+                                    data=raw_data,
+                                    headers=headers_local,
+                                    verify=True,
+                                    timeout=10
+                                )
+                            
+                            resp.raise_for_status()
+                            sent_count += 1
+                            if sent_count % 10 == 0:
+                                yield f"INFO: Sent {sent_count}/{len(records)} events\n"
+                            time_module.sleep(delay)
+                        except Exception as e:
+                            yield f"ERROR: Failed to send event: {e}\n"
+            
+            yield f"INFO: Successfully sent {sent_count} events to HEC\n"
+            
+        except Exception as e:
+            logger.error(f"Failed to process upload: {e}", exc_info=True)
+            yield f"ERROR: Failed to process upload: {e}\n"
+    
+    return Response(stream_with_context(generate_and_stream()), mimetype='text/plain')
+
 
 @app.route('/get-scripts', methods=['GET'])
 def get_available_scripts():

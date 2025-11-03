@@ -16,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from app.core.config import settings
-from app.routers import generators, parsers, health, scenarios, export, metrics, search, categories, destinations
+from app.routers import generators, parsers, health, scenarios, export, metrics, search, categories, destinations, uploads
 from app.utils.logging import setup_logging
 from app.core.simple_auth import validate_api_keys_config
 from app.services.destination_service import init_db
@@ -216,6 +216,12 @@ app.include_router(
     destinations.router,
     prefix=f"{settings.API_V1_STR}/destinations",
     tags=["destinations"]
+)
+
+app.include_router(
+    uploads.router,
+    prefix=f"{settings.API_V1_STR}/uploads",
+    tags=["uploads"]
 )
 
 if __name__ == "__main__":
