@@ -67,6 +67,10 @@ attack_scenario_*.json
 scenario_*.json
 !scenario_example.json
 
+# Generated Scenario Configs (timestamped outputs)
+Backend/scenarios/configs/*.json
+!Backend/scenarios/configs/*_example.json
+
 # Generated Event Files
 # ====================
 events_*.json

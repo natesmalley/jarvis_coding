@@ -28,6 +28,7 @@ import json
 import sys
 import os
 import errno
+import random
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List
 
@@ -121,15 +122,25 @@ def generate_normal_day_events(base_time: datetime, day: int) -> List[Dict]:
         file_time = get_scenario_time(base_time, day, hour, 15)
         m365_event_str = microsoft_365_collaboration_log()
         m365_event = json.loads(m365_event_str) if isinstance(m365_event_str, str) else m365_event_str
+        
+        filename = file_names[i % len(file_names)]
+        file_path = f"/Finance Department/Reports/{filename}"
+        file_size = random.randint(50000, 500000)  # 50KB - 500KB
+        
         m365_event['TimeStamp'] = file_time
         m365_event['UserId'] = JAKE_PROFILE['email']
         m365_event['ClientIP'] = JAKE_PROFILE['normal_ip']
         m365_event['Operation'] = 'FileAccessed'
-        m365_event['ObjectId'] = file_names[i % len(file_names)]
-        m365_event['Workload'] = 'OneDrive'
+        m365_event['ObjectId'] = file_path
+        m365_event['FileName'] = filename
+        m365_event['FileSize'] = file_size
+        m365_event['Workload'] = 'SharePoint'
+        m365_event['RecordType'] = 6  # SharePoint file operations
+        m365_event['SiteUrl'] = 'https://securatech.sharepoint.com/sites/Finance'
+        m365_event['TargetUser'] = JAKE_PROFILE['email']  # Maps to user.email_addr for queries
+        m365_event['EventType'] = 'Audit.SharePoint'  # Maps to event.type
         # Remove unrealistic fields
         m365_event.pop('Details', None)
-        m365_event.pop('TargetUser', None)
         m365_event.pop('RequestedBy', None)
         m365_event.pop('ThreatIndicator', None)
         
@@ -142,13 +153,44 @@ def generate_mfa_fatigue_attack(base_time: datetime) -> List[Dict]:
     events = []
     day = 7  # Day 8 (0-indexed)
     
-    # Attack starts at 7:30 PM Denver time (which is early morning in Moscow)
-    attack_start_hour = 19  # 7 PM
-    attack_start_minute = 30
-    
     print(f"🚨 Day 8 - MFA Fatigue Attack from Russia")
     print(f"   Attacker IP: {ATTACKER_PROFILE['ip']}")
     print(f"   Location: {ATTACKER_PROFILE['location']}")
+    
+    # IMPOSSIBLE TRAVELER: Normal Denver login at 7:00 PM
+    denver_login_time = get_scenario_time(base_time, day, 19, 0)  # 7:00 PM
+    okta_denver_str = okta_authentication_log()
+    okta_denver = json.loads(okta_denver_str) if isinstance(okta_denver_str, str) else okta_denver_str
+    okta_denver['published'] = denver_login_time
+    okta_denver['eventType'] = 'user.session.start'
+    okta_denver['actor']['alternateId'] = JAKE_PROFILE['email']
+    okta_denver['actor']['displayName'] = JAKE_PROFILE['name']
+    okta_denver['client']['ipAddress'] = JAKE_PROFILE['normal_ip']
+    okta_denver['client']['geographicalContext']['city'] = 'Denver'
+    okta_denver['client']['geographicalContext']['state'] = 'Colorado'
+    okta_denver['client']['geographicalContext']['country'] = 'United States'
+    okta_denver['outcome']['result'] = 'SUCCESS'
+    okta_denver['outcome']['reason'] = 'User logged in successfully'
+    okta_denver['displayMessage'] = 'Evening login from Denver office'
+    okta_denver['severity'] = 'INFO'
+    
+    events.append(create_event(denver_login_time, "okta_authentication", "normal_behavior", okta_denver))
+    
+    # Azure AD sign-in from Denver at 7:00 PM
+    azuread_denver_str = azuread_log()
+    azuread_denver = json.loads(azuread_denver_str) if isinstance(azuread_denver_str, str) else azuread_denver_str
+    azuread_denver['initiatedByUserUserPrincipalName'] = JAKE_PROFILE['email']
+    azuread_denver['initiatedByUserIpAddress'] = JAKE_PROFILE['normal_ip']
+    azuread_denver['result'] = 'success'
+    azuread_denver['activityDisplayName'] = 'User signed in'
+    
+    events.append(create_event(denver_login_time, "microsoft_azuread", "normal_behavior", azuread_denver))
+    print(f"   ✓ Normal Denver login at 7:00 PM (Okta + Azure AD)")
+    
+    # Attack starts at 7:30 PM (30 minutes later from Moscow - IMPOSSIBLE!)
+    attack_start_hour = 19  # 7 PM
+    attack_start_minute = 30
+    print(f"   ⚠️  IMPOSSIBLE TRAVELER: Moscow login 30 minutes after Denver (~5,000 miles)")
     
     # Generate 15 failed MFA attempts (MFA Fatigue)
     for i in range(15):
@@ -273,16 +315,24 @@ def generate_data_exfiltration(base_time: datetime) -> List[Dict]:
         access_time = get_scenario_time(base_time, day, exfil_start_hour, exfil_start_minute + i)
         m365_access_str = microsoft_365_collaboration_log()
         m365_access = json.loads(m365_access_str) if isinstance(m365_access_str, str) else m365_access_str
+        file_path = f"/Finance Department/Confidential/{filename}"
+        file_size = random.randint(100000, 5000000)  # 100KB - 5MB for sensitive files
+        
         m365_access['TimeStamp'] = access_time
         m365_access['UserId'] = JAKE_PROFILE['email']
         m365_access['ClientIP'] = ATTACKER_PROFILE['ip']
         m365_access['Operation'] = 'FileAccessed'
-        m365_access['ObjectId'] = filename
-        m365_access['Workload'] = 'OneDrive'
+        m365_access['ObjectId'] = file_path
+        m365_access['FileName'] = filename
+        m365_access['FileSize'] = file_size
+        m365_access['Workload'] = 'SharePoint'
+        m365_access['RecordType'] = 6  # SharePoint file operations
+        m365_access['SiteUrl'] = 'https://securatech.sharepoint.com/sites/Finance'
+        m365_access['TargetUser'] = JAKE_PROFILE['email']  # Maps to user.email_addr for queries
+        m365_access['EventType'] = 'Audit.SharePoint'  # Maps to event.type
         m365_access['UserAgent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Automated Download'
         # Remove unrealistic fields
         m365_access.pop('Details', None)
-        m365_access.pop('TargetUser', None)
         m365_access.pop('RequestedBy', None)
         m365_access.pop('ThreatIndicator', None)
         
@@ -292,16 +342,21 @@ def generate_data_exfiltration(base_time: datetime) -> List[Dict]:
         download_time = get_scenario_time(base_time, day, exfil_start_hour, exfil_start_minute + i, 30)
         m365_download_str = microsoft_365_collaboration_log()
         m365_download = json.loads(m365_download_str) if isinstance(m365_download_str, str) else m365_download_str
+        
         m365_download['TimeStamp'] = download_time
         m365_download['UserId'] = JAKE_PROFILE['email']
         m365_download['ClientIP'] = ATTACKER_PROFILE['ip']
         m365_download['Operation'] = 'FileDownloaded'
-        m365_download['ObjectId'] = filename
-        m365_download['Workload'] = 'OneDrive'
-        m365_download['FileSize'] = f'{(i+1) * 150}KB'
+        m365_download['ObjectId'] = file_path
+        m365_download['FileName'] = filename
+        m365_download['FileSize'] = file_size
+        m365_download['Workload'] = 'SharePoint'
+        m365_download['RecordType'] = 6  # SharePoint file operations
+        m365_download['SiteUrl'] = 'https://securatech.sharepoint.com/sites/Finance'
+        m365_download['TargetUser'] = JAKE_PROFILE['email']  # Maps to user.email_addr for queries
+        m365_download['EventType'] = 'Audit.SharePoint'  # Maps to event.type
         # Remove unrealistic fields
         m365_download.pop('Details', None)
-        m365_download.pop('TargetUser', None)
         m365_download.pop('RequestedBy', None)
         m365_download.pop('ThreatIndicator', None)
         
