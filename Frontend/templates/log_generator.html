@@ -347,6 +347,49 @@
                         <p class="text-xs text-[#b8a0d2] mt-1">More workers = Higher throughput (default: 10)</p>
                     </div>
 
+                    <details class="bg-[#241d3a] rounded-lg p-3 border border-[#3c325c]">
+                        <summary class="cursor-pointer text-sm font-semibold text-[#c8b3e8]">Metadata Options</summary>
+                        <div class="mt-3 space-y-2 text-sm">
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" id="include-phase-tag" checked>
+                                <span class="text-[#f3e8ff]">Include <code>scenario.phase</code> tag for tracking</span>
+                            </label>
+                            <p class="text-xs text-[#b8a0d2]">Uncheck to disable adding the <code>scenario.phase</code> attribute on events sent to HEC.</p>
+                            <div class="mt-3 pt-3 border-t border-[#3c325c] space-y-2">
+                                <label class="flex items-center gap-2">
+                                    <input type="checkbox" id="include-trace-id" checked>
+                                    <span class="text-[#f3e8ff]">Attach <code>scenario.trace_id</code> to every event</span>
+                                </label>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div class="md:col-span-2 input-group">
+                                        <label for="trace-id" class="text-sm font-semibold text-[#c8b3e8]">Trace ID (GUID)</label>
+                                        <input type="text" id="trace-id" placeholder="e.g. 3f2504e0-4f89-11d3-9a0c-0305e82c3301">
+                                    </div>
+                                    <div class="flex items-end">
+                                        <button type="button" id="gen-trace-id" class="btn" style="width:auto; padding:0.6rem 1rem;">Generate</button>
+                                    </div>
+                                </div>
+                                <p class="text-xs text-[#b8a0d2]">If blank, a GUID can be auto-generated. Use this value to correlate the full run.</p>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details class="bg-[#241d3a] rounded-lg p-3 border border-[#3c325c]">
+                        <summary class="cursor-pointer text-sm font-semibold text-[#c8b3e8]">Background Noise Options</summary>
+                        <div class="mt-3 space-y-2 text-sm">
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" id="generate-noise">
+                                <span class="text-[#f3e8ff]">Generate background noise data</span>
+                            </label>
+                            <p class="text-xs text-[#b8a0d2]">Generates realistic activity from other users during the same 8-day window. 70% during business hours (8 AM - 5 PM EST), 30% off-hours.</p>
+                            <div class="mt-3 input-group">
+                                <label for="noise-events-count" class="text-sm font-semibold text-[#c8b3e8]">Total Noise Events</label>
+                                <input type="number" id="noise-events-count" value="1200" min="100" max="1000000" step="100">
+                                <p class="text-xs text-[#b8a0d2] mt-1">Recommended: 1200 events (400 per source: Okta, Azure AD, M365). Max: 1M events.</p>
+                            </div>
+                        </div>
+                    </details>
+
                     <button type="submit" id="run-scenario-btn" class="btn">
                         Run Scenario
                     </button>
@@ -498,6 +541,19 @@
 
         async function fetchScripts() {
             try {
+                // Trace options
+                const tagPhase = document.getElementById('include-phase-tag')?.checked !== false;
+                const tagTrace = document.getElementById('include-trace-id')?.checked !== false;
+                let traceId = (document.getElementById('trace-id')?.value || '').trim();
+                // Generate a GUID if requested/blank but trace tagging is enabled
+                if (tagTrace && !traceId) {
+                    // browser GUID
+                    traceId = ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+                        (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+                    );
+                    const traceInput = document.getElementById('trace-id');
+                    if (traceInput) traceInput.value = traceId;
+                }
                 const response = await fetch('/get-generators');
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -832,6 +888,22 @@
             scenarioOutputBox.innerText = '';
             
             try {
+                // Metadata options
+                const tagPhase = document.getElementById('include-phase-tag')?.checked !== false;
+                const tagTrace = document.getElementById('include-trace-id')?.checked !== false;
+                let traceId = (document.getElementById('trace-id')?.value || '').trim();
+                // Auto-generate a GUID if tagging is enabled and no trace id provided
+                if (tagTrace && !traceId) {
+                    traceId = ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+                        (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+                    );
+                    const traceInput = document.getElementById('trace-id');
+                    if (traceInput) traceInput.value = traceId;
+                }
+                // Background noise options
+                const generateNoise = document.getElementById('generate-noise')?.checked || false;
+                const noiseEventsCount = parseInt(document.getElementById('noise-events-count')?.value || '1200', 10);
+                
                 const response = await fetch('/scenarios/run', {
                     method: 'POST',
                     headers: {
@@ -840,7 +912,12 @@
                     body: JSON.stringify({
                         scenario_id: selectedId,
                         destination_id: destinationId,
-                        workers: workerCount
+                        workers: workerCount,
+                        tag_phase: tagPhase,
+                        tag_trace: tagTrace,
+                        trace_id: traceId,
+                        generate_noise: generateNoise,
+                        noise_events_count: noiseEventsCount
                     })
                 });
                 
@@ -869,6 +946,19 @@
         });
 
         fetchScenarios();
+        // GUID generate button for Trace ID
+        const genBtn = document.getElementById('gen-trace-id');
+        if (genBtn) {
+            genBtn.addEventListener('click', () => {
+                const guid = ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+                    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+                );
+                const traceInput = document.getElementById('trace-id');
+                if (traceInput) traceInput.value = guid;
+                const traceChk = document.getElementById('include-trace-id');
+                if (traceChk) traceChk.checked = true;
+            });
+        }
         })();
     });
 </script>

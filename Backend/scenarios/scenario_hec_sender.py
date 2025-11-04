@@ -11,9 +11,12 @@ import json
 import os
 import time
 import random
+import argparse
+import uuid
 import requests
+import re
 from datetime import datetime, timezone
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 # Import the existing hec_sender functionality
 from hec_sender import send_one
@@ -54,8 +57,12 @@ class ScenarioHECSender:
         print(f"📁 Loading scenario from: {scenario_file}")
         
         with open(scenario_file, 'r') as f:
-            events = json.load(f)
-        
+            data = json.load(f)
+        # Support either a plain list of events or an object with 'events'
+        if isinstance(data, dict) and 'events' in data:
+            events = data['events']
+        else:
+            events = data
         print(f"📊 Loaded {len(events)} events")
         return events
     
@@ -99,9 +106,9 @@ class ScenarioHECSender:
             try:
                 # Handle timing
                 if real_time and last_timestamp:
-                    current_time = datetime.fromisoformat(event['timestamp'].replace('Z', '+00:00'))
-                    last_time = datetime.fromisoformat(last_timestamp.replace('Z', '+00:00'))
-                    time_diff = (current_time - last_time).total_seconds()
+                    current_time = self._parse_timestamp(event.get('timestamp'))
+                    last_time = self._parse_timestamp(last_timestamp)
+                    time_diff = (current_time - last_time).total_seconds() if current_time and last_time else 0
                     
                     # Apply speed multiplier
                     adjusted_delay = time_diff / speed_multiplier
@@ -157,43 +164,58 @@ class ScenarioHECSender:
     def _send_single_event(self, event: Dict, preserve_timestamp: bool = True) -> bool:
         """Send a single event to the appropriate HEC endpoint"""
         try:
-            platform = event.get('platform', 'unknown')
-            raw_event = event.get('raw_event', '{}')
-            
-            # Determine which product to use for this platform
-            if platform in self.platform_mapping:
-                products = self.platform_mapping[platform]
-                product = random.choice(products)  # Randomly select from available products
-            else:
-                print(f"⚠️  Unknown platform: {platform}")
+            # Product is the generator/source identifier (e.g., okta_authentication)
+            product = event.get('source') or event.get('product') or 'unknown'
+            if product == 'unknown':
+                print("⚠️  Event missing 'source' field; skipping")
                 return False
-            
-            # Get ATTR_FIELDS for this product
+
+            # Build raw event body from 'event' field (dict -> JSON, str -> as-is)
+            payload = event.get('event', {})
+            if isinstance(payload, dict):
+                raw_event = json.dumps(payload, separators=(',', ':'))
+            else:
+                raw_event = str(payload)
+
+            # Build attributes
             attr_fields = self.product_attr_fields.get(product, {})
-            
-            # Add scenario context to attr_fields
+            # Decide whether to include scenario.phase
+            env_tag_phase = os.getenv("S1_TAG_PHASE")
+            include_phase_tag = True if env_tag_phase is None else env_tag_phase not in ("0", "false", "False")
             enhanced_attr_fields = {
                 **attr_fields,
-                "scenario.campaign_id": event.get('campaign_id', ''),
-                "scenario.phase": event.get('phase', ''),
-                "scenario.day": str(event.get('day', '')),
-                "scenario.platform": platform
+                "scenario.timestamp": event.get('timestamp', ''),
             }
-            
-            # If preserving timestamps and this is a JSON product, inject the timestamp into the event
-            if preserve_timestamp and event.get('timestamp') and product in self.product_attr_fields:
+            if include_phase_tag:
+                enhanced_attr_fields["scenario.phase"] = event.get('phase', '')
+            # Trace tagging via environment
+            env_tag_trace = os.getenv("S1_TAG_TRACE")
+            include_trace_tag = True if env_tag_trace is None else env_tag_trace not in ("0", "false", "False")
+            trace_id_env = os.getenv("S1_TRACE_ID")
+            if include_trace_tag and trace_id_env:
+                enhanced_attr_fields["scenario.trace_id"] = trace_id_env
+
+            # Inject scenario timestamp into JSON payload for consistent downstream time handling
+            if preserve_timestamp and isinstance(payload, dict) and event.get('timestamp'):
                 try:
-                    # Parse the raw event JSON
-                    event_data = json.loads(raw_event)
-                    # Ensure the event has the original timestamp
-                    event_data['_time'] = event['timestamp']
-                    raw_event = json.dumps(event_data, separators=(',', ':'))
-                except:
-                    # If we can't parse/modify, just send as-is
+                    payload_copy = dict(payload)
+                    ts = event['timestamp']
+                    # Set _time to scenario timestamp for HEC/Splunk indexing
+                    payload_copy.setdefault('_time', ts)
+                    raw_event = json.dumps(payload_copy, separators=(',', ':'))
+                except Exception:
                     pass
-            
-            # Send the event using existing hec_sender functionality
-            response = send_one(raw_event, product, enhanced_attr_fields)
+
+            # Preserve original event time in HEC envelope if available
+            event_time_sec = None
+            ts = event.get('timestamp')
+            if ts:
+                dt = self._parse_timestamp(ts)
+                if dt:
+                    event_time_sec = dt.timestamp()
+
+            # Send via existing hec sender (passing event_time to set HEC envelope time)
+            send_one(raw_event, product, enhanced_attr_fields, event_time=event_time_sec)
             
             return True
             
@@ -215,14 +237,14 @@ class ScenarioHECSender:
         timestamps = []
         for event in events:
             timestamp = event.get('timestamp')
-            platform = event.get('platform', 'unknown')
+            source = event.get('source', 'unknown')
             phase = event.get('phase', 'unknown')
-            
+
             if timestamp:
                 timestamps.append(timestamp)
-            
-            # Count by platform
-            analysis["platforms"][platform] = analysis["platforms"].get(platform, 0) + 1
+
+            # Count by platform (use source as proxy)
+            analysis["platforms"][source] = analysis["platforms"].get(source, 0) + 1
             
             # Count by phase
             analysis["phases"][phase] = analysis["phases"].get(phase, 0) + 1
@@ -245,107 +267,177 @@ class ScenarioHECSender:
         
         return analysis
 
+    def _parse_timestamp(self, ts: str) -> Optional[datetime]:
+        """Parse various ISO8601-like timestamp formats into a timezone-aware datetime.
+        Returns None if parsing fails.
+        """
+        if not ts:
+            return None
+        s = str(ts).strip()
+        try:
+            # Normalize space separator to 'T'
+            if ' ' in s and 'T' not in s:
+                s = s.replace(' ', 'T')
+            # Normalize Zulu designator
+            if s.endswith('Z'):
+                s = s[:-1] + '+00:00'
+            # Add missing colon in timezone offset (e.g., +0000 -> +00:00)
+            if re.search(r"[+-]\d{4}$", s):
+                s = s[:-5] + s[-5:-2] + ':' + s[-2:]
+            # If no timezone provided, assume UTC
+            if re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$", s):
+                s = s + '+00:00'
+            return datetime.fromisoformat(s)
+        except Exception:
+            # Best-effort strptime fallbacks
+            fmts = [
+                '%Y-%m-%dT%H:%M:%S%z',
+                '%Y-%m-%dT%H:%M:%S.%f%z',
+                '%Y-%m-%d %H:%M:%S%z',
+                '%Y-%m-%d %H:%M:%S.%f%z',
+                '%Y-%m-%dT%H:%M:%S',
+                '%Y-%m-%dT%H:%M:%S.%f',
+            ]
+            for fmt in fmts:
+                try:
+                    dt = datetime.strptime(s, fmt)
+                    # Assume UTC if naive
+                    if dt.tzinfo is None:
+                        return dt.replace(tzinfo=timezone.utc)
+                    return dt
+                except Exception:
+                    continue
+        return None
+
 def main():
     """Main execution function"""
     print("📡 SCENARIO HEC SENDER")
     print("Send attack scenario events to SentinelOne AI-SIEM")
     print("=" * 50)
-    
+
+    parser = argparse.ArgumentParser(description="Replay scenario events to HEC")
+    parser.add_argument("--scenario", help="Path to scenario JSON file")
+    parser.add_argument("--auto", action="store_true", help="Run non-interactively with sane defaults")
+    parser.add_argument("--preserve-timestamps", action="store_true", help="Preserve original timestamps")
+    parser.add_argument("--real-time", action="store_true", help="Respect original event timing for replay")
+    parser.add_argument("--speed", type=float, default=1.0, help="Speed multiplier for real-time mode")
+    parser.add_argument("--delay", type=float, default=0.0, help="Delay between events (non real-time mode)")
+    parser.add_argument("--no-phase-tag", action="store_true", help="Disable adding scenario.phase attribute field")
+    parser.add_argument("--trace-id", help="Attach this trace ID (GUID) to every event as scenario.trace_id")
+    args = parser.parse_args()
+
     # Initialize sender
     try:
         sender = ScenarioHECSender()
     except RuntimeError as e:
         print(f"❌ Configuration error: {e}")
         return
-    
-    # Get scenario file
-    scenario_file = input("Enter scenario JSON file path: ").strip()
-    if not scenario_file:
-        print("❌ No file specified")
-        return
-    
+
+    # Determine scenario file
+    if args.scenario:
+        scenario_file = args.scenario
+    else:
+        scenario_file = input("Enter scenario JSON file path: ").strip()
+        if not scenario_file:
+            print("❌ No file specified")
+            return
+
     if not os.path.exists(scenario_file):
         print(f"❌ File not found: {scenario_file}")
         return
-    
+
     # Load and analyze scenario
     events = sender.load_scenario(scenario_file)
     analysis = sender.analyze_scenario(events)
-    
+
     print(f"\n📊 SCENARIO ANALYSIS")
     print(f"   Total Events: {analysis['total_events']}")
     print(f"   Date Range: {analysis['date_range'].get('start', 'N/A')} to {analysis['date_range'].get('end', 'N/A')}")
     print(f"   Platforms: {', '.join(analysis['platforms'].keys())}")
     print(f"   Attack Phases: {len(analysis['phases'])}")
-    
-    print(f"\n📈 Timeline:")
-    for phase_info in analysis["timeline"]:
-        print(f"   {phase_info['phase'].title()}: {phase_info['event_count']} events")
-    
-    # Configuration options
+
     print(f"\n⚙️  TRANSMISSION OPTIONS")
-    
-    # Check if events are historical (in the past)
-    first_event_time = datetime.fromisoformat(events[0]['timestamp'].replace('Z', '+00:00'))
-    is_historical = first_event_time < datetime.now(timezone.utc)
-    
-    if is_historical:
-        print(f"📅 Historical data detected (events from {analysis['date_range'].get('start', 'N/A')})")
-        preserve_timestamps = input("Preserve original timestamps? (Y/n): ").lower() != 'n'
+
+    # Determine whether to include scenario.phase tag
+    env_tag_phase = os.getenv("S1_TAG_PHASE")
+    include_phase_tag = True
+    if env_tag_phase is not None:
+        include_phase_tag = env_tag_phase not in ("0", "false", "False")
+    if args.no_phase_tag:
+        include_phase_tag = False
+
+    # Trace ID handling (env or CLI). Default: enabled and generate if not provided
+    env_tag_trace = os.getenv("S1_TAG_TRACE")
+    include_trace_tag = True if env_tag_trace is None else env_tag_trace not in ("0", "false", "False")
+    trace_id = args.trace_id or os.getenv("S1_TRACE_ID")
+    if include_trace_tag and not trace_id:
+        trace_id = str(uuid.uuid4())
+    if include_trace_tag:
+        print(f"🧵 Trace ID: {trace_id}")
+
+    if args.auto:
+        preserve_timestamps = args.preserve_timestamps or True
+        real_time = args.real_time or False
+        speed_multiplier = args.speed
+        delay = args.delay
     else:
-        preserve_timestamps = True
-    
-    real_time = input("Respect original event timing for replay? (y/N): ").lower().startswith('y')
-    
-    if real_time:
-        speed_multiplier = float(input("Speed multiplier (1.0 = normal, 2.0 = 2x faster): ") or "1.0")
-    else:
-        speed_multiplier = 1.0
-        delay = float(input("Delay between events in seconds (default 0.1): ") or "0.1")
-    
-    # Confirm transmission
-    print(f"\n🚨 Ready to transmit {len(events)} events to HEC")
-    if not input("Continue? (y/N): ").lower().startswith('y'):
-        print("❌ Transmission cancelled")
-        return
-    
+        # Interactive prompts
+        first_event_time = sender._parse_timestamp(events[0].get('timestamp'))
+        is_historical = (first_event_time or datetime.now(timezone.utc)) < datetime.now(timezone.utc)
+        if is_historical:
+            print(f"📅 Historical data detected (events from {analysis['date_range'].get('start', 'N/A')})")
+            preserve_timestamps = input("Preserve original timestamps? (Y/n): ").lower() != 'n'
+        else:
+            preserve_timestamps = True
+        real_time = input("Respect original event timing for replay? (y/N): ").lower().startswith('y')
+        if real_time:
+            speed_multiplier = float(input("Speed multiplier (1.0 = normal, 2.0 = 2x faster): ") or "1.0")
+            delay = 0.0
+        else:
+            speed_multiplier = 1.0
+            delay = float(input("Delay between events in seconds (default 0.1): ") or "0.1")
+
+        print(f"\n🚨 Ready to transmit {len(events)} events to HEC")
+        if not input("Continue? (y/N): ").lower().startswith('y'):
+            print("❌ Transmission cancelled")
+            return
+
     # Send events
     if real_time:
         results = sender.send_scenario_events(
-            events, 
-            real_time=True, 
+            events,
+            real_time=True,
             speed_multiplier=speed_multiplier,
             preserve_timestamps=preserve_timestamps
         )
     else:
         results = sender.send_scenario_events(
-            events, 
+            events,
             real_time=False,
             preserve_timestamps=preserve_timestamps
         )
-        # Add artificial delay between events if specified
-        if 'delay' in locals():
+        if delay and delay > 0:
             time.sleep(delay)
-    
+
     # Results summary
     print(f"\n📋 TRANSMISSION RESULTS")
     print(f"   Total Events: {results['total_events']}")
     print(f"   Successful: {results['successful']}")
     print(f"   Failed: {results['failed']}")
     print(f"   Success Rate: {results['successful']/results['total_events']*100:.1f}%")
-    
+
     print(f"\n📊 By Platform:")
     for platform, stats in results["by_platform"].items():
         total = stats["successful"] + stats["failed"]
         success_rate = stats["successful"] / total * 100 if total > 0 else 0
         print(f"   {platform}: {stats['successful']}/{total} ({success_rate:.1f}%)")
-    
+
     if results["errors"]:
         print(f"\n❌ Errors ({len(results['errors'])}):")
-        for error in results["errors"][:5]:  # Show first 5 errors
+        for error in results["errors"][:5]:
             print(f"   Event {error['event_index']}: {error['error']}")
         if len(results["errors"]) > 5:
-            print(f"   ... and {len(results['errors']) - 5} more errors")
+            print(f"   ... and {len(results['errors'])} more errors")
 
 if __name__ == "__main__":
     main()
