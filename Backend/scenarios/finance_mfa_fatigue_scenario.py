@@ -253,6 +253,27 @@ def generate_mfa_fatigue_attack(base_time: datetime) -> List[Dict]:
     events.append(create_event(session_time, "okta_authentication", "initial_access", okta_session))
     print(f"   ✓ MFA accepted after 15 attempts")
     
+    # Attacker tries to access Okta Admin Console - BLOCKED (1 minute later)
+    admin_attempt_time = get_scenario_time(base_time, day, attack_start_hour, attack_start_minute + 15, 30)
+    okta_admin_str = okta_authentication_log()
+    okta_admin = json.loads(okta_admin_str) if isinstance(okta_admin_str, str) else okta_admin_str
+    okta_admin['published'] = admin_attempt_time
+    okta_admin['eventType'] = 'user.session.access_admin_app'
+    okta_admin['legacyEventType'] = 'user.session.access_admin_app'
+    okta_admin['actor']['alternateId'] = JAKE_PROFILE['email']
+    okta_admin['actor']['displayName'] = JAKE_PROFILE['name']
+    okta_admin['client']['ipAddress'] = ATTACKER_PROFILE['ip']
+    okta_admin['client']['geographicalContext']['city'] = 'Moscow'
+    okta_admin['client']['geographicalContext']['state'] = 'Moscow'
+    okta_admin['client']['geographicalContext']['country'] = 'Russia'
+    okta_admin['outcome']['result'] = 'FAILURE'
+    okta_admin['outcome']['reason'] = 'Insufficient permissions to access admin console'
+    okta_admin['displayMessage'] = 'User attempted to access Okta admin console but was denied'
+    okta_admin['severity'] = 'WARN'
+    
+    events.append(create_event(admin_attempt_time, "okta_authentication", "initial_access", okta_admin))
+    print(f"   ✓ Failed attempt to access Okta admin console from Moscow")
+    
     # Azure AD sign-in from Russia
     azuread_russia_str = azuread_log()
     azuread_russia = json.loads(azuread_russia_str) if isinstance(azuread_russia_str, str) else azuread_russia_str
@@ -363,6 +384,69 @@ def generate_data_exfiltration(base_time: datetime) -> List[Dict]:
         events.append(create_event(download_time, "microsoft_365_collaboration", "data_exfiltration", m365_download))
     
     print(f"   ✓ {len(sensitive_files)} sensitive files accessed and downloaded")
+    
+    # Attacker downloads RDP files for persistent access (8:15 PM - 8:17 PM)
+    rdp_files = [
+        "FinanceServer01.rdp",
+        "TreasurySystem.rdp", 
+        "ERPDatabase.rdp"
+    ]
+    
+    print(f"🔑 Attacker downloading RDP files for persistent access")
+    for i, rdp_file in enumerate(rdp_files):
+        # File accessed
+        rdp_access_time = get_scenario_time(base_time, day, 20, 15 + i)
+        m365_rdp_access_str = microsoft_365_collaboration_log()
+        m365_rdp_access = json.loads(m365_rdp_access_str) if isinstance(m365_rdp_access_str, str) else m365_rdp_access_str
+        
+        rdp_path = f"/Finance Department/Remote Access/{rdp_file}"
+        rdp_size = random.randint(2000, 5000)
+        
+        m365_rdp_access['TimeStamp'] = rdp_access_time
+        m365_rdp_access['UserId'] = JAKE_PROFILE['email']
+        m365_rdp_access['ClientIP'] = ATTACKER_PROFILE['ip']  # Moscow IP
+        m365_rdp_access['Operation'] = 'FileAccessed'
+        m365_rdp_access['ObjectId'] = rdp_path
+        m365_rdp_access['FileName'] = rdp_file
+        m365_rdp_access['FileSize'] = rdp_size
+        m365_rdp_access['SourceFileExtension'] = 'rdp'  # Critical for detection
+        m365_rdp_access['Workload'] = 'SharePoint'
+        m365_rdp_access['RecordType'] = 6
+        m365_rdp_access['SiteUrl'] = 'https://securatech.sharepoint.com/sites/Finance'
+        m365_rdp_access['TargetUser'] = JAKE_PROFILE['email']
+        m365_rdp_access['EventType'] = 'Audit.SharePoint'
+        m365_rdp_access['UserAgent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Automated Download'
+        m365_rdp_access.pop('Details', None)
+        m365_rdp_access.pop('RequestedBy', None)
+        m365_rdp_access.pop('ThreatIndicator', None)
+        
+        events.append(create_event(rdp_access_time, "microsoft_365_collaboration", "data_exfiltration", m365_rdp_access))
+        
+        # File downloaded
+        rdp_download_time = get_scenario_time(base_time, day, 20, 15 + i, 30)
+        m365_rdp_download_str = microsoft_365_collaboration_log()
+        m365_rdp_download = json.loads(m365_rdp_download_str) if isinstance(m365_rdp_download_str, str) else m365_rdp_download_str
+        
+        m365_rdp_download['TimeStamp'] = rdp_download_time
+        m365_rdp_download['UserId'] = JAKE_PROFILE['email']
+        m365_rdp_download['ClientIP'] = ATTACKER_PROFILE['ip']  # Moscow IP
+        m365_rdp_download['Operation'] = 'FileDownloaded'
+        m365_rdp_download['ObjectId'] = rdp_path
+        m365_rdp_download['FileName'] = rdp_file
+        m365_rdp_download['FileSize'] = rdp_size
+        m365_rdp_download['SourceFileExtension'] = 'rdp'  # Critical for detection
+        m365_rdp_download['Workload'] = 'SharePoint'
+        m365_rdp_download['RecordType'] = 6
+        m365_rdp_download['SiteUrl'] = 'https://securatech.sharepoint.com/sites/Finance'
+        m365_rdp_download['TargetUser'] = JAKE_PROFILE['email']
+        m365_rdp_download['EventType'] = 'Audit.SharePoint'
+        m365_rdp_download.pop('Details', None)
+        m365_rdp_download.pop('RequestedBy', None)
+        m365_rdp_download.pop('ThreatIndicator', None)
+        
+        events.append(create_event(rdp_download_time, "microsoft_365_collaboration", "data_exfiltration", m365_rdp_download))
+    
+    print(f"   ✓ {len(rdp_files)} RDP files downloaded from Moscow IP")
     
     return events
 
