@@ -19,7 +19,7 @@ PROTOCOLS = ["TCP", "UDP", "ICMP", "GRE", "ESP"]
 APPLICATIONS = [
     "HTTP", "HTTPS", "SSH", "FTP", "DNS", "SMTP", "POP3", "IMAP",
     "Facebook", "YouTube", "Twitter", "WhatsApp", "Skype", "Zoom",
-    "Dropbox", "OneDrive", "GoogleDrive", "Box", "Slack", "Teams"
+    "Dropbox", "OneDrive", "GoogleDrive", "Box", "Slack", "Teams", "QUIC"
 ]
 
 # Threat categories
@@ -42,6 +42,9 @@ COUNTRIES = ["US", "CA", "GB", "DE", "FR", "CN", "RU", "IN", "BR", "JP", "AU", "
 # Departments  
 DEPARTMENTS = ["IT", "Sales", "Marketing", "Finance", "HR", "Engineering", "Legal", "Operations"]
 
+#Rules
+RULES = ["Recommended Firewall Rule", "Default Firewall Filtering Rule", "Block QUIC", "Proxy Bypass"]
+
 def generate_ip() -> str:
     """Generate a random IP address"""
     return f"{random.randint(1, 223)}.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(1, 254)}"
@@ -54,56 +57,54 @@ def zscaler_firewall_log() -> str:
     action = random.choice(ACTIONS)
     protocol = random.choice(PROTOCOLS)
     app = random.choice(APPLICATIONS)
-    
+    user = f"user{random.randint(1, 100)}@company.com",
     event = {
         "datetime": event_time.isoformat(),
-        "timestamp": int(event_time.timestamp()),
-        "recordtype": "FirewallLogs",
-        "recordid": f"fw_{random.randint(1000000000, 9999999999)}",
-        "action": action,
-        "aggregate": "Yes" if random.choice([True, False]) else "No",
-        "bandwidth_throttle": random.choice(["Yes", "No"]),
-        "client_ip": f"10.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(1, 254)}",
-        "client_publicip": generate_ip(),
-        "client_country": random.choice(COUNTRIES),
-        "client_latitude": round(random.uniform(-90, 90), 6),
-        "client_longitude": round(random.uniform(-180, 180), 6),
+        "user": user,
         "department": random.choice(DEPARTMENTS),
-        "dest_ip": generate_ip(),
-        "dest_port": random.choice([22, 23, 25, 53, 80, 143, 443, 993, 995, 8080]),
-        "dest_country": random.choice(COUNTRIES),
-        "device_owner": f"user{random.randint(1, 100)}@company.com",
-        "device_hostname": f"PC-{random.randint(1000, 9999)}",
-        "dnat_ip": generate_ip() if action == "Allow" else "",
-        "dnat_port": random.randint(1024, 65535) if action == "Allow" else 0,
-        "duration": random.randint(1, 3600),  # seconds
-        "inbound_bytes": random.randint(0, 1000000),
-        "outbound_bytes": random.randint(0, 1000000),
-        "app": app,
-        "nwapp": random.choice(["Web Browsing", "SSL", "SSH", "DNS", "Email"]),
-        "nwsvc": random.choice(["HTTP", "HTTPS", "DNS", "SMTP", "IMAP"]),
-        "proto": protocol,
-        "src_ip": f"10.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(1, 254)}",
-        "src_port": random.randint(32768, 65535),
-        "stateful": "Yes",
-        "aggregate_session": random.choice(["Yes", "No"]),
-        "policy": f"FW_Policy_{random.randint(1, 20)}",
-        "rule": f"Rule_{random.randint(100, 999)}",
-        "nat_rule": f"NAT_Rule_{random.randint(10, 99)}" if action == "Allow" else "",
         "locationname": random.choice(["San Jose", "New York", "London", "Frankfurt", "Tokyo"]),
-        "numsessions": random.randint(1, 100),
-        "user": f"user{random.randint(1, 100)}@company.com",
-        "vendor": "Zscaler",
-        "product": "ZIA",
-        "version": "1.0"
+        "cdport": random.choice([22, 23, 25, 53, 80, 143, 443, 993, 995, 8080]),
+        "csport": random.randint(32768, 65535),
+        "sdport":"0",
+        "ssport":"0",
+        "csip":f"10.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(1, 254)}",
+        "cdip": generate_ip(),
+        "ssip":"0.0.0.0",
+        "sdip":"0.0.0.0",
+        "tsip": generate_ip(),
+        "tunsport":"0",
+        "tuntype":"ZscalerClientConnector",
+        "action": action,
+        "dnat":"No",
+        "stateful":"Yes",
+        "aggregate":"No",
+        "nwsvc": app,
+        "nwapp":"udp",
+        "proto":"UDP",
+        "ipcat":"Miscellaneous or Unknown",
+        "destcountry": random.choice(COUNTRIES),
+        "avgduration":random.randint(1000, 5000),
+        "rulelabel": random.choice(RULES),
+        "inbytes":random.randint(0, 5000),
+        "outbytes":random.randint(0, 5000),
+        "duration":random.randint(0, 10),
+        "durationms":random.randint(0, 5000),
+        "numsessions":"1",
+        "ipsrulelabel":"None",
+        "threatcat":"None",
+        "threatname":"None",
+        "deviceowner":"user",
+        "devicehostname": f"DEVICE{random.randint(1, 100)}",
+        "threat_score":"0",
+        "threat_severity":"None"
     }
     
     # Add threat detection fields for blocked traffic
     if action in ["Block", "Drop"]:
         if random.choice([True, False]):  # 50% chance of threat detection
             event.update({
-                "threat_category": random.choice(THREAT_CATEGORIES),
-                "threat_name": random.choice([
+                "threatcat": random.choice(THREAT_CATEGORIES),
+                "threatnam": random.choice([
                     "Trojan.GenKryptik",
                     "Adware.Bundler",
                     "Phishing.Generic",

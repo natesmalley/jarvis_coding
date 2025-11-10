@@ -36,7 +36,7 @@ docker compose up -d --build
 ```
 - **API**: http://localhost:8000
 - **Frontend UI**: http://localhost:9001
-- **API Docs**: http://localhost:8000/docs
+- **API Docs**: http://localhost:8000/api/v1/docs
 
 ### 3. Stop Services
 ```bash

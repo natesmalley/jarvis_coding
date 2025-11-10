@@ -230,6 +230,10 @@
                 <div class="nav-tab-icon">🎯</div>
                 <div class="nav-tab-label">Scenarios</div>
             </button>
+            <button type="button" data-target="upload-section" class="nav-tab">
+                <div class="nav-tab-icon">📤</div>
+                <div class="nav-tab-label">Upload</div>
+            </button>
             <button type="button" data-target="settings-section" class="nav-tab">
                 <div class="nav-tab-icon">⚙️</div>
                 <div class="nav-tab-label">Settings</div>
@@ -259,6 +263,18 @@
                 <span class="flow-label">② Data Options & Output</span>
                 
                 <form id="log-form" class="space-y-6">
+                    <div class="input-group">
+                        <label style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
+                        <input type="checkbox" id="continuous-mode" style="width: auto;">
+                        <span>Continuous Mode (run until stopped)</span>
+                    </label>
+                    <label id="speed-mode-container" style="display: none; align-items: center; gap: 8px; margin-top: 8px; margin-left: 24px;">
+                        <input type="checkbox" id="speed-mode" style="width: auto;">
+                        <span>Speed Mode (pre-generate 1K events, loop for max throughput)</span>
+                    </label>
+                    <p class="text-xs text-[#b8a0d2] mt-1">When enabled, logs will generate continuously until stopped</p>
+                    </div>
+
                     <div class="grid grid-cols-2 gap-4">
                         <div class="input-group">
                             <label for="log-count" class="text-sm font-semibold text-[#c8b3e8]">Number of Events</label>
@@ -271,9 +287,14 @@
                         </div>
                     </div>
 
-                    <button type="submit" id="start-btn" class="btn">
-                        Start Log Generation
-                    </button>
+                    <div class="flex gap-3">
+                        <button type="submit" id="start-btn" class="btn flex-1">
+                            Start Log Generation
+                        </button>
+                        <button type="button" id="stop-btn" class="btn bg-red-600 hover:bg-red-700" style="display: none;">
+                            Stop Generation
+                        </button>
+                    </div>
                 </form>
 
                 <div>
@@ -413,6 +434,90 @@
         </div>
     </div>
 
+    <div id="upload-section" class="grid grid-cols-1 lg:grid-cols-12 gap-6" style="display:none;">
+        <!-- LEFT: Upload Panel -->
+        <div class="lg:col-span-3">
+            <div class="flow-panel space-y-4">
+                <span class="flow-label">① Upload File</span>
+                <div id="upload-dropzone" style="border: 2px dashed #8b5cf6; border-radius: 0.75rem; padding: 2rem; text-align: center; cursor: pointer; transition: all 0.3s;">
+                    <div style="margin-bottom: 1rem; font-size: 3rem;">📁</div>
+                    <p class="text-sm font-semibold text-[#c8b3e8] mb-2">Drag & Drop File Here</p>
+                    <p class="text-xs text-[#b8a0d2] mb-3">or click to browse</p>
+                    <p class="text-xs text-[#8b7a9f]">CSV or JSON files (max 1GB)</p>
+                    <input type="file" id="file-input" accept=".csv,.json" style="display: none;">
+                </div>
+                
+                <div id="uploaded-files-list" class="space-y-2" style="display:none;">
+                    <h4 class="text-sm font-semibold text-[#c8b3e8]">Uploaded Files</h4>
+                    <div id="files-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MIDDLE: Options & Output -->
+        <div class="lg:col-span-6">
+            <div class="flow-panel space-y-6">
+                <span class="flow-label">② Processing Options & Output</span>
+                
+                <form id="upload-process-form" class="space-y-6">
+                    <div class="input-group">
+                        <label for="upload-file-select" class="text-sm font-semibold text-[#c8b3e8]">Select File</label>
+                        <select id="upload-file-select" name="upload-file-select" required>
+                            <option value="" disabled selected>No files uploaded</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="upload-sourcetype" class="text-sm font-semibold text-[#c8b3e8]">Sourcetype / Parser</label>
+                        <input type="text" id="upload-sourcetype" name="upload-sourcetype" placeholder="e.g. aws_cloudtrail, fortinet_fortigate_logs" required>
+                        <p class="text-xs text-[#b8a0d2] mt-1">Specify the sourcetype for HEC parsing</p>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="upload-endpoint" class="text-sm font-semibold text-[#c8b3e8]">HEC Endpoint</label>
+                        <select id="upload-endpoint" name="upload-endpoint" required>
+                            <option value="event" selected>Event Endpoint (JSON structured)</option>
+                            <option value="raw">Raw Endpoint (Text/Syslog)</option>
+                        </select>
+                        <p class="text-xs text-[#b8a0d2] mt-1">/event for JSON, /raw for text logs</p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="input-group">
+                            <label for="upload-batch-size" class="text-sm font-semibold text-[#c8b3e8]">Batch Size</label>
+                            <input type="number" id="upload-batch-size" name="upload-batch-size" value="100" min="1" max="1000" required>
+                            <p class="text-xs text-[#b8a0d2] mt-1">Events per batch (1-1000)</p>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="upload-eps" class="text-sm font-semibold text-[#c8b3e8]">Events Per Second (EPS)</label>
+                            <input type="number" id="upload-eps" name="upload-eps" value="10" min="0.1" step="0.1" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="process-upload-btn" class="btn">
+                        Process File
+                    </button>
+                </form>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 text-[#f3e8ff]">Processing Output</h3>
+                    <div id="upload-output-box" style="background-color: #1a1629; border-radius: 0.75rem; padding: 1.5rem; min-height: 200px; max-height: 500px; overflow-y: auto; border: 1px solid #3c325c; font-family: monospace; white-space: pre-wrap; word-wrap: break-word; box-shadow: inset 0 2px 5px rgba(0,0,0,0.3); font-size: 0.875rem; line-height: 1.5;">
+                        <!-- Processing output will be streamed here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Destination (shared selector) -->
+        <div class="lg:col-span-3">
+            <div class="flow-panel space-y-4" id="upload-destination-panel">
+                <span class="flow-label">③ Destination</span>
+                <!-- Destination selector will be moved here dynamically -->
+            </div>
+        </div>
+    </div>
+
             <div id="settings-section" class="card space-y-4" style="display:none;">
                 <h2 class="text-2xl font-bold text-[#f3e8ff]">Settings</h2>
                 <div class="space-y-3">
@@ -505,6 +610,7 @@
         const sections = {
             'generate-section': document.getElementById('generate-section'),
             'scenarios-section': document.getElementById('scenarios-section'),
+            'upload-section': document.getElementById('upload-section'),
             'settings-section': document.getElementById('settings-section')
         };
         
@@ -524,10 +630,14 @@
             const destContainer = document.getElementById('destination-selector-container');
             const eventsPanel = document.getElementById('events-destination-panel');
             const scenarioPanel = document.getElementById('scenario-destination-panel');
+            const uploadPanel = document.getElementById('upload-destination-panel');
             
             if (target === 'scenarios-section' && destContainer && scenarioPanel) {
                 // Move to scenarios panel
                 scenarioPanel.appendChild(destContainer);
+            } else if (target === 'upload-section' && destContainer && uploadPanel) {
+                // Move to upload panel
+                uploadPanel.appendChild(destContainer);
             } else if (target === 'generate-section' && destContainer && eventsPanel) {
                 // Move back to events panel
                 eventsPanel.appendChild(destContainer);
@@ -732,6 +842,53 @@
             });
         }
         
+        // Handle continuous mode toggle
+        const continuousModeCheckbox = document.getElementById('continuous-mode');
+        const speedModeContainer = document.getElementById('speed-mode-container');
+        const speedModeCheckbox = document.getElementById('speed-mode');
+        const logCountInput = document.getElementById('log-count');
+        const epsInput = document.getElementById('eps');
+        const stopBtn = document.getElementById('stop-btn');
+        let currentAbortController = null;
+
+        continuousModeCheckbox.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                logCountInput.disabled = true;
+                logCountInput.required = false;
+                logCountInput.style.opacity = '0.5';
+                speedModeContainer.style.display = 'flex';
+            } else {
+                logCountInput.disabled = false;
+                logCountInput.required = true;
+                logCountInput.style.opacity = '1';
+                speedModeContainer.style.display = 'none';
+                speedModeCheckbox.checked = false;
+            }
+        });
+        
+        // Auto-enable speed mode for high EPS
+        epsInput.addEventListener('change', (e) => {
+            const eps = parseFloat(e.target.value);
+            if (continuousModeCheckbox.checked && eps > 1000) {
+                speedModeCheckbox.checked = true;
+                speedModeCheckbox.disabled = true;
+            } else {
+                speedModeCheckbox.disabled = false;
+            }
+        });
+
+        // Stop button handler
+        stopBtn.addEventListener('click', () => {
+            if (currentAbortController) {
+                currentAbortController.abort();
+                outputBox.innerText += '\n\n--- Stopped by user ---\n';
+                startBtn.disabled = false;
+                startBtn.innerText = 'Start Log Generation';
+                stopBtn.style.display = 'none';
+                currentAbortController = null;
+            }
+        });
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
@@ -743,32 +900,49 @@
             const productId = scriptSelect.selectedOptions[0]?.dataset?.productId; // for HEC mode
             const logCount = parseInt(document.getElementById('log-count').value, 10);
             const eps = parseFloat(document.getElementById('eps').value);
+            const continuousMode = continuousModeCheckbox.checked;
+            const speedMode = speedModeCheckbox.checked;
             const selectedOpt = destSelect.options[destSelect.selectedIndex];
             const destinationId = selectedOpt ? selectedOpt.value : '';
             const destinationType = selectedOpt ? selectedOpt.dataset.type : '';
             
-            const destinationMessage = destinationType === 'hec'
-              ? `Sending ${logCount} logs to selected HEC destination...`
-              : `Streaming ${logCount} logs to saved syslog destination...`;
+            const destinationMessage = continuousMode 
+              ? `Starting continuous log generation at ${eps} EPS${speedMode ? ' (SPEED MODE)' : ''}...`
+              : (destinationType === 'hec'
+                  ? `Sending ${logCount} logs to selected HEC destination...`
+                  : `Streaming ${logCount} logs to saved syslog destination...`);
             outputBox.innerText = destinationMessage + '\n\n';
 
+            // Show stop button for continuous mode
+            if (continuousMode) {
+                stopBtn.style.display = 'block';
+            }
+
             try {
+                // Create abort controller for stopping
+                currentAbortController = new AbortController();
+
                 const response = await fetch('/generate-logs', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
+                    signal: currentAbortController.signal,
                     body: JSON.stringify(destinationType === 'hec' ? {
                         destination: 'hec',
                         product: productId,
-                        count: logCount,
+                        count: continuousMode ? null : logCount,
                         eps: eps,
+                        continuous: continuousMode,
+                        speed_mode: speedMode,
                         destination_id: destinationId
                     } : {
                         destination: 'syslog',
                         script: scriptPath,
-                        count: logCount,
+                        count: continuousMode ? null : logCount,
                         eps: eps,
+                        continuous: continuousMode,
+                        speed_mode: speedMode,
                         destination_id: destinationId
                     })
                 });
@@ -789,11 +963,17 @@
                     outputBox.scrollTop = outputBox.scrollHeight;
                 }
             } catch (error) {
-                console.error('Error:', error);
-                outputBox.innerText += `\n--- Generation failed! Error: ${error.message} ---`;
+                if (error.name === 'AbortError') {
+                    console.log('Generation stopped by user');
+                } else {
+                    console.error('Error:', error);
+                    outputBox.innerText += `\n--- Generation failed! Error: ${error.message} ---`;
+                }
             } finally {
                 startBtn.disabled = false;
                 startBtn.innerText = 'Start Log Generation';
+                stopBtn.style.display = 'none';
+                currentAbortController = null;
             }
         });
 
@@ -946,19 +1126,234 @@
         });
 
         fetchScenarios();
-        // GUID generate button for Trace ID
-        const genBtn = document.getElementById('gen-trace-id');
-        if (genBtn) {
-            genBtn.addEventListener('click', () => {
-                const guid = ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
-                    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
-                );
-                const traceInput = document.getElementById('trace-id');
-                if (traceInput) traceInput.value = guid;
-                const traceChk = document.getElementById('include-trace-id');
-                if (traceChk) traceChk.checked = true;
-            });
+
+        // ===== FILE UPLOAD FUNCTIONALITY =====
+        const uploadDropzone = document.getElementById('upload-dropzone');
+        const fileInput = document.getElementById('file-input');
+        const uploadFileSelect = document.getElementById('upload-file-select');
+        const uploadProcessForm = document.getElementById('upload-process-form');
+        const processUploadBtn = document.getElementById('process-upload-btn');
+        const uploadOutputBox = document.getElementById('upload-output-box');
+        const uploadedFilesList = document.getElementById('uploaded-files-list');
+        const filesContainer = document.getElementById('files-container');
+
+        // Drag and drop functionality
+        uploadDropzone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        uploadDropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadDropzone.style.borderColor = '#a78bfa';
+            uploadDropzone.style.backgroundColor = 'rgba(167, 139, 250, 0.05)';
+        });
+
+        uploadDropzone.addEventListener('dragleave', () => {
+            uploadDropzone.style.borderColor = '#8b5cf6';
+            uploadDropzone.style.backgroundColor = 'transparent';
+        });
+
+        uploadDropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadDropzone.style.borderColor = '#8b5cf6';
+            uploadDropzone.style.backgroundColor = 'transparent';
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileUpload(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileUpload(e.target.files[0]);
+            }
+        });
+
+        async function handleFileUpload(file) {
+            // Validate file type
+            const validTypes = ['.csv', '.json'];
+            const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+            if (!validTypes.includes(fileExt)) {
+                alert('Invalid file type. Only CSV and JSON files are allowed.');
+                return;
+            }
+
+            // Validate file size (1GB)
+            const maxSize = 1 * 1024 * 1024 * 1024;
+            if (file.size > maxSize) {
+                alert('File size exceeds 1GB limit.');
+                return;
+            }
+
+            uploadOutputBox.innerText = `Uploading ${file.name} (${(file.size / (1024*1024)).toFixed(2)} MB)...\n`;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/uploads', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Upload failed');
+                }
+
+                const result = await response.json();
+                uploadOutputBox.innerText += `✓ Successfully uploaded ${result.filename}\n`;
+                uploadOutputBox.innerText += `  File ID: ${result.id}\n`;
+                uploadOutputBox.innerText += `  Records: ${result.line_count || 'Unknown'}\n`;
+                
+                // Refresh uploads list
+                await refreshUploads();
+                
+                // Reset file input
+                fileInput.value = '';
+            } catch (error) {
+                console.error('Upload error:', error);
+                uploadOutputBox.innerText += `✗ Upload failed: ${error.message}\n`;
+            }
         }
+
+        async function refreshUploads() {
+            try {
+                const response = await fetch('/uploads');
+                if (!response.ok) throw new Error('Failed to fetch uploads');
+                
+                const data = await response.json();
+                const uploads = data.uploads || [];
+
+                // Update file select dropdown
+                uploadFileSelect.innerHTML = '';
+                if (uploads.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.value = '';
+                    opt.textContent = 'No files uploaded';
+                    opt.disabled = true;
+                    opt.selected = true;
+                    uploadFileSelect.appendChild(opt);
+                    uploadedFilesList.style.display = 'none';
+                } else {
+                    uploads.forEach(upload => {
+                        const opt = document.createElement('option');
+                        opt.value = upload.id;
+                        opt.textContent = `${upload.filename} (${upload.line_count || '?'} records, ${(upload.size / (1024*1024)).toFixed(2)} MB)`;
+                        uploadFileSelect.appendChild(opt);
+                    });
+                    
+                    // Show uploaded files list
+                    uploadedFilesList.style.display = '';
+                    filesContainer.innerHTML = '';
+                    uploads.forEach(upload => {
+                        const fileDiv = document.createElement('div');
+                        fileDiv.className = 'card p-2 flex items-center justify-between gap-2';
+                        fileDiv.innerHTML = `
+                            <span class="text-xs truncate" style="color: #f3e8ff;">${upload.filename}</span>
+                            <button type="button" class="delete-upload-btn" data-id="${upload.id}" style="background: transparent; border: none; padding: 4px; cursor: pointer; color: #f3e8ff;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3 6 5 6 21 6" />
+                                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                </svg>
+                            </button>
+                        `;
+                        filesContainer.appendChild(fileDiv);
+                    });
+
+                    // Add delete handlers
+                    document.querySelectorAll('.delete-upload-btn').forEach(btn => {
+                        btn.addEventListener('click', async () => {
+                            const uploadId = btn.dataset.id;
+                            if (!confirm('Delete this file?')) return;
+                            
+                            try {
+                                const resp = await fetch(`/uploads/${uploadId}`, { method: 'DELETE' });
+                                if (resp.status === 204) {
+                                    await refreshUploads();
+                                    uploadOutputBox.innerText += `✓ Deleted file\n`;
+                                } else {
+                                    throw new Error('Delete failed');
+                                }
+                            } catch (error) {
+                                alert('Failed to delete file');
+                                console.error(error);
+                            }
+                        });
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to refresh uploads:', error);
+            }
+        }
+
+        // Process uploaded file
+        uploadProcessForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const uploadId = uploadFileSelect.value;
+            const destinationId = destSelect.value;
+            const batchSize = parseInt(document.getElementById('upload-batch-size').value, 10);
+            const eps = parseFloat(document.getElementById('upload-eps').value);
+            const sourcetype = document.getElementById('upload-sourcetype').value.trim();
+            const endpoint = document.getElementById('upload-endpoint').value;
+
+            if (!uploadId || !destinationId) {
+                alert('Please select both a file and a destination');
+                return;
+            }
+
+            if (!sourcetype) {
+                alert('Please specify a sourcetype');
+                return;
+            }
+
+            processUploadBtn.disabled = true;
+            processUploadBtn.innerText = 'Processing...';
+            uploadOutputBox.innerText = 'Starting file processing...\n\n';
+
+            try {
+                const response = await fetch('/uploads/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        upload_id: uploadId,
+                        destination_id: destinationId,
+                        batch_size: batchSize,
+                        eps: eps,
+                        sourcetype: sourcetype,
+                        endpoint: endpoint
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    uploadOutputBox.innerText += chunk;
+                    uploadOutputBox.scrollTop = uploadOutputBox.scrollHeight;
+                }
+            } catch (error) {
+                console.error('Processing error:', error);
+                uploadOutputBox.innerText += `\n✗ Processing failed: ${error.message}\n`;
+            } finally {
+                processUploadBtn.disabled = false;
+                processUploadBtn.innerText = 'Process File';
+            }
+        });
+
+        // Initialize uploads list
+        refreshUploads();
+
         })();
     });
 </script>

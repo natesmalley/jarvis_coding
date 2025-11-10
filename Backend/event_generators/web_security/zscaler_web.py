@@ -12,9 +12,6 @@ from typing import Dict
 # Actions taken by firewall
 ACTIONS = ["Allow", "Block", "Drop", "Redirect"]
 
-# DNS Record types
-DNSRECORD = ["A","AAAA","SRV","HTTPS"]
-
 # Protocols
 PROTOCOLS = ["TCP", "UDP", "ICMP", "GRE", "ESP"]
 
@@ -22,7 +19,7 @@ PROTOCOLS = ["TCP", "UDP", "ICMP", "GRE", "ESP"]
 APPLICATIONS = [
     "HTTP", "HTTPS", "SSH", "FTP", "DNS", "SMTP", "POP3", "IMAP",
     "Facebook", "YouTube", "Twitter", "WhatsApp", "Skype", "Zoom",
-    "Dropbox", "OneDrive", "GoogleDrive", "Box", "Slack", "Teams"
+    "Dropbox", "OneDrive", "GoogleDrive", "Box", "Slack", "Teams", "QUIC"
 ]
 
 # Threat categories
@@ -45,14 +42,8 @@ COUNTRIES = ["US", "CA", "GB", "DE", "FR", "CN", "RU", "IN", "BR", "JP", "AU", "
 # Departments  
 DEPARTMENTS = ["IT", "Sales", "Marketing", "Finance", "HR", "Engineering", "Legal", "Operations"]
 
-# DNS Requests 
-REQUESTS = ["google.com","linkedin.com","amazon.com","cloudflare.com"]
-
-# DNS RESPONSES
-RESPONSES = ["1.1.1.1","2.2.2.2","3.3.3.3","4.4.4.4"]
-
-# Categories
-CATEGORIES = ["Internet Services","Social Networking","Ecommerce","Internet Infrastructure"]
+#Rules
+RULES = ["Recommended Firewall Rule", "Default Firewall Filtering Rule", "Block QUIC", "Proxy Bypass"]
 
 def generate_ip() -> str:
     """Generate a random IP address"""
@@ -66,33 +57,53 @@ def zscaler_firewall_log() -> str:
     action = random.choice(ACTIONS)
     protocol = random.choice(PROTOCOLS)
     app = random.choice(APPLICATIONS)
-    dns = random.choice(DNSRECORD)
-    request = random.choice(REQUESTS)
-    response = random.choice(RESPONSES)
-    category = random.choice(CATEGORIES)
+    user = f"user{random.randint(1, 100)}@company.com",
     
     event = {
-        "datetime": event_time.isoformat(),
-        "user": f"user{random.randint(1, 100)}@company.com",
-        "department": random.choice(DEPARTMENTS),
-        "location": random.choice(["San Jose", "New York", "London", "Frankfurt", "Tokyo"]),
-        "reqaction": action,
-        "resaction": action,
-        "reqrulelabel":"Default Firewall DNS Rule",
-        "resrulelabel":"Default Firewall DNS Rule",
-        "dns_reqtype": dns,
-        "dns_req": request,
-        "dns_resp": response,
-        "srv_dport":"53",
-        "durationms":"2",
-        "clt_sip":f"10.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(1, 254)}",
-        "srv_dip":f"{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}",
-        "category": category,
-        "respipcategory":"Professional Services",
-        "deviceowner":"test_owner",
-        "devicehostname":"test_hostname"
+    "datetime": event_time.isoformat(),
+    "reason":"Allowed",
+    "event_id": random.randint(1000000000000000000,9999999999999999999 ),
+    "protocol":"HTTP",
+    "action":"Allowed"
+    "transactionsize":random.randint(1,1000),
+    "responsesize":random.randint(1,1000),
+    "requestsize":random.randint(1,1000),
+    "urlcategory":"Internet Services",
+    "serverip": generate_ip(),
+    "requestmethod":"GET",
+    "refererURL":"None",
+    "useragent":"Mozilla/5.0",
+    "product":"NSS",
+    "location": random.choice(COUNTRIES)
+    "ClientIP":f"10.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(1, 254)}",
+    "status":"200",
+    "user": user
+    "url":"www.msftconnecttest.com/connecttest.txt",
+    "vendor":"Zscaler",
+    "hostname":"www.msftconnecttest.com",
+    "clientpublicIP":generate_ip(),
+    "threatcategory":"None",
+    "threatname":"None",
+    "filetype":"None",
+    "appname":"General Browsing",
+    "app_status":"N/A",
+    "pagerisk":"0",
+    "threatseverity":"None",
+    "department": random.choice(DEPARTMENTS),
+    "urlsupercategory":"Internet Communication",
+    "appclass":"General Browsing",
+    "dlpengine":"None",
+    "urlclass":"Business Use",
+    "threatclass":"None",
+    "dlpdictionaries":"None",
+    "fileclass":"None",
+    "bwthrottle":"NO",
+    "contenttype":"text/plain",
+    "unscannabletype":"None",
+    "deviceowner": user,
+    "devicehostname":f"DEVICE{random.randint(1, 100)}",
+    "keyprotectiontype":"N/A"
     }
-    
     # Add OCSF compliance fields
     event.update({
         "class_uid": 4001,

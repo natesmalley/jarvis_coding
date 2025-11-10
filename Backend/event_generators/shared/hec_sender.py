@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Send logs from vendor_product generators to SentinelOne AI SIEM (Splunk‑HEC) one‑by‑one."""
 import argparse, json, os, time, random, requests, importlib, sys
-import gzip, io, threading
+import gzip, io, threading, queue
+from datetime import datetime
 from typing import Callable, Tuple, Optional
 
 # Add generator category paths to sys.path
@@ -617,12 +618,14 @@ _BATCH_FLUSH_MS = int(os.getenv("S1_HEC_BATCH_FLUSH_MS", "1000"))
 _BATCH_LOCK = threading.Lock()
 _BATCH_BUFFERS = {}  # key: (is_json:bool, product:str) -> {'lines': list[str], 'bytes': int, 'last': float}
 _BATCH_THREAD_STARTED = False
+_VERBOSITY = 'info'  # Global verbosity level, set after arg parsing
+_BATCH_SEND_QUEUE = None  # Queue for pipelined batch sending
+_BATCH_SENDER_THREAD = None  # Background thread for sending batches
 
 def _batch_key(is_json: bool, product: str):
     return (is_json, product)
 
 def _batch_enqueue(line_str: str, is_json: bool, product: str, attr_fields: dict):
-    global _BATCH_THREAD_STARTED
     key = _batch_key(is_json, product)
     now = time.time()
     with _BATCH_LOCK:
@@ -633,11 +636,55 @@ def _batch_enqueue(line_str: str, is_json: bool, product: str, attr_fields: dict
         sz = len(line_str.encode('utf-8'))
         buf['lines'].append(line_str)
         buf['bytes'] += sz
-        buf['last'] = now
+        # DON'T update 'last' timestamp - we want to track time since first event in batch
+        # Flush immediately if size threshold reached
         if buf['bytes'] >= _BATCH_MAX_BYTES:
             _flush_batch_locked(key)
-        if not _BATCH_THREAD_STARTED:
-            _start_batch_thread()
+
+def _batch_check_and_flush():
+    """Check all buffers and flush expired ones. Call this from main thread."""
+    # Only show detailed batch checks in debug mode
+    if _VERBOSITY == 'debug':
+        print(f"[BATCH] Checking buffers for flush (threshold: {_BATCH_FLUSH_MS}ms)...", flush=True)
+        sys.stdout.flush()
+    
+    now = time.time()
+    to_flush = []
+    with _BATCH_LOCK:
+        for key, buf in list(_BATCH_BUFFERS.items()):
+            elapsed_ms = (now - buf['last']) * 1000
+            if _VERBOSITY == 'debug':
+                print(f"[BATCH] Buffer {key}: {len(buf['lines'])} lines, {elapsed_ms:.0f}ms elapsed", flush=True)
+                sys.stdout.flush()
+            if buf['lines'] and elapsed_ms >= _BATCH_FLUSH_MS:
+                to_flush.append(key)
+                if _VERBOSITY == 'debug':
+                    print(f"[BATCH] Marking {key} for flush", flush=True)
+                    sys.stdout.flush()
+    
+    if _VERBOSITY == 'debug' and not to_flush:
+        print(f"[BATCH] No buffers ready for flush", flush=True)
+        sys.stdout.flush()
+    
+    for key in to_flush:
+        with _BATCH_LOCK:
+            _flush_batch_locked(key)
+
+def _batch_sender_worker():
+    """Background worker thread that sends batches from the queue"""
+    while True:
+        try:
+            item = _BATCH_SEND_QUEUE.get(timeout=1)
+            if item is None:  # Poison pill to stop the thread
+                break
+            lines, is_json, product = item
+            _send_batch(lines, is_json, product)
+            _BATCH_SEND_QUEUE.task_done()
+        except queue.Empty:
+            continue
+        except Exception as e:
+            if _VERBOSITY == 'debug':
+                print(f"[BATCH] Error in sender worker: {e}", flush=True)
 
 def _start_batch_thread():
     global _BATCH_THREAD_STARTED
@@ -645,15 +692,31 @@ def _start_batch_thread():
     t = threading.Thread(target=_batch_loop, daemon=True)
     t.start()
 
+def _start_batch_sender(queue_size=10):
+    """Start background batch sender thread for pipelined sending"""
+    global _BATCH_SEND_QUEUE, _BATCH_SENDER_THREAD
+    _BATCH_SEND_QUEUE = queue.Queue(maxsize=queue_size)
+    _BATCH_SENDER_THREAD = threading.Thread(target=_batch_sender_worker, daemon=True)
+    _BATCH_SENDER_THREAD.start()
+    if _VERBOSITY == 'debug':
+        print(f"[BATCH] Started background sender thread with queue size {queue_size}", flush=True)
+
 def _batch_loop():
+    if DEBUG:
+        print("[BATCH] Background flush thread started", flush=True)
+        sys.stdout.flush()
     while True:
         time.sleep(0.2)
         now = time.time()
         to_flush = []
         with _BATCH_LOCK:
             for key, buf in list(_BATCH_BUFFERS.items()):
-                if buf['lines'] and (now - buf['last']) * 1000 >= _BATCH_FLUSH_MS:
+                elapsed_ms = (now - buf['last']) * 1000
+                if buf['lines'] and elapsed_ms >= _BATCH_FLUSH_MS:
                     to_flush.append(key)
+                    if DEBUG:
+                        print(f"[BATCH] Triggering flush for {key} ({len(buf['lines'])} events, {elapsed_ms:.0f}ms elapsed)", flush=True)
+                        sys.stdout.flush()
         for key in to_flush:
             with _BATCH_LOCK:
                 _flush_batch_locked(key)
@@ -663,37 +726,75 @@ def _flush_batch_locked(key):
     if not buf or not buf['lines']:
         return
     is_json, product = key
-    lines = buf['lines']
+    lines = buf['lines'][::]  # Copy the list to avoid race conditions
     _BATCH_BUFFERS[key] = {'lines': [], 'bytes': 0, 'last': time.time()}
-    _send_batch(lines, is_json, product)
+    
+    # If pipelining is enabled, queue the batch for background sending
+    if _BATCH_SEND_QUEUE is not None:
+        try:
+            _BATCH_SEND_QUEUE.put_nowait((lines, is_json, product))
+        except:
+            # Queue full, send synchronously as fallback
+            _send_batch(lines, is_json, product)
+    else:
+        # Synchronous sending
+        _send_batch(lines, is_json, product)
 
 def _send_batch(lines: list, is_json: bool, product: str):
+    if _VERBOSITY == 'debug':
+        print(f"[BATCH] _send_batch called with {len(lines)} lines, is_json={is_json}", flush=True)
+        sys.stdout.flush()
+    
     if not lines:
         return
+    
     # Ensure connection cache is established; if not, send first line via normal path
     if not _CONNECTION_CACHE['configured']:
+        if _VERBOSITY == 'debug':
+            print(f"[BATCH] Connection not configured, establishing with first event...", flush=True)
+            sys.stdout.flush()
         first = lines.pop(0)
         try:
             if is_json:
                 payload = json.loads(first)
-                send_one(payload, product, {})
+                result = send_one(payload, product, {})
+                if _VERBOSITY == 'debug':
+                    print(f"[BATCH] First event result: {result}", flush=True)
+                    sys.stdout.flush()
             else:
-                send_one(first, product, {})
-        except Exception:
+                result = send_one(first, product, {})
+                if _VERBOSITY == 'debug':
+                    print(f"[BATCH] First event result: {result}", flush=True)
+                    sys.stdout.flush()
+        except Exception as e:
+            if _VERBOSITY == 'debug':
+                print(f"[BATCH] Error establishing connection: {e}", flush=True)
+                sys.stdout.flush()
             pass
         if not lines:
+            if _VERBOSITY == 'debug':
+                print(f"[BATCH] No more lines after connection setup", flush=True)
+                sys.stdout.flush()
             return
+    
     if not _CONNECTION_CACHE['configured']:
+        if _VERBOSITY == 'debug':
+            print(f"[BATCH] Connection still not configured after setup attempt, skipping batch", flush=True)
+            sys.stdout.flush()
         return
+    
     if _CONNECTION_CACHE['session'] is None:
         _CONNECTION_CACHE['session'] = _make_poster(_CONNECTION_CACHE['verify'], _CONNECTION_CACHE['tls_low'])
     POST = _CONNECTION_CACHE['session']
     headers_auth = {**HEADERS}
     headers_auth["Authorization"] = f"{_CONNECTION_CACHE['auth_scheme']} {HEC_TOKEN}"
     # Both endpoints use text/plain with gzip for batched events
-    headers = {**headers_auth, "Content-Type": "text/plain", "Content-Encoding": "gzip"}
     body = "\n".join(lines).encode('utf-8')
-    gz = gzip.compress(body)
+    
+    # Use fast compression (level 1) for high throughput - trades compression ratio for speed
+    # Level 1 is ~10x faster than default level 9, with only ~10% larger output
+    gz = gzip.compress(body, compresslevel=1)
+    headers = {**headers_auth, "Content-Type": "text/plain", "Content-Encoding": "gzip"}
     
     if is_json:
         # JSON products to /event endpoint
@@ -702,8 +803,17 @@ def _send_batch(lines: list, is_json: bool, product: str):
         # Raw/syslog products to /raw endpoint
         url = f"{_CONNECTION_CACHE['raw_base']}?{_build_qs(product)}"
     
+    # Show batch flush in info mode and above (not debug only)
+    if _VERBOSITY in ('info', 'verbose', 'debug'):
+        print(f"[BATCH] Flushing {len(lines)} events ({len(gz)} bytes compressed)", flush=True)
+        sys.stdout.flush()
+    
     resp = POST(url, headers=headers, data=gz, timeout=30)
     resp.raise_for_status()
+    
+    if _VERBOSITY == 'debug':
+        print(f"[BATCH] Response: {resp.status_code} - {resp.text[:200] if resp.text else 'OK'}", flush=True)
+        sys.stdout.flush()
 
 SOURCETYPE_MAP_OVERRIDES = {
     # ===== FIXED PARSER MAPPINGS (Based on actual parser directory names) =====
@@ -1286,9 +1396,21 @@ if __name__ == "__main__":
     )
     parser.add_argument("--marketplace-parser", type=str,
                         help="Use a specific marketplace parser (e.g., marketplace-awscloudtrail-latest)")
+    parser.add_argument("--verbosity", type=str, choices=['quiet', 'info', 'verbose', 'debug'],
+                        default='info',
+                        help="Output verbosity: quiet (no output), info (periodic stats), verbose (every event), debug (all details)")
     parser.add_argument("--print-responses", action="store_true",
-                        help="Print all HEC responses instead of a concise summary")
+                        help="(Deprecated: use --verbosity verbose) Print all HEC responses")
+    parser.add_argument("--speed-mode", action="store_true",
+                        help="Speed mode: pre-generate 1K events and loop for max throughput")
     args = parser.parse_args()
+    
+    # Backward compatibility: --print-responses sets verbosity to verbose
+    if args.print_responses:
+        args.verbosity = 'verbose'
+    
+    # Set module-level verbosity for batch logging (no global needed since it's already module-level)
+    _VERBOSITY = args.verbosity
 
     # Handle marketplace parser name
     if args.marketplace_parser:
@@ -1316,11 +1438,167 @@ if __name__ == "__main__":
     attr_fields = {}  # Empty dict since we removed ATTR_FIELDS
     generators = [getattr(gen_mod, fn) for fn in func_names]
 
-    events = [generators[i % len(generators)]() for i in range(args.count)]
-
+    # For large counts (continuous mode), stream events instead of pre-generating
+    STREAMING_THRESHOLD = 10000
+    
     if args.count == 1:
-        print("HEC response:", send_one(events[0], product, attr_fields))
+        event = generators[0]()
+        print("HEC response:", send_one(event, product, attr_fields))
+    elif args.count > STREAMING_THRESHOLD:
+        # Streaming mode for continuous/large counts - generate on the fly
+        print(f"Starting continuous send mode (spacing {args.min_delay}s – {args.max_delay}s)…", flush=True)
+        
+        # Establish connection with first event BEFORE enabling batch mode
+        # This prevents blocking during the first batch flush
+        if _BATCH_ENABLED:
+            if args.verbosity in ('info', 'verbose', 'debug'):
+                print("[BATCH] Establishing connection with first event...", flush=True)
+            first_event = generators[0]()
+            # Temporarily disable batch mode for connection setup
+            import os
+            original_batch = os.environ.get('S1_HEC_BATCH')
+            os.environ['S1_HEC_BATCH'] = '0'
+            globals()['_BATCH_ENABLED'] = False
+            
+            try:
+                result = send_one(first_event, product, attr_fields)
+                if args.verbosity == 'debug':
+                    print(f"[BATCH] Connection established: {result}", flush=True)
+            except Exception as e:
+                print(f"[BATCH] Failed to establish connection: {e}", flush=True)
+            finally:
+                # Re-enable batch mode
+                if original_batch:
+                    os.environ['S1_HEC_BATCH'] = original_batch
+                globals()['_BATCH_ENABLED'] = True
+            
+            # Enable pipelined batch sending for high throughput (>1K EPS)
+            if args.min_delay < 0.001:  # >1K EPS
+                _start_batch_sender(queue_size=20)  # Allow up to 20 batches in flight
+                if args.verbosity in ('info', 'verbose', 'debug'):
+                    print("[BATCH] Enabled pipelined sending for high throughput", flush=True)
+            
+            # Start from event 2 since we already sent event 1
+            start_idx = 1
+        else:
+            start_idx = 0
+        
+        # Speed mode: pre-generate 1K events and loop through them
+        speed_events = None
+        if args.speed_mode:
+            if args.verbosity in ('info', 'verbose', 'debug'):
+                print("[SPEED] Pre-generating 1000 events for maximum throughput...", flush=True)
+            speed_events = [generators[i % len(generators)]() for i in range(1000)]
+            if args.verbosity in ('info', 'verbose', 'debug'):
+                print(f"[SPEED] Pre-generated {len(speed_events)} events, looping continuously", flush=True)
+        
+        ok = 0
+        fail = 0
+        samples = []
+        last_status_time = time.time()
+        status_interval = 5.0  # seconds
+        start_time = time.time()
+        
+        for i in range(start_idx, args.count):
+            try:
+                # Use pre-generated events in speed mode, otherwise generate on the fly
+                if args.speed_mode:
+                    # Get pre-generated event
+                    # For ultra-high EPS (>10K), skip timestamp updates to reduce overhead
+                    # Timestamps will be slightly stale but throughput is prioritized
+                    event = speed_events[i % len(speed_events)]
+                    
+                    # Only update timestamps for moderate EPS (<10K)
+                    if args.min_delay >= 0.0001:  # ~10K EPS threshold
+                        # Update timestamps for JSON events
+                        if isinstance(event, dict):
+                            current_time = time.time()
+                            current_time_ms = int(current_time * 1000)
+                            current_time_s = int(current_time)
+                            # Update common timestamp fields
+                            for ts_field in ['eventtime', 'timestamp', 'time', '@timestamp', 'event_time', 'logTime', 'createdAt', 'datetime']:
+                                if ts_field in event:
+                                    # Handle different timestamp formats
+                                    if isinstance(event[ts_field], int):
+                                        # Check if milliseconds (>1e12) or seconds
+                                        if event[ts_field] > 1e12:
+                                            event[ts_field] = current_time_ms
+                                        else:
+                                            event[ts_field] = current_time_s
+                                    elif isinstance(event[ts_field], float):
+                                        event[ts_field] = current_time
+                                    elif isinstance(event[ts_field], str):
+                                        # ISO format timestamp
+                                        event[ts_field] = datetime.utcnow().isoformat() + 'Z'
+                else:
+                    event = generators[i % len(generators)]()
+                result = send_one(event, product, attr_fields)
+                
+                # Verbose mode: print every response
+                if args.verbosity == 'verbose':
+                    print(f"Response {i+1 if start_idx == 0 else i}:", result, flush=True)
+                
+                if isinstance(result, dict) and (result.get('code') == 0 or result.get('status') in ('OK', 'QUEUED')):
+                    ok += 1
+                else:
+                    fail += 1
+                    if len(samples) < 3:
+                        samples.append(result)
+                
+                # Check and flush batches periodically (in batch mode)
+                # At high EPS, check less frequently to reduce overhead
+                check_interval = 1000 if args.min_delay < 0.001 else 10  # Every 1000 events for >1K EPS, else every 10
+                if _BATCH_ENABLED and (i + 1) % check_interval == 0:
+                    _batch_check_and_flush()
+                
+                # Info mode: periodic status updates every 5 seconds
+                current_time = time.time()
+                if args.verbosity == 'info' and (current_time - last_status_time) >= status_interval:
+                    elapsed = current_time - start_time
+                    total_sent = i + 1 - start_idx
+                    actual_eps = total_sent / elapsed if elapsed > 0 else 0
+                    success_rate = (ok / total_sent * 100) if total_sent > 0 else 0
+                    print(f"INFO: {total_sent} events sent | {actual_eps:.1f} EPS | {ok} success ({success_rate:.1f}%) | {fail} failed", flush=True)
+                    last_status_time = current_time
+                
+                # Sleep between events (skip for ultra-high EPS where sleep overhead dominates)
+                # Python's time.sleep() has ~1ms overhead, so skip for delays < 0.001s (>1000 EPS)
+                if args.min_delay >= 0.001:
+                    time.sleep(random.uniform(args.min_delay, args.max_delay))
+                    
+            except KeyboardInterrupt:
+                print(f"\nStopped by user after {i+1} events", flush=True)
+                break
+            except Exception as e:
+                print(f"Error at event {i+1}: {e}", flush=True)
+                fail += 1
+        
+        # Flush any remaining batches
+        if _BATCH_ENABLED:
+            if args.verbosity in ('info', 'verbose', 'debug'):
+                print("\n[BATCH] Flushing remaining batches...", flush=True)
+            _batch_check_and_flush()
+            # Force flush all buffers
+            with _BATCH_LOCK:
+                for key in list(_BATCH_BUFFERS.keys()):
+                    _flush_batch_locked(key)
+            
+            # Wait for pipelined batches to complete
+            if _BATCH_SEND_QUEUE is not None:
+                if args.verbosity in ('info', 'verbose', 'debug'):
+                    print("[BATCH] Waiting for pipelined batches to complete...", flush=True)
+                _BATCH_SEND_QUEUE.join()  # Wait for all queued batches to be sent
+                if args.verbosity in ('info', 'verbose', 'debug'):
+                    print("[BATCH] All batches sent", flush=True)
+        
+        print(f"\nDone. Delivered {ok}/{i+1} successfully. Failures: {fail}.")
+        if samples:
+            print("Sample failure responses:")
+            for s in samples:
+                print("  -", s)
     else:
+        # Original batch mode for reasonable counts
+        events = [generators[i % len(generators)]() for i in range(args.count)]
         print(f"Sending {args.count} events one-by-one "
               f"(spacing {args.min_delay}s – {args.max_delay}s)…", flush=True)
         results = send_many_with_spacing(
