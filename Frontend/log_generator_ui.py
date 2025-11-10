@@ -261,6 +261,14 @@ def list_scenarios():
             'phases': ['Access', 'Movement']
         },
         {
+            'id': 'finance_mfa_fatigue_scenario',
+            'name': 'Finance Employee MFA Fatigue Attack',
+            'description': 'Baseline (Days 1-7), MFA fatigue from Russia, OneDrive exfiltration, SOAR detections and automated response.',
+            'duration_days': 8,
+            'total_events': 135,
+            'phases': ['Normal Behavior', 'MFA Fatigue', 'Initial Access', 'Data Exfiltration', 'Detection & Response']
+        },
+        {
             'id': 'scenario_hec_sender',
             'name': 'Scenario HEC Sender',
             'description': 'Generic scenario sender that replays a scenario JSON to HEC.',
@@ -286,6 +294,11 @@ def run_scenario():
     scenario_id = data.get('scenario_id')
     destination_id = data.get('destination_id')
     worker_count = int(data.get('workers', 10))  # Default 10 parallel workers
+    tag_phase = data.get('tag_phase', True)
+    tag_trace = data.get('tag_trace', True)
+    trace_id = (data.get('trace_id') or '').strip()
+    generate_noise = data.get('generate_noise', False)
+    noise_events_count = int(data.get('noise_events_count', 1200))
     
     if not scenario_id:
         return jsonify({'error': 'scenario_id is required'}), 400
@@ -342,6 +355,7 @@ def run_scenario():
                 'quick_scenario_simple': 'quick_scenario_simple.py',
                 'scenario_hec_sender': 'scenario_hec_sender.py',
                 'star_trek_integration_test': 'star_trek_integration_test.py',
+                'finance_mfa_fatigue_scenario': 'finance_mfa_fatigue_scenario.py',
             }
             scenarios_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Backend', 'scenarios'))
             # Resolve script path
@@ -357,6 +371,14 @@ def run_scenario():
             env['S1_HEC_URL'] = hec_url.rstrip('/')
             env['S1_HEC_WORKERS'] = str(worker_count)  # Pass worker count to scripts
             env['S1_HEC_BATCH'] = '0'  # Disable batch mode for immediate responses
+            # Prefer a writable location inside the container for scenario outputs
+            env['SCENARIO_OUTPUT_DIR'] = '/app/data/scenarios/configs'
+            # Control inclusion of scenario.phase tag via env
+            env['S1_TAG_PHASE'] = '1' if tag_phase else '0'
+            # Control inclusion of scenario.trace_id tag via env
+            env['S1_TAG_TRACE'] = '1' if tag_trace else '0'
+            if trace_id:
+                env['S1_TRACE_ID'] = trace_id
             
             # Add event generators and all category subdirectories to Python path
             event_generators_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Backend', 'event_generators'))
@@ -400,7 +422,106 @@ def run_scenario():
             process.wait()
             rc = process.returncode
             if rc == 0:
-                yield "INFO: Scenario execution complete\n"
+                yield "INFO: Scenario generation complete\n"
+                # If this scenario produces a JSON file, automatically replay it to HEC
+                try:
+                    if scenario_id == 'finance_mfa_fatigue_scenario':
+                        from os import path
+                        output_dir = env.get('SCENARIO_OUTPUT_DIR', path.join(scenarios_dir, 'configs'))
+                        output_file = path.join(output_dir, 'finance_mfa_fatigue_scenario.json')
+                        if not path.exists(output_file):
+                            # Fallback to scenarios/configs
+                            fallback = path.join(scenarios_dir, 'configs', 'finance_mfa_fatigue_scenario.json')
+                            if path.exists(fallback):
+                                output_file = fallback
+                        if path.exists(output_file):
+                            yield f"INFO: Replaying generated scenario to HEC: {output_file}\n"
+                            sender_path = os.path.join(scenarios_dir, 'scenario_hec_sender.py')
+                            send_proc = subprocess.Popen(
+                                ['python', sender_path, '--scenario', output_file, '--auto', '--preserve-timestamps'] +
+                                ([] if tag_phase else ['--no-phase-tag']) +
+                                ([] if not trace_id else ['--trace-id', trace_id]),
+                                cwd=scenarios_dir,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT,
+                                text=True,
+                                env=env
+                            )
+                            for sline in iter(send_proc.stdout.readline, ''):
+                                if not sline:
+                                    break
+                                yield sline
+                            send_proc.wait()
+                            if send_proc.returncode == 0:
+                                yield "INFO: Scenario replay to HEC complete\n"
+                                
+                                # Generate and send background noise if requested
+                                if generate_noise and scenario_id == 'finance_mfa_fatigue_scenario':
+                                    yield "\n" + "="*80 + "\n"
+                                    yield "INFO: Generating background noise data...\n"
+                                    yield f"INFO: Creating {noise_events_count} distributed events across 8 days\n"
+                                    yield f"INFO: Distribution: 70% business hours (8 AM - 5 PM EST), 30% off-hours\n"
+                                    yield "="*80 + "\n"
+                                    
+                                    try:
+                                        noise_gen_path = os.path.join(scenarios_dir, 'finance_mfa_noise_generator.py')
+                                        noise_proc = subprocess.Popen(
+                                            ['python', noise_gen_path, '--events', str(noise_events_count), '--days', '8'],
+                                            cwd=scenarios_dir,
+                                            stdout=subprocess.PIPE,
+                                            stderr=subprocess.STDOUT,
+                                            text=True,
+                                            env=env
+                                        )
+                                        for nline in iter(noise_proc.stdout.readline, ''):
+                                            if not nline:
+                                                break
+                                            yield nline
+                                        noise_proc.wait()
+                                        
+                                        if noise_proc.returncode == 0:
+                                            # Check if streaming mode was used (large volume)
+                                            if noise_events_count > 10000:
+                                                yield "\nINFO: Streaming mode - noise events sent directly to HEC\n"
+                                            else:
+                                                # Send noise to HEC via sender script for small volumes
+                                                noise_file = path.join(output_dir, 'finance_mfa_noise.json')
+                                                if not path.exists(noise_file):
+                                                    noise_file = path.join(scenarios_dir, 'configs', 'finance_mfa_noise.json')
+                                                
+                                                if path.exists(noise_file):
+                                                    yield f"\nINFO: Sending background noise to HEC: {noise_file}\n"
+                                                    noise_send_proc = subprocess.Popen(
+                                                        ['python', sender_path, '--scenario', noise_file, '--auto', '--preserve-timestamps'] +
+                                                        ([] if tag_phase else ['--no-phase-tag']) +
+                                                        ([] if not trace_id else ['--trace-id', trace_id]),
+                                                        cwd=scenarios_dir,
+                                                        stdout=subprocess.PIPE,
+                                                        stderr=subprocess.STDOUT,
+                                                        text=True,
+                                                        env=env
+                                                    )
+                                                    for nsline in iter(noise_send_proc.stdout.readline, ''):
+                                                        if not nsline:
+                                                            break
+                                                        yield nsline
+                                                    noise_send_proc.wait()
+                                                    if noise_send_proc.returncode == 0:
+                                                        yield "\nINFO: Background noise sent to HEC successfully\n"
+                                                    else:
+                                                        yield f"\nERROR: Noise replay exited with code {noise_send_proc.returncode}\n"
+                                                else:
+                                                    yield "\nWARN: Generated noise file not found; skipping HEC replay\n"
+                                        else:
+                                            yield f"\nERROR: Noise generation exited with code {noise_proc.returncode}\n"
+                                    except Exception as ne:
+                                        yield f"\nERROR: Failed to generate/send background noise: {ne}\n"
+                            else:
+                                yield f"ERROR: Scenario replay exited with code {send_proc.returncode}\n"
+                        else:
+                            yield "WARN: Generated scenario file not found; skipping HEC replay\n"
+                except Exception as e:
+                    yield f"ERROR: Failed to replay scenario to HEC: {e}\n"
             else:
                 yield f"ERROR: Scenario exited with code {rc}\n"
         except Exception as e:

@@ -1080,14 +1080,16 @@ JSON_PRODUCTS = {
     "pingprotect",
 }
 
-def _envelope(line, product: str, attr_fields: dict) -> dict:
+def _envelope(line, product: str, attr_fields: dict, event_time: float | None = None) -> dict:
     # Handle both JSON dict objects and string inputs
     if isinstance(line, dict):
         event_data = line  # Use dict directly for JSON products
     else:
         event_data = line  # Use string for raw products
     
-    env = {"time": round(time.time()),
+    # If event_time is provided, use it; otherwise current time
+    env_time = round(time.time()) if event_time is None else int(event_time)
+    env = {"time": env_time,
            "event": event_data,
            "sourcetype": SOURCETYPE_MAP.get(product, product),
            "fields": attr_fields}
@@ -1099,7 +1101,7 @@ def _envelope(line, product: str, attr_fields: dict) -> dict:
         env["index"] = ENV_INDEX
     return env
 
-def send_one(line, product: str, attr_fields: dict):
+def send_one(line, product: str, attr_fields: dict, event_time: float | None = None):
     """
     Route JSON‑structured products to the /event endpoint and all
     raw / CSV / syslog products to the /raw endpoint.
@@ -1150,7 +1152,7 @@ def send_one(line, product: str, attr_fields: dict):
     # Batch mode: enqueue and return
     if _BATCH_ENABLED:
         if product in JSON_PRODUCTS:
-            payload = _envelope(line, product, attr_fields)
+            payload = _envelope(line, product, attr_fields, event_time)
             line_str = json.dumps(payload, separators=(",", ":"))
             _batch_enqueue(line_str, True, product, attr_fields)
         else:
@@ -1176,7 +1178,7 @@ def send_one(line, product: str, attr_fields: dict):
             
             if product in JSON_PRODUCTS:
                 url = _CONNECTION_CACHE['event_base']
-                payload = _envelope(line, product, attr_fields)
+                payload = _envelope(line, product, attr_fields, event_time)
                 headers = {**headers_auth, "Content-Type": "application/json"}
                 resp = POST(url, headers=headers, json=payload, timeout=10)
             else:
@@ -1210,7 +1212,7 @@ def send_one(line, product: str, attr_fields: dict):
                     if product in JSON_PRODUCTS:
                         # JSON payload → /event
                         url = event_base
-                        payload = _envelope(line, product, attr_fields)
+                        payload = _envelope(line, product, attr_fields, event_time)
                         headers = {**headers_auth, "Content-Type": "application/json"}
                         if DEBUG:
                             print(f"[DEBUG] Sending to {url}")
