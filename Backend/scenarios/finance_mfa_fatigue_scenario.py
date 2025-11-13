@@ -49,13 +49,13 @@ JAKE_PROFILE = {
     "department": "Finance",
     "role": "Finance Analyst",
     "location": "Denver, Colorado",
-    "normal_ip": "198.51.100.42",  # Denver office IP
+    "normal_ip": "73.229.104.12",  # Denver office IP
     "work_hours_start": 8,  # 8 AM
     "work_hours_end": 17  # 5 PM
 }
 
 ATTACKER_PROFILE = {
-    "ip": "185.220.101.52",  # Russian IP (Moscow)
+    "ip": "185.194.106.94",  # Russian IP (Moscow)
     "location": "Moscow, Russia",
     "timezone_offset": 10  # Moscow is UTC+3, Denver is UTC-7 = 10 hour difference
 }
@@ -219,7 +219,7 @@ def generate_mfa_fatigue_attack(base_time: datetime) -> List[Dict]:
     okta_success_str = okta_authentication_log()
     okta_success = json.loads(okta_success_str) if isinstance(okta_success_str, str) else okta_success_str
     okta_success['published'] = accept_time
-    okta_success['eventType'] = 'user.authentication.auth_via_mfa'
+    okta_success['eventType'] = 'user.mfa.challenge'
     okta_success['actor']['alternateId'] = JAKE_PROFILE['email']
     okta_success['actor']['displayName'] = JAKE_PROFILE['name']
     okta_success['client']['ipAddress'] = ATTACKER_PROFILE['ip']
