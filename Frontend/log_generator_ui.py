@@ -27,6 +27,11 @@ BACKEND_API_KEY = os.environ.get('BACKEND_API_KEY')
 def index():
     return render_template('log_generator.html')
 
+@app.route('/test-token-storage')
+def test_token_storage():
+    """Token storage test page"""
+    return render_template('test_token_storage.html')
+
 def get_scripts():
     scripts = {}
     try:
@@ -299,6 +304,7 @@ def run_scenario():
     trace_id = (data.get('trace_id') or '').strip()
     generate_noise = data.get('generate_noise', False)
     noise_events_count = int(data.get('noise_events_count', 1200))
+    local_token = data.get('hec_token')  # Token from browser localStorage
     
     if not scenario_id:
         return jsonify({'error': 'scenario_id is required'}), 400
@@ -322,16 +328,22 @@ def run_scenario():
         
         hec_url = chosen.get('url')
         
-        # Fetch decrypted token from backend
-        token_resp = requests.get(
-            f"{API_BASE_URL}/api/v1/destinations/{destination_id}/token",
-            headers=_get_api_headers(),
-            timeout=10
-        )
-        if token_resp.status_code != 200:
-            return jsonify({'error': 'Failed to retrieve HEC token'}), 400
-        
-        hec_token = token_resp.json().get('token')
+        # Use local token if provided, otherwise fetch from backend
+        if local_token:
+            hec_token = local_token
+            logger.info(f"Using local token from browser for destination: {destination_id}")
+        else:
+            # Fetch decrypted token from backend as fallback
+            token_resp = requests.get(
+                f"{API_BASE_URL}/api/v1/destinations/{destination_id}/token",
+                headers=_get_api_headers(),
+                timeout=10
+            )
+            if token_resp.status_code != 200:
+                return jsonify({'error': 'Failed to retrieve HEC token. Please set a local token in Settings.'}), 400
+            
+            hec_token = token_resp.json().get('token')
+            logger.info(f"Using backend token for destination: {destination_id}")
         
         if not hec_url or not hec_token:
             return jsonify({'error': 'HEC destination incomplete or token missing'}), 400
@@ -612,6 +624,7 @@ def process_upload():
     eps = float(data.get('eps', 10.0))
     sourcetype = data.get('sourcetype', '').strip()
     endpoint = data.get('endpoint', 'event')  # 'event' or 'raw'
+    local_token = data.get('hec_token')  # Token from browser localStorage
     
     if not upload_id:
         return jsonify({'error': 'upload_id is required'}), 400
@@ -653,17 +666,23 @@ def process_upload():
             
             hec_url = destination.get('url')
             
-            # Get decrypted token
-            token_resp = requests.get(
-                f"{API_BASE_URL}/api/v1/destinations/{destination_id}/token",
-                headers=_get_api_headers(),
-                timeout=10
-            )
-            if token_resp.status_code != 200:
-                yield "ERROR: Failed to retrieve HEC token\n"
-                return
-            
-            hec_token = token_resp.json().get('token')
+            # Use local token if provided, otherwise fetch from backend
+            if local_token:
+                hec_token = local_token
+                logger.info(f"Using local token from browser for destination: {destination_id}")
+            else:
+                # Get decrypted token from backend as fallback
+                token_resp = requests.get(
+                    f"{API_BASE_URL}/api/v1/destinations/{destination_id}/token",
+                    headers=_get_api_headers(),
+                    timeout=10
+                )
+                if token_resp.status_code != 200:
+                    yield "ERROR: Failed to retrieve HEC token. Please set a local token in Settings.\n"
+                    return
+                
+                hec_token = token_resp.json().get('token')
+                logger.info(f"Using backend token for destination: {destination_id}")
             
             yield f"INFO: Processing {file_type.upper()} file with {line_count} records\n"
             yield f"INFO: Sending to {hec_url} at {eps} EPS\n"
@@ -825,6 +844,7 @@ def generate_logs():
     syslog_port = int(data.get('port')) if data.get('port') is not None else None
     syslog_protocol = data.get('protocol')
     product_id = data.get('product')
+    local_hec_token = data.get('hec_token')  # Token from browser localStorage
     # Unified destination id (preferred)
     unified_dest_id = data.get('destination_id')
     # Back-compat fields
@@ -962,17 +982,23 @@ def generate_logs():
                     hec_url = chosen.get('url')
                     dest_id = chosen.get('id')
                     
-                    # Fetch decrypted token from backend
-                    token_resp = requests.get(
-                        f"{API_BASE_URL}/api/v1/destinations/{dest_id}/token",
-                        headers=_get_api_headers(),
-                        timeout=10
-                    )
-                    if token_resp.status_code != 200:
-                        yield "ERROR: Failed to retrieve HEC token from backend.\n"
-                        return
-                    
-                    hec_token = token_resp.json().get('token')
+                    # Use local token if provided, otherwise fetch from backend
+                    if local_hec_token:
+                        hec_token = local_hec_token
+                        logger.info(f"Using local token from browser for destination: {dest_id}")
+                    else:
+                        # Fetch decrypted token from backend as fallback
+                        token_resp = requests.get(
+                            f"{API_BASE_URL}/api/v1/destinations/{dest_id}/token",
+                            headers=_get_api_headers(),
+                            timeout=10
+                        )
+                        if token_resp.status_code != 200:
+                            yield "ERROR: Failed to retrieve HEC token from backend. Please set a local token in Settings.\n"
+                            return
+                        
+                        hec_token = token_resp.json().get('token')
+                        logger.info(f"Using backend token for destination: {dest_id}")
                     
                     if not hec_url or not hec_token:
                         yield "ERROR: Selected HEC destination is incomplete or token missing.\n"

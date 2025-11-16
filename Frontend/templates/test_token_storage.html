@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Token Storage Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #00ff00;
+        }
+        button {
+            background: #00aa00;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background: #00cc00;
+        }
+        .output {
+            background: #000;
+            border: 1px solid #00ff00;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            min-height: 100px;
+            white-space: pre-wrap;
+        }
+        .success { color: #00ff00; }
+        .error { color: #ff0000; }
+        .info { color: #00aaff; }
+        input {
+            background: #333;
+            color: #fff;
+            border: 1px solid #00ff00;
+            padding: 8px;
+            margin: 5px 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔒 Token Vault Test Suite</h1>
+    <p>Test the local encrypted token storage system</p>
+
+    <div>
+        <h2>1. Basic Storage Test</h2>
+        <button onclick="getAllTokens()" style="background: #0088cc; width: 100%; margin-bottom: 15px; font-weight: bold;">📋 GET ALL LOCAL TOKENS</button>
+        <input type="text" id="test-dest-id" placeholder="Destination ID (e.g., hec:1)" value="hec:test">
+        <input type="password" id="test-token" placeholder="Test Token" value="test-token-12345">
+        <button onclick="testStore()">Store Token</button>
+        <button onclick="testRetrieve()">Retrieve Token</button>
+        <button onclick="testCheck()">Check if Exists</button>
+        <button onclick="testRemove()">Remove Token</button>
+        <div class="output" id="basic-output"></div>
+    </div>
+
+    <div>
+        <h2>2. Multiple Destinations Test</h2>
+        <button onclick="testMultiple()">Store 3 Different Tokens</button>
+        <button onclick="listAll()">List All Stored Destinations</button>
+        <div class="output" id="multiple-output"></div>
+    </div>
+
+    <div>
+        <h2>3. Encryption Test</h2>
+        <button onclick="testEncryption()">Verify Encryption (Check localStorage)</button>
+        <button onclick="inspectLocalStorage()">Inspect Raw localStorage</button>
+        <div class="output" id="encryption-output"></div>
+    </div>
+
+    <div>
+        <h2>4. Clear All Test</h2>
+        <button onclick="clearAll()">Clear All Tokens</button>
+        <button onclick="verifyCleared()">Verify Cleared</button>
+        <div class="output" id="clear-output"></div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/token_vault.js') }}"></script>
+    <script>
+        function log(elementId, message, type = 'info') {
+            const output = document.getElementById(elementId);
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+            const timestamp = new Date().toLocaleTimeString();
+            output.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+        }
+
+        function clearOutput(elementId) {
+            document.getElementById(elementId).innerHTML = '';
+        }
+
+        async function getAllTokens() {
+            clearOutput('basic-output');
+            log('basic-output', '=== ALL STORED TOKENS ===', 'info');
+            
+            const destIds = window.tokenVault.getStoredDestinationIds();
+            log('basic-output', `\nTotal tokens stored: ${destIds.length}`, 'info');
+            
+            if (destIds.length === 0) {
+                log('basic-output', '\n⚠ No tokens stored', 'error');
+                return;
+            }
+            
+            log('basic-output', '\nRetrieving all tokens...\n', 'info');
+            
+            for (const id of destIds) {
+                try {
+                    const token = await window.tokenVault.getToken(id);
+                    if (token) {
+                        log('basic-output', `✓ ID: "${id}"`, 'success');
+                        log('basic-output', `  Token: ${token}\n`, 'info');
+                    } else {
+                        log('basic-output', `✗ ID: "${id}" - Failed to decrypt`, 'error');
+                    }
+                } catch (e) {
+                    log('basic-output', `✗ ID: "${id}" - Error: ${e.message}`, 'error');
+                }
+            }
+        }
+
+        async function testStore() {
+            clearOutput('basic-output');
+            const destId = document.getElementById('test-dest-id').value;
+            const token = document.getElementById('test-token').value;
+            
+            log('basic-output', `Storing token for destination: ${destId}`, 'info');
+            const result = await window.tokenVault.storeToken(destId, token);
+            
+            if (result) {
+                log('basic-output', '✓ Token stored successfully!', 'success');
+            } else {
+                log('basic-output', '✗ Failed to store token', 'error');
+            }
+        }
+
+        async function testRetrieve() {
+            const destId = document.getElementById('test-dest-id').value;
+            log('basic-output', `Retrieving token for destination: ${destId}`, 'info');
+            
+            const token = await window.tokenVault.getToken(destId);
+            
+            if (token) {
+                log('basic-output', `✓ Token retrieved: ${token}`, 'success');
+            } else {
+                log('basic-output', '✗ No token found', 'error');
+            }
+        }
+
+        async function testCheck() {
+            const destId = document.getElementById('test-dest-id').value;
+            const exists = window.tokenVault.hasToken(destId);
+            
+            if (exists) {
+                log('basic-output', `✓ Token exists for: ${destId}`, 'success');
+            } else {
+                log('basic-output', `✗ No token found for: ${destId}`, 'error');
+            }
+        }
+
+        async function testRemove() {
+            const destId = document.getElementById('test-dest-id').value;
+            log('basic-output', `Removing token for: ${destId}`, 'info');
+            window.tokenVault.removeToken(destId);
+            log('basic-output', '✓ Token removed', 'success');
+        }
+
+        async function testMultiple() {
+            clearOutput('multiple-output');
+            const destinations = [
+                { id: 'hec:1', token: 'token-alpha-123' },
+                { id: 'hec:2', token: 'token-beta-456' },
+                { id: 'hec:3', token: 'token-gamma-789' }
+            ];
+
+            log('multiple-output', 'Storing 3 different tokens...', 'info');
+            
+            for (const dest of destinations) {
+                const result = await window.tokenVault.storeToken(dest.id, dest.token);
+                if (result) {
+                    log('multiple-output', `✓ Stored: ${dest.id}`, 'success');
+                } else {
+                    log('multiple-output', `✗ Failed: ${dest.id}`, 'error');
+                }
+            }
+
+            log('multiple-output', '\nVerifying retrieval...', 'info');
+            for (const dest of destinations) {
+                const retrieved = await window.tokenVault.getToken(dest.id);
+                if (retrieved === dest.token) {
+                    log('multiple-output', `✓ Match: ${dest.id}`, 'success');
+                } else {
+                    log('multiple-output', `✗ Mismatch: ${dest.id} (got: ${retrieved})`, 'error');
+                }
+            }
+        }
+
+        async function listAll() {
+            const destIds = window.tokenVault.getStoredDestinationIds();
+            log('multiple-output', `\nStored destination IDs: ${destIds.length}`, 'info');
+            
+            if (destIds.length === 0) {
+                log('multiple-output', 'No tokens stored', 'info');
+            } else {
+                for (const id of destIds) {
+                    const token = await window.tokenVault.getToken(id);
+                    const preview = token ? token.substring(0, 20) + '...' : 'ERROR';
+                    log('multiple-output', `  - ${id}: ${preview}`, 'info');
+                }
+            }
+        }
+
+        async function testEncryption() {
+            clearOutput('encryption-output');
+            log('encryption-output', 'Testing encryption...', 'info');
+            
+            const testId = 'test:encryption';
+            const testToken = 'super-secret-token-should-not-be-readable';
+            
+            await window.tokenVault.storeToken(testId, testToken);
+            log('encryption-output', '✓ Token stored', 'success');
+            
+            const raw = localStorage.getItem('jarvis_user_tokens');
+            log('encryption-output', '\nRaw localStorage data:', 'info');
+            log('encryption-output', raw.substring(0, 200) + '...', 'info');
+            
+            if (raw.includes(testToken)) {
+                log('encryption-output', '\n✗ WARNING: Token visible in plaintext!', 'error');
+            } else {
+                log('encryption-output', '\n✓ Token is encrypted (not readable)', 'success');
+            }
+            
+            const retrieved = await window.tokenVault.getToken(testId);
+            if (retrieved === testToken) {
+                log('encryption-output', '✓ Decryption successful', 'success');
+            } else {
+                log('encryption-output', '✗ Decryption failed', 'error');
+            }
+            
+            window.tokenVault.removeToken(testId);
+        }
+
+        function inspectLocalStorage() {
+            clearOutput('encryption-output');
+            log('encryption-output', 'Inspecting localStorage...', 'info');
+            
+            const raw = localStorage.getItem('jarvis_user_tokens');
+            if (!raw) {
+                log('encryption-output', 'No tokens in storage', 'info');
+                return;
+            }
+            
+            try {
+                const parsed = JSON.parse(raw);
+                const destCount = Object.keys(parsed).length;
+                log('encryption-output', `Found ${destCount} encrypted token(s)`, 'info');
+                
+                for (const [destId, data] of Object.entries(parsed)) {
+                    log('encryption-output', `\nDestination: ${destId}`, 'info');
+                    log('encryption-output', `  IV length: ${data.iv.length} bytes`, 'info');
+                    log('encryption-output', `  Data length: ${data.data.length} bytes`, 'info');
+                    log('encryption-output', `  Timestamp: ${new Date(data.timestamp).toLocaleString()}`, 'info');
+                }
+            } catch (e) {
+                log('encryption-output', `Error parsing: ${e.message}`, 'error');
+            }
+        }
+
+        function clearAll() {
+            clearOutput('clear-output');
+            log('clear-output', 'Clearing all tokens...', 'info');
+            window.tokenVault.clearAll();
+            log('clear-output', '✓ All tokens cleared', 'success');
+        }
+
+        function verifyCleared() {
+            const destIds = window.tokenVault.getStoredDestinationIds();
+            log('clear-output', `\nVerifying... Found ${destIds.length} token(s)`, 'info');
+            
+            if (destIds.length === 0) {
+                log('clear-output', '✓ All tokens successfully cleared', 'success');
+            } else {
+                log('clear-output', '✗ Some tokens still present!', 'error');
+            }
+        }
+
+        // Auto-run on load
+        window.addEventListener('load', () => {
+            console.log('Token Vault Test Suite loaded');
+            console.log('TokenVault instance:', window.tokenVault);
+        });
+    </script>
+</body>
+</html>

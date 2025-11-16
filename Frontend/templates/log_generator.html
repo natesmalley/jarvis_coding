@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Synthetic Log Generator</title>
     <script src="https://cdn.tailwindcss.com/3.4.1"></script>
+    <script src="{{ url_for('static', filename='js/token_vault.js') }}"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -542,6 +543,12 @@
                             <div class="input-group md:col-span-3">
                                 <label for="dest-token" class="text-sm font-semibold text-[#c8b3e8]">HEC API Key</label>
                                 <input type="password" id="dest-token" name="dest-token" autocomplete="off" placeholder="Paste token here" required>
+                                <div class="mt-2">
+                                    <label class="flex items-center gap-2 text-xs">
+                                        <input type="checkbox" id="store-token-locally" checked>
+                                        <span class="text-[#b8a0d2]">Store token locally in browser (recommended for multi-user environments)</span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                         <div id="syslog-config" class="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4" style="display:none;">
@@ -570,18 +577,38 @@
                         <ul id="destinations-list" class="space-y-2"></ul>
                         <template id="destination-item-template">
                             <li class="card p-3 flex items-center justify-between gap-3">
-                                <span class="truncate dest-label"></span>
-                                <button type="button" class="delete-dest" aria-label="Delete" title="Delete" style="background: transparent; border: none; padding: 4px; cursor: pointer; color: #f3e8ff;">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <polyline points="3 6 5 6 21 6" />
-                                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                                        <path d="M10 11v6" />
-                                        <path d="M14 11v6" />
-                                        <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
-                                    </svg>
-                                </button>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2">
+                                        <span class="truncate dest-label"></span>
+                                        <span class="token-indicator" style="display: none; font-size: 0.75rem; color: #10b981;" title="Token stored locally">🔒</span>
+                                    </div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button type="button" class="set-token-btn" aria-label="Set Local Token" title="Set Local Token" style="background: transparent; border: none; padding: 4px; cursor: pointer; color: #a78bfa; display: none;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                        </svg>
+                                    </button>
+                                    <button type="button" class="delete-dest" aria-label="Delete" title="Delete" style="background: transparent; border: none; padding: 4px; cursor: pointer; color: #f3e8ff;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <polyline points="3 6 5 6 21 6" />
+                                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                            <path d="M10 11v6" />
+                                            <path d="M14 11v6" />
+                                            <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                                        </svg>
+                                    </button>
+                                </div>
                             </li>
                         </template>
+                    </div>
+                    <div class="mt-4 p-3 bg-[#241d3a] rounded-lg border border-[#3c325c]">
+                        <h4 class="text-sm font-semibold text-[#c8b3e8] mb-2">Local Token Storage</h4>
+                        <p class="text-xs text-[#b8a0d2] mb-3">Tokens are encrypted and stored in your browser. Each user can have their own tokens.</p>
+                        <button type="button" id="clear-all-tokens-btn" class="text-xs px-3 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-700 rounded text-red-300" style="transition: all 0.3s;">
+                            Clear All Local Tokens
+                        </button>
                     </div>
                 </div>
             </div>
@@ -760,6 +787,28 @@
                     items.forEach(d => {
                         const node = tpl.content.firstElementChild.cloneNode(true);
                         node.querySelector('.dest-label').textContent = d.name;
+                        
+                        // Show lock icon if token is stored locally
+                        const tokenIndicator = node.querySelector('.token-indicator');
+                        if (d.type === 'hec' && window.tokenVault && window.tokenVault.hasToken(d.id)) {
+                            tokenIndicator.style.display = 'inline';
+                        }
+                        
+                        // Show "Set Token" button for HEC destinations
+                        const setTokenBtn = node.querySelector('.set-token-btn');
+                        if (d.type === 'hec') {
+                            setTokenBtn.style.display = 'block';
+                            setTokenBtn.addEventListener('click', async () => {
+                                const token = prompt(`Enter HEC token for "${d.name}":`);
+                                if (token && token.trim()) {
+                                    await window.tokenVault.storeToken(d.id, token.trim());
+                                    alert('Token stored locally in your browser');
+                                    await refreshDestinations();
+                                }
+                            });
+                        }
+                        
+                        // Delete button
                         const delBtn = node.querySelector('.delete-dest');
                         delBtn.addEventListener('click', async () => {
                             if (!confirm(`Delete destination "${d.name}"?`)) return;
@@ -768,6 +817,10 @@
                                 if (r.status !== 204) {
                                     const txt = await r.text();
                                     throw new Error(`Failed to delete (${r.status}): ${txt}`);
+                                }
+                                // Also remove local token if exists
+                                if (window.tokenVault && window.tokenVault.hasToken(d.id)) {
+                                    window.tokenVault.removeToken(d.id);
                                 }
                                 await refreshDestinations();
                             } catch (err) {
@@ -813,31 +866,69 @@
                 e.preventDefault();
                 const name = document.getElementById('dest-name').value.trim();
                 const type = destTypeSel.value;
+                const storeLocally = document.getElementById('store-token-locally')?.checked;
+                
                 try {
                     const payload = { type, name };
+                    let tokenValue = null;
+                    
                     if (type === 'hec') {
                         payload.url = document.getElementById('dest-url').value.trim();
-                        payload.token = document.getElementById('dest-token').value;
+                        tokenValue = document.getElementById('dest-token').value;
+                        
+                        if (storeLocally) {
+                            // Store locally - don't send to backend
+                            payload.token = 'LOCAL_STORAGE';  // Placeholder for backend
+                        } else {
+                            // Send to backend for database storage
+                            payload.token = tokenValue;
+                        }
                     } else {
                         payload.ip = document.getElementById('dest-syslog-ip').value.trim();
                         payload.port = parseInt(document.getElementById('dest-syslog-port').value, 10);
                         payload.protocol = document.getElementById('dest-syslog-protocol').value;
                     }
+                    
                     const r = await fetch('/destinations', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
                     if (!r.ok) throw new Error(`Failed to save destination (${r.status})`);
+                    
+                    const result = await r.json();
+                    const destinationId = result.id;
+                    
+                    // Store token locally if requested
+                    if (type === 'hec' && storeLocally && tokenValue && window.tokenVault) {
+                        await window.tokenVault.storeToken(destinationId, tokenValue);
+                        console.log(`Token stored locally for destination: ${destinationId}`);
+                    }
+                    
                     // Clear token field
-                    const tokenEl = document.getElementById('dest-token'); if (tokenEl) tokenEl.value = '';
+                    const tokenEl = document.getElementById('dest-token'); 
+                    if (tokenEl) tokenEl.value = '';
+                    
                     await refreshDestinations();
+                    
                     // Switch to Generate tab to use it
                     const genBtn = document.querySelector('.nav-tab[data-target="generate-section"]');
                     if (genBtn) genBtn.click();
                 } catch (err) {
                     alert('Failed to save destination. See console.');
                     console.error(err);
+                }
+            });
+        }
+        
+        // Clear all tokens button
+        const clearAllTokensBtn = document.getElementById('clear-all-tokens-btn');
+        if (clearAllTokensBtn) {
+            clearAllTokensBtn.addEventListener('click', () => {
+                if (confirm('Are you sure you want to clear all locally stored tokens? This cannot be undone.')) {
+                    window.tokenVault.clearAll();
+                    alert('All local tokens have been cleared');
+                    refreshDestinations();
                 }
             });
         }
@@ -921,6 +1012,12 @@
             try {
                 // Create abort controller for stopping
                 currentAbortController = new AbortController();
+                
+                // Get local token if available for HEC destinations
+                let localToken = null;
+                if (destinationType === 'hec' && window.tokenVault && window.tokenVault.hasToken(destinationId)) {
+                    localToken = await window.tokenVault.getToken(destinationId);
+                }
 
                 const response = await fetch('/generate-logs', {
                     method: 'POST',
@@ -935,7 +1032,8 @@
                         eps: eps,
                         continuous: continuousMode,
                         speed_mode: speedMode,
-                        destination_id: destinationId
+                        destination_id: destinationId,
+                        hec_token: localToken  // Pass local token if available
                     } : {
                         destination: 'syslog',
                         script: scriptPath,
@@ -1084,6 +1182,12 @@
                 const generateNoise = document.getElementById('generate-noise')?.checked || false;
                 const noiseEventsCount = parseInt(document.getElementById('noise-events-count')?.value || '1200', 10);
                 
+                // Get local token if available
+                let localToken = null;
+                if (window.tokenVault && window.tokenVault.hasToken(destinationId)) {
+                    localToken = await window.tokenVault.getToken(destinationId);
+                }
+                
                 const response = await fetch('/scenarios/run', {
                     method: 'POST',
                     headers: {
@@ -1097,7 +1201,8 @@
                         tag_trace: tagTrace,
                         trace_id: traceId,
                         generate_noise: generateNoise,
-                        noise_events_count: noiseEventsCount
+                        noise_events_count: noiseEventsCount,
+                        hec_token: localToken  // Pass local token if available
                     })
                 });
                 
@@ -1314,6 +1419,12 @@
             uploadOutputBox.innerText = 'Starting file processing...\n\n';
 
             try {
+                // Get local token if available
+                let localToken = null;
+                if (window.tokenVault && window.tokenVault.hasToken(destinationId)) {
+                    localToken = await window.tokenVault.getToken(destinationId);
+                }
+                
                 const response = await fetch('/uploads/process', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1323,7 +1434,8 @@
                         batch_size: batchSize,
                         eps: eps,
                         sourcetype: sourcetype,
-                        endpoint: endpoint
+                        endpoint: endpoint,
+                        hec_token: localToken  // Pass local token if available
                     })
                 });
 

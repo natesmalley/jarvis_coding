@@ -204,8 +204,18 @@ async def get_destination_token(
     
     try:
         token = service.decrypt_token(destination.token_encrypted)
+        
+        # Check if this is a local-storage-only destination
+        if token == 'LOCAL_STORAGE':
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This destination uses local browser storage. Please provide the token from your browser."
+            )
+        
         logger.info(f"Successfully decrypted token for destination: {dest_id}")
         return {"token": token}
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
     except Exception as e:
         logger.error(f"Failed to decrypt token: {e}")
         raise HTTPException(
