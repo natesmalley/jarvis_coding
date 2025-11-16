@@ -1,6 +1,7 @@
 # Core API dependencies
 fastapi
 uvicorn[standard]
+gunicorn>=20.1.0
 python-multipart
 pydantic
 pydantic-settings

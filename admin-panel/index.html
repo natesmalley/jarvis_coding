@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jarvis Admin Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            color: #333;
+        }
+        
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            width: 100%;
+        }
+        
+        .login-box {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            width: 90%;
+            max-width: 400px;
+        }
+        
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1rem;
+            display: block;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: #667eea;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #666;
+            font-weight: 500;
+        }
+        
+        input[type="text"],
+        input[type="password"],
+        input[type="number"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+        
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.3s;
+        }
+        
+        .btn:hover {
+            background: #764ba2;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .sidebar {
+            width: 250px;
+            background: white;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            padding: 1rem;
+            display: none;
+        }
+        
+        .sidebar.active {
+            display: block;
+        }
+        
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            display: none;
+        }
+        
+        .main-content.active {
+            display: block;
+        }
+        
+        .header {
+            background: white;
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            margin-bottom: 1rem;
+            color: #667eea;
+        }
+        
+        .nav-item {
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .nav-item:hover {
+            background: #f0f0f0;
+        }
+        
+        .nav-item.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .feature-toggle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .feature-toggle:last-child {
+            border-bottom: none;
+        }
+        
+        .toggle {
+            position: relative;
+            width: 50px;
+            height: 24px;
+            background: #ccc;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .toggle.active {
+            background: #667eea;
+        }
+        
+        .toggle-handle {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+        
+        .toggle.active .toggle-handle {
+            transform: translateX(26px);
+        }
+        
+        .session-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 5px;
+            margin-bottom: 0.75rem;
+        }
+        
+        .session-info {
+            flex: 1;
+        }
+        
+        .session-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .error {
+            color: #dc3545;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+        }
+        
+        .success {
+            color: #28a745;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+        }
+        
+        .feature-disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Form -->
+    <div id="loginContainer" class="login-container">
+        <div class="login-box">
+            <img src="logo.png" alt="Jarvis Logo" class="logo">
+            <h1>Jarvis Admin Panel</h1>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" required value="admin">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" required>
+                </div>
+                <button type="submit" class="btn">Login</button>
+                <div id="loginError" class="error"></div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Admin Panel -->
+    <div id="sidebar" class="sidebar">
+        <h3 style="margin-bottom: 1.5rem; color: #667eea;">Admin Panel</h3>
+        <div class="nav-item active" onclick="showSection('config')">Configuration</div>
+        <div class="nav-item" onclick="showSection('sessions')">Active Sessions</div>
+        <div class="nav-item" onclick="showSection('features')">Feature Control</div>
+        <div class="nav-item" onclick="logout()">Logout</div>
+    </div>
+    
+    <div id="mainContent" class="main-content">
+        <div class="header">
+            <h1>Jarvis Control Center</h1>
+            <div>
+                <span id="adminUser"></span>
+                <button class="btn btn-small" onclick="logout()">Logout</button>
+            </div>
+        </div>
+        
+        <!-- Configuration Section -->
+        <div id="configSection" class="section">
+            <div class="card">
+                <h2>System Configuration</h2>
+                <div class="form-group">
+                    <label for="landingPort">Landing Page Port</label>
+                    <input type="number" id="landingPort" min="1" max="65535" value="80">
+                </div>
+                <div class="form-group">
+                    <label for="maxSessions">Maximum Sessions</label>
+                    <input type="number" id="maxSessions" min="1" max="500" value="150">
+                </div>
+                <div class="form-group">
+                    <label for="sessionTTL">Session TTL (hours)</label>
+                    <input type="number" id="sessionTTL" min="1" max="168" value="24">
+                </div>
+                <button class="btn" onclick="saveConfig()">Save Configuration</button>
+                <div id="configMessage"></div>
+            </div>
+        </div>
+        
+        <!-- Sessions Section -->
+        <div id="sessionsSection" class="section" style="display: none;">
+            <div class="card">
+                <h2>Active Sessions</h2>
+                <div id="sessionsList"></div>
+                <button class="btn btn-danger" onclick="cleanupSessions()">Cleanup Expired</button>
+            </div>
+        </div>
+        
+        <!-- Features Section -->
+        <div id="featuresSection" class="section" style="display: none;">
+            <div class="card">
+                <h2>Feature Control</h2>
+                <p style="margin-bottom: 1rem; color: #666;">Toggle features for new sessions. Existing sessions require individual configuration.</p>
+                
+                <div class="feature-toggle">
+                    <span>Event Generators</span>
+                    <div class="toggle active" id="toggle-generators" onclick="toggleFeature('generators')">
+                        <div class="toggle-handle"></div>
+                    </div>
+                </div>
+                
+                <div class="feature-toggle">
+                    <span>Scenarios</span>
+                    <div class="toggle active" id="toggle-scenarios" onclick="toggleFeature('scenarios')">
+                        <div class="toggle-handle"></div>
+                    </div>
+                </div>
+                
+                <div class="feature-toggle">
+                    <span>Destinations</span>
+                    <div class="toggle active" id="toggle-destinations" onclick="toggleFeature('destinations')">
+                        <div class="toggle-handle"></div>
+                    </div>
+                </div>
+                
+                <div class="feature-toggle">
+                    <span>File Upload</span>
+                    <div class="toggle active" id="toggle-uploads" onclick="toggleFeature('uploads')">
+                        <div class="toggle-handle"></div>
+                    </div>
+                </div>
+                
+                <div class="feature-toggle">
+                    <span>Export</span>
+                    <div class="toggle active" id="toggle-export" onclick="toggleFeature('export')">
+                        <div class="toggle-handle"></div>
+                    </div>
+                </div>
+                
+                <div class="feature-toggle">
+                    <span>Continuous Mode</span>
+                    <div class="toggle active" id="toggle-continuous_mode" onclick="toggleFeature('continuous_mode')">
+                        <div class="toggle-handle"></div>
+                    </div>
+                </div>
+                
+                <button class="btn" onclick="saveFeatures()">Apply to New Sessions</button>
+                <div id="featureMessage"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = '/api/admin';
+        let authToken = null;
+        let currentConfig = {};
+        
+        // Check if already logged in
+        if (localStorage.getItem('adminAuth')) {
+            showAdminPanel();
+        }
+        
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    localStorage.setItem('adminAuth', btoa(`${username}:${password}`));
+                    authToken = btoa(`${username}:${password}`);
+                    showAdminPanel();
+                } else {
+                    document.getElementById('loginError').textContent = 'Invalid credentials';
+                }
+            } catch (error) {
+                document.getElementById('loginError').textContent = 'Login failed: ' + error.message;
+            }
+        });
+        
+        function showAdminPanel() {
+            authToken = localStorage.getItem('adminAuth');
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('sidebar').classList.add('active');
+            document.getElementById('mainContent').classList.add('active');
+            document.getElementById('adminUser').textContent = 'Admin';
+            loadConfig();
+            loadSessions();
+        }
+        
+        function logout() {
+            localStorage.removeItem('adminAuth');
+            location.reload();
+        }
+        
+        function showSection(section) {
+            // Update nav
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Show section
+            document.querySelectorAll('.section').forEach(s => {
+                s.style.display = 'none';
+            });
+            document.getElementById(section + 'Section').style.display = 'block';
+        }
+        
+        async function loadConfig() {
+            try {
+                const response = await fetch(`${API_BASE}/config`, {
+                    headers: {
+                        'Authorization': `Basic ${authToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    currentConfig = await response.json();
+                    document.getElementById('landingPort').value = currentConfig.landing_port;
+                    document.getElementById('maxSessions').value = currentConfig.max_sessions;
+                    document.getElementById('sessionTTL').value = currentConfig.session_ttl_hours;
+                    
+                    // Update feature toggles
+                    for (const [feature, enabled] of Object.entries(currentConfig.features)) {
+                        const toggle = document.getElementById(`toggle-${feature}`);
+                        if (toggle) {
+                            if (enabled) {
+                                toggle.classList.add('active');
+                            } else {
+                                toggle.classList.remove('active');
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load config:', error);
+            }
+        }
+        
+        async function saveConfig() {
+            const config = {
+                landing_port: parseInt(document.getElementById('landingPort').value),
+                max_sessions: parseInt(document.getElementById('maxSessions').value),
+                session_ttl_hours: parseInt(document.getElementById('sessionTTL').value),
+                features: currentConfig.features || {}
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/config`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Basic ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+                
+                if (response.ok) {
+                    document.getElementById('configMessage').innerHTML = '<span class="success">Configuration saved successfully</span>';
+                    currentConfig = config;
+                } else {
+                    document.getElementById('configMessage').innerHTML = '<span class="error">Failed to save configuration</span>';
+                }
+            } catch (error) {
+                document.getElementById('configMessage').innerHTML = '<span class="error">Error: ' + error.message + '</span>';
+            }
+        }
+        
+        async function loadSessions() {
+            try {
+                const response = await fetch(`${API_BASE}/sessions/active`, {
+                    headers: {
+                        'Authorization': `Basic ${authToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const sessionsList = document.getElementById('sessionsList');
+                    
+                    if (data.sessions.length === 0) {
+                        sessionsList.innerHTML = '<p>No active sessions</p>';
+                    } else {
+                        sessionsList.innerHTML = data.sessions.map(session => `
+                            <div class="session-item">
+                                <div class="session-info">
+                                    <div><strong>${session.session_id}</strong></div>
+                                    <div>User: ${session.user_id}</div>
+                                    <div>Created: ${new Date(session.created_at).toLocaleString()}</div>
+                                </div>
+                                <div class="session-actions">
+                                    <span class="status-badge status-active">Active</span>
+                                    <button class="btn btn-small btn-danger" onclick="terminateSession('${session.session_id}')">Terminate</button>
+                                </div>
+                            </div>
+                        `).join('');
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load sessions:', error);
+            }
+        }
+        
+        async function terminateSession(sessionId) {
+            if (!confirm(`Terminate session ${sessionId}?`)) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/sessions/${sessionId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Basic ${authToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    loadSessions();
+                }
+            } catch (error) {
+                console.error('Failed to terminate session:', error);
+            }
+        }
+        
+        async function cleanupSessions() {
+            try {
+                const response = await fetch(`${API_BASE}/sessions/cleanup`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Basic ${authToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    alert(data.message);
+                    loadSessions();
+                }
+            } catch (error) {
+                console.error('Failed to cleanup sessions:', error);
+            }
+        }
+        
+        function toggleFeature(feature) {
+            const toggle = document.getElementById(`toggle-${feature}`);
+            toggle.classList.toggle('active');
+            
+            if (!currentConfig.features) {
+                currentConfig.features = {};
+            }
+            currentConfig.features[feature] = toggle.classList.contains('active');
+        }
+        
+        async function saveFeatures() {
+            try {
+                const response = await fetch(`${API_BASE}/config`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Basic ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(currentConfig)
+                });
+                
+                if (response.ok) {
+                    document.getElementById('featureMessage').innerHTML = '<span class="success">Features updated for new sessions</span>';
+                } else {
+                    document.getElementById('featureMessage').innerHTML = '<span class="error">Failed to update features</span>';
+                }
+            } catch (error) {
+                document.getElementById('featureMessage').innerHTML = '<span class="error">Error: ' + error.message + '</span>';
+            }
+        }
+        
+        // Auto-refresh sessions every 30 seconds
+        setInterval(() => {
+            if (document.getElementById('sessionsSection').style.display !== 'none') {
+                loadSessions();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>

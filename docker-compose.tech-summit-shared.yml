@@ -1,0 +1,90 @@
+version: '3.8'
+
+# This file adds a shared frontend instance for Tech Summit
+# Use with: docker-compose -f docker-compose.tech-summit.yml -f docker-compose.tech-summit-shared.yml up -d
+
+services:
+  # Shared Frontend Instance (Landing page for all users)
+  # This runs alongside the per-user frontends
+  shared-frontend:
+    build:
+      context: .
+      dockerfile: Frontend/Dockerfile
+    container_name: jarvis-shared-frontend
+    ports:
+      - "8080:8000"  # Main landing page on port 8080
+    environment:
+      - API_BASE_URL=http://session-manager:9000
+      - SHARED_FRONTEND=true  # Enables multi-user optimizations in Gunicorn
+      - SERVER_MODE=gunicorn
+      - PORT=8000
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - WORKERS=16  # Override for shared instance
+      - THREADS=4   # More threads for concurrency
+    volumes:
+      - ./Frontend:/app/Frontend:ro
+      - ./Backend:/app/Backend:ro
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # HAProxy for better load balancing (alternative to NGINX)
+  # Provides sticky sessions and better health checking
+  haproxy:
+    image: haproxy:2.8-alpine
+    container_name: jarvis-haproxy
+    ports:
+      - "81:80"    # Alternative load balancer port
+      - "8404:8404"  # HAProxy stats page
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - session-manager
+      - shared-frontend
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+
+  # Varnish Cache for static content
+  varnish:
+    image: varnish:7.4-alpine
+    container_name: jarvis-varnish
+    ports:
+      - "6081:6081"  # Varnish HTTP port
+    volumes:
+      - ./varnish/default.vcl:/etc/varnish/default.vcl:ro
+    environment:
+      - VARNISH_SIZE=2G
+    command: |
+      -F -f /etc/varnish/default.vcl 
+      -a :6081 
+      -s malloc,2G 
+      -p default_ttl=3600 
+      -p default_grace=3600
+    depends_on:
+      - shared-frontend
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+
+networks:
+  jarvis-network:
+    external: true

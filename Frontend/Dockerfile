@@ -16,6 +16,9 @@ RUN pip install --no-cache-dir -r Frontend/requirements.txt
 # Copy source code (both Frontend and Backend to maintain expected relative paths)
 COPY Frontend/ Frontend/
 COPY Backend/ Backend/
+
+# Copy Gunicorn config
+COPY Frontend/gunicorn.conf.py Frontend/gunicorn.conf.py
  
  # Provide expected top-level path for event_generators used by the UI (CWD/event_generators)
  RUN ln -s Backend/event_generators event_generators
@@ -30,5 +33,12 @@ EXPOSE 8000
 # Environment: allow overriding API base URL; default points to backend service name in compose
 ENV API_BASE_URL=http://api:8000
 
-# Start the Flask UI
-CMD ["python", "Frontend/log_generator_ui.py"]
+# Set server mode (default to gunicorn for production)
+ENV SERVER_MODE=${SERVER_MODE:-gunicorn}
+
+# Start the Flask UI with Gunicorn or Python
+CMD sh -c 'if [ "$SERVER_MODE" = "gunicorn" ]; then \
+    exec gunicorn Frontend.log_generator_ui:app -c Frontend/gunicorn.conf.py; \
+else \
+    exec python Frontend/log_generator_ui.py; \
+fi'
