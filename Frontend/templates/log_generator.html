@@ -287,6 +287,17 @@
                             <input type="number" id="eps" name="eps" value="10" min="0.1" step="0.1" required>
                         </div>
                     </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div class="md:col-span-3 input-group">
+                            <label for="metadata-fields" class="text-sm font-semibold text-[#c8b3e8]">Metadata Fields (Optional)</label>
+                            <input type="text" id="metadata-fields" name="metadata-fields" placeholder='{"scenario.trace_id":"abc-123","environment":"test"}'>
+                            <p class="text-xs text-[#b8a0d2] mt-1">Add custom fields to all events as JSON object (e.g., scenario.trace_id, environment, etc.)</p>
+                        </div>
+                        <div class="flex items-end">
+                            <button type="button" id="gen-metadata-guid" class="btn" style="width:auto; padding:0.6rem 1rem;">Generate Trace ID</button>
+                        </div>
+                    </div>
 
                     <div class="flex gap-3">
                         <button type="submit" id="start-btn" class="btn flex-1">
@@ -1037,6 +1048,34 @@
             }
         });
 
+        // Generate metadata GUID button handler
+        const genMetadataGuidBtn = document.getElementById('gen-metadata-guid');
+        const metadataFieldsInput = document.getElementById('metadata-fields');
+        if (genMetadataGuidBtn) {
+            genMetadataGuidBtn.addEventListener('click', () => {
+                // Generate UUID v4
+                const guid = crypto.randomUUID();
+                
+                // Parse existing metadata or create new
+                let metadata = {};
+                const currentValue = metadataFieldsInput.value.trim();
+                if (currentValue) {
+                    try {
+                        metadata = JSON.parse(currentValue);
+                    } catch (e) {
+                        // If parse fails, start fresh
+                        metadata = {};
+                    }
+                }
+                
+                // Add/update scenario.trace_id
+                metadata['scenario.trace_id'] = guid;
+                
+                // Update input field
+                metadataFieldsInput.value = JSON.stringify(metadata);
+            });
+        }
+        
         // Stop button handler
         stopBtn.addEventListener('click', () => {
             if (currentAbortController) {
@@ -1065,6 +1104,26 @@
             const selectedOpt = destSelect.options[destSelect.selectedIndex];
             const destinationId = selectedOpt ? selectedOpt.value : '';
             const destinationType = selectedOpt ? selectedOpt.dataset.type : '';
+            
+            // Parse metadata fields if provided
+            const metadataInput = document.getElementById('metadata-fields').value.trim();
+            let metadataFields = null;
+            if (metadataInput) {
+                try {
+                    metadataFields = JSON.parse(metadataInput);
+                    if (typeof metadataFields !== 'object' || Array.isArray(metadataFields)) {
+                        alert('Metadata must be a JSON object (e.g., {"scenario.trace_id":"abc-123"})');
+                        startBtn.disabled = false;
+                        startBtn.innerText = 'Start Log Generation';
+                        return;
+                    }
+                } catch (e) {
+                    alert('Invalid JSON in metadata fields: ' + e.message);
+                    startBtn.disabled = false;
+                    startBtn.innerText = 'Start Log Generation';
+                    return;
+                }
+            }
             
             const destinationMessage = continuousMode 
               ? `Starting continuous log generation at ${eps} EPS${speedMode ? ' (SPEED MODE)' : ''}...`
@@ -1102,7 +1161,8 @@
                         continuous: continuousMode,
                         speed_mode: speedMode,
                         destination_id: destinationId,
-                        hec_token: localToken  // Pass local token if available
+                        hec_token: localToken,  // Pass local token if available
+                        metadata: metadataFields  // Pass metadata fields if provided
                     } : {
                         destination: 'syslog',
                         script: scriptPath,
@@ -1110,7 +1170,8 @@
                         eps: eps,
                         continuous: continuousMode,
                         speed_mode: speedMode,
-                        destination_id: destinationId
+                        destination_id: destinationId,
+                        metadata: metadataFields  // Pass metadata fields if provided
                     })
                 });
 
@@ -1215,6 +1276,16 @@
             }
         });
 
+        // Generate Trace ID button for scenarios
+        const genTraceIdBtn = document.getElementById('gen-trace-id');
+        const traceIdInput = document.getElementById('trace-id');
+        if (genTraceIdBtn && traceIdInput) {
+            genTraceIdBtn.addEventListener('click', () => {
+                const guid = crypto.randomUUID();
+                traceIdInput.value = guid;
+            });
+        }
+        
         scenarioForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -1346,10 +1417,10 @@
 
         async function handleFileUpload(file) {
             // Validate file type
-            const validTypes = ['.csv', '.json'];
+            const validTypes = ['.csv', '.json', '.txt', '.log', '.gz'];
             const fileExt = '.' + file.name.split('.').pop().toLowerCase();
             if (!validTypes.includes(fileExt)) {
-                alert('Invalid file type. Only CSV and JSON files are allowed.');
+                alert('Invalid file type. Allowed: CSV, JSON, TXT, LOG, GZ');
                 return;
             }
 

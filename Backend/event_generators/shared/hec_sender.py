@@ -1403,6 +1403,8 @@ if __name__ == "__main__":
                         help="(Deprecated: use --verbosity verbose) Print all HEC responses")
     parser.add_argument("--speed-mode", action="store_true",
                         help="Speed mode: pre-generate 1K events and loop for max throughput")
+    parser.add_argument("--metadata", type=str, default=None,
+                        help="Custom metadata fields as JSON object (e.g., '{\"scenario.trace_id\":\"abc-123\",\"environment\":\"test\"}')")
     args = parser.parse_args()
     
     # Backward compatibility: --print-responses sets verbosity to verbose
@@ -1434,8 +1436,20 @@ if __name__ == "__main__":
 
     mod_name, func_names = PROD_MAP[product]
     gen_mod = importlib.import_module(mod_name)
-    # ATTR_FIELDS removed - generators now produce realistic fields only
-    attr_fields = {}  # Empty dict since we removed ATTR_FIELDS
+    
+    # Parse custom metadata fields if provided
+    attr_fields = {}
+    if args.metadata:
+        try:
+            attr_fields = json.loads(args.metadata)
+            if not isinstance(attr_fields, dict):
+                print(f"Error: --metadata must be a JSON object, got {type(attr_fields).__name__}")
+                sys.exit(1)
+            print(f"Using custom metadata fields: {attr_fields}", flush=True)
+        except json.JSONDecodeError as e:
+            print(f"Error: Invalid JSON in --metadata argument: {e}")
+            sys.exit(1)
+    
     generators = [getattr(gen_mod, fn) for fn in func_names]
 
     # For large counts (continuous mode), stream events instead of pre-generating

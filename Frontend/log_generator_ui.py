@@ -574,10 +574,10 @@ def upload_file():
         return jsonify({'error': 'No file selected'}), 400
     
     # Validate file extension
-    allowed_extensions = {'.csv', '.json'}
+    allowed_extensions = {'.csv', '.json', '.txt', '.log', '.gz'}
     file_ext = os.path.splitext(file.filename)[1].lower()
     if file_ext not in allowed_extensions:
-        return jsonify({'error': f'Invalid file type. Only CSV and JSON files are allowed'}), 400
+        return jsonify({'error': f'Invalid file type. Allowed: CSV, JSON, TXT, LOG, GZ'}), 400
     
     try:
         # Forward to backend API
@@ -837,6 +837,56 @@ def process_upload():
                         except Exception as e:
                             yield f"ERROR: Failed to send event: {e}\n"
             
+            elif file_type in ['txt', 'log']:
+                # Process text/log files line by line
+                with open(file_path, 'r') as f:
+                    lines = [line.rstrip('\n') for line in f if line.strip()]
+                    
+                    for line in lines:
+                        try:
+                            if endpoint == 'event':
+                                # Send to HEC /event endpoint (wrap line in JSON)
+                                headers_local = {
+                                    'Authorization': f'Splunk {hec_token}',
+                                    'Content-Type': 'application/json'
+                                }
+                                payload = {
+                                    'event': line,
+                                    'sourcetype': sourcetype
+                                }
+                                resp = requests.post(
+                                    hec_endpoint_url,
+                                    json=payload,
+                                    headers=headers_local,
+                                    verify=True,
+                                    timeout=10
+                                )
+                            else:
+                                # Send to HEC /raw endpoint
+                                headers_local = {
+                                    'Authorization': f'Splunk {hec_token}',
+                                    'Content-Type': 'text/plain'
+                                }
+                                resp = requests.post(
+                                    hec_endpoint_url,
+                                    data=line,
+                                    headers=headers_local,
+                                    verify=True,
+                                    timeout=10
+                                )
+                            
+                            resp.raise_for_status()
+                            sent_count += 1
+                            if sent_count % 10 == 0:
+                                yield f"INFO: Sent {sent_count}/{len(lines)} events\n"
+                            time_module.sleep(delay)
+                        except Exception as e:
+                            yield f"ERROR: Failed to send event: {e}\n"
+            
+            else:
+                yield f"ERROR: Unsupported file type: {file_type}\n"
+                return
+            
             yield f"INFO: Successfully sent {sent_count} events to HEC\n"
             
         except Exception as e:
@@ -867,6 +917,7 @@ def generate_logs():
     syslog_protocol = data.get('protocol')
     product_id = data.get('product')
     local_hec_token = data.get('hec_token')  # Token from browser localStorage
+    metadata_fields = data.get('metadata')  # Custom metadata fields as JSON object
     # Unified destination id (preferred)
     unified_dest_id = data.get('destination_id')
     # Back-compat fields
@@ -1068,6 +1119,10 @@ def generate_logs():
                 env = os.environ.copy()
                 env['S1_HEC_TOKEN'] = hec_token
                 env['S1_HEC_URL'] = normalized_hec_url
+                # Enable TLS compatibility for older/misconfigured servers
+                env['S1_HEC_TLS_LOW'] = '1'
+                # Enable automatic insecure fallback as last resort
+                env['S1_HEC_AUTO_INSECURE'] = 'true'
                 
                 if continuous:
                     # Batch mode for continuous
@@ -1100,6 +1155,16 @@ def generate_logs():
                 # Use --verbosity info for periodic status updates instead of per-event output
                 command = ['python3', '-u', hec_sender_path, '--product', product_id, '-n', str(log_count), 
                            '--min-delay', str(delay), '--max-delay', str(delay), '--verbosity', 'info']
+                
+                # Add metadata fields if provided
+                if metadata_fields:
+                    # Metadata should be a dict, convert to JSON string for command line
+                    import json as json_module
+                    if isinstance(metadata_fields, dict):
+                        command.extend(['--metadata', json_module.dumps(metadata_fields)])
+                        logger.info(f"Adding metadata fields: {metadata_fields}")
+                    else:
+                        logger.warning(f"Invalid metadata format (expected dict): {type(metadata_fields)}")
                 
                 # Add speed mode flag
                 if speed_mode:
