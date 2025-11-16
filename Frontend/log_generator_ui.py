@@ -169,23 +169,45 @@ def create_destination():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/destinations/<dest_id>', methods=['DELETE'])
-def delete_destination(dest_id: str):
-    """Delete destination via backend API"""
+def delete_destination(dest_id):
+    """Delete a destination"""
     try:
-        resp = requests.delete(
+        response = requests.delete(
             f"{API_BASE_URL}/api/v1/destinations/{dest_id}",
             headers=_get_api_headers(),
             timeout=10
         )
-        
-        if resp.status_code == 204:
-            return ('', 204)
-        else:
-            error_detail = resp.json().get('detail', resp.text) if resp.headers.get('content-type') == 'application/json' else resp.text
-            logger.error(f"Backend returned {resp.status_code}: {error_detail}")
-            return jsonify({'error': error_detail}), resp.status_code
+        return Response(status=response.status_code)
     except Exception as e:
         logger.error(f"Failed to delete destination: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/destinations/<dest_id>/update-token', methods=['POST'])
+def update_destination_token(dest_id):
+    """Update token for a destination in the database"""
+    try:
+        data = request.json
+        token = data.get('token')
+        
+        if not token:
+            return jsonify({'error': 'Token is required'}), 400
+        
+        # Update the destination with new token
+        response = requests.put(
+            f"{API_BASE_URL}/api/v1/destinations/{dest_id}",
+            headers=_get_api_headers(),
+            json={'token': token},
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            logger.info(f"Updated token for destination: {dest_id}")
+            return jsonify({'message': 'Token updated successfully'})
+        else:
+            return jsonify({'error': f'Backend returned {response.status_code}'}), response.status_code
+            
+    except Exception as e:
+        logger.error(f"Failed to update destination token: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/scenarios', methods=['GET'])

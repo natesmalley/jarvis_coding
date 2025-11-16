@@ -545,7 +545,7 @@
                                 <input type="password" id="dest-token" name="dest-token" autocomplete="off" placeholder="Paste token here" required>
                                 <div class="mt-2">
                                     <label class="flex items-center gap-2 text-xs">
-                                        <input type="checkbox" id="store-token-locally" checked>
+                                        <input type="checkbox" id="store-token-locally">
                                         <span class="text-[#b8a0d2]">Store token locally in browser (recommended for multi-user environments)</span>
                                     </label>
                                 </div>
@@ -750,7 +750,32 @@
             try {
                 const res = await fetch('/destinations');
                 const data = await res.json();
-                const items = (data.destinations || []);
+                const allItems = (data.destinations || []);
+                
+                // Filter destinations: only show if user has access to them
+                const items = allItems.filter(d => {
+                    // Syslog destinations - always show (no tokens needed)
+                    if (d.type === 'syslog') return true;
+                    
+                    // HEC destinations - check if user has access
+                    if (d.type === 'hec') {
+                        // Has local token? Always show
+                        if (window.tokenVault && window.tokenVault.hasToken(d.id)) {
+                            return true;
+                        }
+                        
+                        // Has database token (not LOCAL_STORAGE)? Show
+                        if (d.has_database_token === true) {
+                            return true;
+                        }
+                        
+                        // Neither local nor database token - hide it
+                        return false;
+                    }
+                    
+                    return true;
+                });
+                
                 // Populate unified selector
                 destSelect.innerHTML = '';
                 if (items.length === 0) {
@@ -800,11 +825,41 @@
                             setTokenBtn.style.display = 'block';
                             setTokenBtn.addEventListener('click', async () => {
                                 const token = prompt(`Enter HEC token for "${d.name}":`);
-                                if (token && token.trim()) {
+                                if (!token || !token.trim()) return;
+                                
+                                // Ask where to store it
+                                const storeLocal = confirm(
+                                    'Where do you want to store this token?\n\n' +
+                                    'OK = Store locally in browser (recommended for multi-user)\n' +
+                                    'Cancel = Store in database (shared across browsers)'
+                                );
+                                
+                                if (storeLocal) {
+                                    // Store locally in browser
                                     await window.tokenVault.storeToken(d.id, token.trim());
-                                    alert('Token stored locally in your browser');
-                                    await refreshDestinations();
+                                    alert('✓ Token stored locally in your browser');
+                                } else {
+                                    // Store in database
+                                    try {
+                                        const response = await fetch(`/destinations/${d.id}/update-token`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ token: token.trim() })
+                                        });
+                                        
+                                        if (response.ok) {
+                                            alert('✓ Token stored in database');
+                                        } else {
+                                            throw new Error(`Server returned ${response.status}`);
+                                        }
+                                    } catch (err) {
+                                        alert('✗ Failed to store token in database. See console.');
+                                        console.error(err);
+                                        return;
+                                    }
                                 }
+                                
+                                await refreshDestinations();
                             });
                         }
                         
@@ -876,12 +931,19 @@
                         payload.url = document.getElementById('dest-url').value.trim();
                         tokenValue = document.getElementById('dest-token').value;
                         
+                        if (!tokenValue || tokenValue.trim() === '') {
+                            alert('Please enter a HEC token');
+                            return;
+                        }
+                        
                         if (storeLocally) {
                             // Store locally - don't send to backend
                             payload.token = 'LOCAL_STORAGE';  // Placeholder for backend
+                            console.log('Storing token locally');
                         } else {
                             // Send to backend for database storage
                             payload.token = tokenValue;
+                            console.log('Storing token in database');
                         }
                     } else {
                         payload.ip = document.getElementById('dest-syslog-ip').value.trim();
@@ -889,12 +951,19 @@
                         payload.protocol = document.getElementById('dest-syslog-protocol').value;
                     }
                     
+                    console.log('Sending payload:', { ...payload, token: payload.token ? '***' : undefined });
+                    
                     const r = await fetch('/destinations', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
-                    if (!r.ok) throw new Error(`Failed to save destination (${r.status})`);
+                    
+                    if (!r.ok) {
+                        const errorText = await r.text();
+                        console.error('Server error:', r.status, errorText);
+                        throw new Error(`Failed to save destination (${r.status}): ${errorText}`);
+                    }
                     
                     const result = await r.json();
                     const destinationId = result.id;
