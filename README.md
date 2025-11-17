@@ -607,6 +607,84 @@ docker restart session-manager
 
 ## Production Deployment
 
+### Quick Production Setup
+
+For a production deployment on a server with a public IP or domain:
+
+1. **Prepare Environment Configuration**:
+```bash
+# Copy the template and edit with your values
+cp .env.production.template .env.production
+nano .env.production
+
+# Key settings to update:
+# - DOMAIN_NAME=jarvis.yourdomain.com
+# - ADMIN_PASSWORD=secure-password-here
+# - WORKSPACE_PATH=/path/to/jarvis_coding
+```
+
+2. **Run Production Deployment Script**:
+```bash
+# Make script executable
+chmod +x deploy-production.sh
+
+# Run deployment
+./deploy-production.sh
+```
+
+3. **Use Docker Compose for Production**:
+```bash
+# Alternative: Manual deployment with docker-compose
+docker-compose -f docker-compose.production.yml up -d
+
+# View logs
+docker-compose -f docker-compose.production.yml logs -f
+
+# Stop services
+docker-compose -f docker-compose.production.yml down
+```
+
+### Production Configuration Files
+
+The platform includes production-ready configurations:
+
+- **`nginx-production.conf`**: Production NGINX configuration with security headers
+- **`docker-compose.production.yml`**: Production orchestration setup
+- **`.env.production.template`**: Environment variables template
+- **`deploy-production.sh`**: Automated deployment script
+
+### Key Production Changes
+
+1. **No Hardcoded localhost**: 
+   - Landing page uses relative URLs (`/api` instead of `http://localhost:9001`)
+   - NGINX proxies all API calls
+   - Works with any domain or IP
+
+2. **Security Enhancements**:
+   - Security headers in NGINX
+   - Optional basic auth for admin panel
+   - HTTPS/SSL support ready
+
+3. **Environment Variables**:
+   - All configuration externalized
+   - Easy to deploy to different environments
+   - No code changes needed
+
+### SSL/HTTPS Setup
+
+For production, enable HTTPS:
+
+```bash
+# 1. Obtain SSL certificates (e.g., Let's Encrypt)
+certbot certonly --standalone -d jarvis.yourdomain.com
+
+# 2. Mount certificates in docker-compose.production.yml:
+volumes:
+  - /etc/letsencrypt/live/jarvis.yourdomain.com:/etc/nginx/ssl:ro
+
+# 3. Uncomment HTTPS section in nginx-production.conf
+```
+
 ### Scaling Considerations
 
 #### For 150 Concurrent Users

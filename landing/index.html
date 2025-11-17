@@ -157,7 +157,9 @@
     </div>
     
     <script>
-        const SESSION_MANAGER_URL = 'http://localhost:9001';
+        // Use relative URL so it works in any environment (dev/staging/production)
+        // This will use the same host as the landing page, proxied through NGINX
+        const SESSION_MANAGER_URL = '/api';
         const TOKEN_KEY = 'jarvis_session_token';
         const SESSION_KEY = 'jarvis_session_data';
         
