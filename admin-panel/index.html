@@ -443,13 +443,27 @@
             document.querySelectorAll('.nav-item').forEach(item => {
                 item.classList.remove('active');
             });
-            event.target.classList.add('active');
+            
+            // Find and activate the clicked nav item
+            const navItems = document.querySelectorAll('.nav-item');
+            navItems.forEach(item => {
+                if (item.getAttribute('onclick') && item.getAttribute('onclick').includes(section)) {
+                    item.classList.add('active');
+                }
+            });
             
             // Show section
             document.querySelectorAll('.section').forEach(s => {
                 s.style.display = 'none';
             });
             document.getElementById(section + 'Section').style.display = 'block';
+            
+            // Load data for the section
+            if (section === 'sessions') {
+                loadSessions();
+            } else if (section === 'config') {
+                loadConfig();
+            }
         }
         
         async function loadConfig() {
@@ -533,7 +547,7 @@
                             const createdAt = new Date(expiresAt.getTime() - (24 * 60 * 60 * 1000)); // 24 hours before expiration
                             
                             return `
-                            <div class="session-item">
+                            <div class="session-item" data-session-id="${session.session_id}">
                                 <div class="session-info">
                                     <div><strong>${session.session_id}</strong></div>
                                     <div>User: ${session.user_id}</div>
@@ -542,10 +556,18 @@
                                 </div>
                                 <div class="session-actions">
                                     <span class="status-badge status-active">Active</span>
-                                    <button class="btn btn-small btn-danger" onclick="terminateSession('${session.session_id}')">Terminate</button>
+                                    <button class="btn btn-small btn-danger session-terminate-btn" data-session-id="${session.session_id}">Terminate</button>
                                 </div>
                             </div>
                         `}).join('');
+                        
+                        // Attach event listeners to terminate buttons
+                        document.querySelectorAll('.session-terminate-btn').forEach(btn => {
+                            btn.addEventListener('click', (e) => {
+                                const sessionId = e.target.getAttribute('data-session-id');
+                                terminateSession(sessionId);
+                            });
+                        });
                     }
                 }
             } catch (error) {
@@ -556,6 +578,12 @@
         async function terminateSession(sessionId) {
             if (!confirm(`Terminate session ${sessionId}?`)) return;
             
+            // Show loading state
+            const btn = document.querySelector(`button[data-session-id="${sessionId}"]`);
+            const originalText = btn.textContent;
+            btn.textContent = 'Terminating...';
+            btn.disabled = true;
+            
             try {
                 const response = await fetch(`${API_BASE}/sessions/${sessionId}`, {
                     method: 'DELETE',
@@ -565,14 +593,41 @@
                 });
                 
                 if (response.ok) {
-                    loadSessions();
+                    const result = await response.json();
+                    console.log('Session terminated:', result);
+                    
+                    // Show success message
+                    const sessionItem = document.querySelector(`div[data-session-id="${sessionId}"]`);
+                    if (sessionItem) {
+                        sessionItem.style.opacity = '0.5';
+                        sessionItem.querySelector('.status-badge').textContent = 'Terminated';
+                        sessionItem.querySelector('.status-badge').className = 'status-badge status-inactive';
+                    }
+                    
+                    // Reload sessions after a brief delay
+                    setTimeout(() => {
+                        loadSessions();
+                    }, 1000);
+                } else {
+                    const error = await response.text();
+                    alert(`Failed to terminate session: ${error}`);
+                    btn.textContent = originalText;
+                    btn.disabled = false;
                 }
             } catch (error) {
                 console.error('Failed to terminate session:', error);
+                alert(`Error terminating session: ${error.message}`);
+                btn.textContent = originalText;
+                btn.disabled = false;
             }
         }
         
         async function cleanupSessions() {
+            const cleanupBtn = document.querySelector('.btn-danger');
+            const originalText = cleanupBtn.textContent;
+            cleanupBtn.textContent = 'Cleaning up...';
+            cleanupBtn.disabled = true;
+            
             try {
                 const response = await fetch(`${API_BASE}/sessions/cleanup`, {
                     method: 'POST',
@@ -583,11 +638,28 @@
                 
                 if (response.ok) {
                     const data = await response.json();
-                    alert(data.message);
+                    // Show success message inline instead of alert
+                    const sessionsSection = document.getElementById('sessionsSection');
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'success';
+                    messageDiv.textContent = data.message || 'Cleanup completed';
+                    messageDiv.style.marginTop = '1rem';
+                    sessionsSection.querySelector('.card').appendChild(messageDiv);
+                    
+                    // Remove message after 3 seconds
+                    setTimeout(() => messageDiv.remove(), 3000);
+                    
                     loadSessions();
+                } else {
+                    const error = await response.text();
+                    alert(`Cleanup failed: ${error}`);
                 }
             } catch (error) {
                 console.error('Failed to cleanup sessions:', error);
+                alert(`Error during cleanup: ${error.message}`);
+            } finally {
+                cleanupBtn.textContent = originalText;
+                cleanupBtn.disabled = false;
             }
         }
         

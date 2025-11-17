@@ -153,12 +153,17 @@ async def create_session(request: SessionCreate):
         backend_port = port_allocator.allocate_port()
         frontend_port = port_allocator.allocate_port()
         
+        # Get features from admin config
+        from .routers.admin import admin_config
+        features = admin_config.features if hasattr(admin_config, 'features') else {}
+        
         # Create containers
         container_info = docker_manager.create_session_containers(
             session_id=session_id,
             user_id=request.user_id,
             backend_port=backend_port,
-            frontend_port=frontend_port
+            frontend_port=frontend_port,
+            features=features
         )
         
         # Create response

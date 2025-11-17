@@ -48,7 +48,8 @@ class DockerManager:
         session_id: str,
         user_id: str,
         backend_port: int,
-        frontend_port: int
+        frontend_port: int,
+        features: Dict[str, Any] = None
     ) -> Dict[str, str]:
         """
         Create frontend and backend containers for a session
@@ -73,6 +74,17 @@ class DockerManager:
             # Environment variables for containers
             expires_at = (datetime.utcnow() + timedelta(hours=settings.session_ttl_hours)).isoformat()
             
+            # Get features configuration
+            if features is None:
+                features = {
+                    'generators': True,
+                    'scenarios': True,
+                    'destinations': True,
+                    'uploads': True,
+                    'export': True,
+                    'continuous_mode': True
+                }
+            
             # Create backend container
             backend_env = {
                 'SESSION_ID': session_id,
@@ -82,7 +94,14 @@ class DockerManager:
                 'API_KEY': session_api_key,
                 # Don't use SERVER_MODE - let it default to uvicorn
                 'PORT': '8000',
-                'LOG_LEVEL': 'info'
+                'LOG_LEVEL': 'info',
+                # Feature flags
+                'ENABLE_GENERATORS': str(features.get('generators', True)),
+                'ENABLE_SCENARIOS': str(features.get('scenarios', True)),
+                'ENABLE_DESTINATIONS': str(features.get('destinations', True)),
+                'ENABLE_UPLOADS': str(features.get('uploads', True)),
+                'ENABLE_EXPORT': str(features.get('export', True)),
+                'ENABLE_CONTINUOUS': str(features.get('continuous_mode', True))
             }
             
             backend_labels = {
@@ -139,7 +158,14 @@ class DockerManager:
                 'BACKEND_API_KEY': session_api_key,
                 # Don't use SERVER_MODE - let it default  
                 'PORT': '8000',
-                'LOG_LEVEL': 'info'
+                'LOG_LEVEL': 'info',
+                # Feature flags (same as backend)
+                'ENABLE_GENERATORS': str(features.get('generators', True)),
+                'ENABLE_SCENARIOS': str(features.get('scenarios', True)),
+                'ENABLE_DESTINATIONS': str(features.get('destinations', True)),
+                'ENABLE_UPLOADS': str(features.get('uploads', True)),
+                'ENABLE_EXPORT': str(features.get('export', True)),
+                'ENABLE_CONTINUOUS': str(features.get('continuous_mode', True))
             }
             
             frontend_labels = {
@@ -307,7 +333,12 @@ class DockerManager:
         return list(sessions.values())
     
     def cleanup_expired_sessions(self):
-        """Clean up sessions that have expired"""
+        """Clean up sessions that have expired
+        
+        Returns:
+            int: Number of sessions cleaned up
+        """
+        cleaned_count = 0
         try:
             containers = self.client.containers.list(
                 all=True,
@@ -325,8 +356,11 @@ class DockerManager:
                             session_id = container.labels.get('session_id')
                             logger.info(f"Cleaning up expired session {session_id}")
                             self.stop_session(session_id)
+                            cleaned_count += 1
                     except Exception as e:
                         logger.error(f"Error processing expiration for container {container.name}: {e}")
                         
         except Exception as e:
             logger.error(f"Failed to cleanup expired sessions: {e}")
+        
+        return cleaned_count
