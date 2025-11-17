@@ -527,19 +527,25 @@
                     if (data.sessions.length === 0) {
                         sessionsList.innerHTML = '<p>No active sessions</p>';
                     } else {
-                        sessionsList.innerHTML = data.sessions.map(session => `
+                        sessionsList.innerHTML = data.sessions.map(session => {
+                            // Calculate created time from expires_at (24 hours before expiration)
+                            const expiresAt = new Date(session.expires_at);
+                            const createdAt = new Date(expiresAt.getTime() - (24 * 60 * 60 * 1000)); // 24 hours before expiration
+                            
+                            return `
                             <div class="session-item">
                                 <div class="session-info">
                                     <div><strong>${session.session_id}</strong></div>
                                     <div>User: ${session.user_id}</div>
-                                    <div>Created: ${new Date(session.created_at).toLocaleString()}</div>
+                                    <div>Created: ${createdAt.toLocaleString()}</div>
+                                    <div>Expires: ${expiresAt.toLocaleString()}</div>
                                 </div>
                                 <div class="session-actions">
                                     <span class="status-badge status-active">Active</span>
                                     <button class="btn btn-small btn-danger" onclick="terminateSession('${session.session_id}')">Terminate</button>
                                 </div>
                             </div>
-                        `).join('');
+                        `}).join('');
                     }
                 }
             } catch (error) {

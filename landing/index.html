@@ -285,7 +285,7 @@
         }
         
         function goToInstance(session) {
-            // Redirect to the user's frontend (with trailing slash)
+            // Redirect to the user's frontend (path-based routing)
             const frontendPath = `/session/${session.session_id}/frontend/`;
             window.location.href = frontendPath;
         }

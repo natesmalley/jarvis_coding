@@ -36,7 +36,7 @@ User → Landing Page → Session Manager → Docker Orchestration
 
 ### Network Architecture
 
-- **Shared Network**: All containers use `jarvis-network` to avoid Docker subnet exhaustion
+- **Shared Network**: All containers use `jarvis-shared` to avoid Docker subnet exhaustion
 - **Port Allocation**: Dynamic port allocation (10000-20000 range) managed by Redis
 - **Service Discovery**: Containers communicate via Docker DNS names
 
@@ -72,7 +72,7 @@ git clone <repository-url>
 cd jarvis_coding
 
 # Create Docker network (required for shared network architecture)
-docker network create jarvis-network
+docker network create jarvis-shared
 ```
 
 ### Step 2: Build Production Images
@@ -96,7 +96,7 @@ cd ..
 # Start Redis (required for session state)
 docker run -d --name redis \
   -p 6379:6379 \
-  --network jarvis-network \
+  --network jarvis-shared \
   redis:alpine
 
 # Start Session Manager with correct backend image
@@ -108,11 +108,13 @@ docker run -d --name session-manager \
   --network bridge \
   session-manager:latest
 
-# Start Landing Page
-docker run -d --name jarvis-landing \
+# Start NGINX with Landing Page and Admin Panel
+docker run -d --name jarvis-nginx \
   -p 80:80 \
   -v $(pwd)/landing:/usr/share/nginx/html:ro \
-  --network jarvis-network \
+  -v $(pwd)/admin-panel:/usr/share/nginx/admin:ro \
+  -v $(pwd)/nginx-combined.conf:/etc/nginx/nginx.conf:ro \
+  --network jarvis-shared \
   nginx:alpine
 ```
 
@@ -397,6 +399,16 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "<ASK_NATE>")
    - **Solution**: Mount host Backend directory as read-only volume in both containers
    - **Result**: All products and scenarios accessible in dropdowns
 
+6. **Admin Panel Date/Time Display**
+   - **Problem**: Admin panel showing "Invalid Date" for session creation times
+   - **Solution**: Calculate creation time from expires_at field (24 hours before expiration)
+   - **Result**: Proper date/time display in admin console
+
+7. **NGINX Path-Based Routing (502 Errors)**
+   - **Problem**: NGINX returning 502 errors when routing to session containers
+   - **Solution**: Ensure NGINX runs on same network (jarvis-shared) as session containers
+   - **Result**: Successfully routes /session/{id}/frontend and /session/{id}/backend paths
+
 ## Troubleshooting
 
 ### Common Issues and Solutions
@@ -435,10 +447,10 @@ docker restart session-manager
 **Solution**: Platform now uses shared network architecture:
 ```bash
 # Verify shared network exists
-docker network ls | grep jarvis-network
+docker network ls | grep jarvis-shared
 
 # If missing, create it
-docker network create jarvis-network
+docker network create jarvis-shared
 ```
 
 #### 4. Port Allocation Failures
