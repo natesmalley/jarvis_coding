@@ -237,7 +237,7 @@
             replace: "$0"
           }, {
             input: "resp_l2_addr",
-            output: "dst_endpiont.mac",
+            output: "dst_endpoint.mac",
             match: ".*",
             replace: "$0"
           }, {
