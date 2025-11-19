@@ -159,7 +159,7 @@
     <script>
         // Use relative URL so it works in any environment (dev/staging/production)
         // This will use the same host as the landing page, proxied through NGINX
-        const SESSION_MANAGER_URL = '/api';
+        const SESSION_MANAGER_URL = '';  // Empty because we'll use direct paths
         const TOKEN_KEY = 'jarvis_session_token';
         const SESSION_KEY = 'jarvis_session_data';
         
@@ -185,7 +185,7 @@
                 
                 // Check if session is still valid
                 try {
-                    const response = await fetch(`${SESSION_MANAGER_URL}/api/sessions/${session.session_id}`);
+                    const response = await fetch(`/api/sessions/${session.session_id}`);
                     if (!response.ok) {
                         // Session expired, clear and reset
                         localStorage.removeItem(TOKEN_KEY);
@@ -225,7 +225,7 @@
                 // Create session
                 statusDiv.innerHTML = 'Creating your personal Jarvis instance...';
                 
-                const response = await fetch(`${SESSION_MANAGER_URL}/api/sessions`, {
+                const response = await fetch('/api/sessions', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
