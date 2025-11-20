@@ -664,7 +664,7 @@
                     const traceInput = document.getElementById('trace-id');
                     if (traceInput) traceInput.value = traceId;
                 }
-                const response = await fetch('/get-generators');
+                const response = await fetch('get-generators');
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -721,7 +721,7 @@
         // Destinations management
         async function refreshDestinations() {
             try {
-                const res = await fetch('/destinations');
+                const res = await fetch('destinations');
                 const data = await res.json();
                 const items = (data.destinations || []);
                 // Populate unified selector
@@ -823,7 +823,7 @@
                         payload.port = parseInt(document.getElementById('dest-syslog-port').value, 10);
                         payload.protocol = document.getElementById('dest-syslog-protocol').value;
                     }
-                    const r = await fetch('/destinations', {
+                    const r = await fetch('destinations', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
@@ -922,7 +922,7 @@
                 // Create abort controller for stopping
                 currentAbortController = new AbortController();
 
-                const response = await fetch('/generate-logs', {
+                const response = await fetch('generate-logs', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -987,7 +987,7 @@
 
         async function fetchScenarios() {
             try {
-                const response = await fetch('/scenarios');
+                const response = await fetch('scenarios');
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
                 scenariosData = data.scenarios || [];
@@ -1084,7 +1084,7 @@
                 const generateNoise = document.getElementById('generate-noise')?.checked || false;
                 const noiseEventsCount = parseInt(document.getElementById('noise-events-count')?.value || '1200', 10);
                 
-                const response = await fetch('/scenarios/run', {
+                const response = await fetch('scenarios/run', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1192,7 +1192,7 @@
             formData.append('file', file);
 
             try {
-                const response = await fetch('/uploads', {
+                const response = await fetch('uploads', {
                     method: 'POST',
                     body: formData
                 });
@@ -1220,7 +1220,7 @@
 
         async function refreshUploads() {
             try {
-                const response = await fetch('/uploads');
+                const response = await fetch('uploads');
                 if (!response.ok) throw new Error('Failed to fetch uploads');
                 
                 const data = await response.json();
@@ -1314,7 +1314,7 @@
             uploadOutputBox.innerText = 'Starting file processing...\n\n';
 
             try {
-                const response = await fetch('/uploads/process', {
+                const response = await fetch('uploads/process', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

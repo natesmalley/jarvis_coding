@@ -4,6 +4,7 @@
 !README.md
 !AGENTS.md
 *.md
+!planning.md
 !README.md.example
 *.markdown
 *.mdown

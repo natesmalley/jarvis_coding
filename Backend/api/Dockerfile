@@ -30,6 +30,7 @@ COPY --from=builder /usr/local /usr/local
 # Copy application code
 COPY Backend/api/app/ ./app/
 COPY Backend/api/start_api.py .
+COPY Backend/api/gunicorn.conf.py .
 COPY Backend/api/entrypoint.sh .
 
 # Copy event generators and parsers from parent directory
