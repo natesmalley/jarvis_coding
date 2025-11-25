@@ -565,7 +565,7 @@ def run_scenario():
 
 @app.route('/uploads', methods=['POST'])
 def upload_file():
-    """Upload a CSV or JSON file"""
+    """Upload a CSV, JSON, TXT, LOG, or GZ file"""
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
     
