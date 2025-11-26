@@ -69,10 +69,23 @@ class DestinationService:
         Returns:
             Created Destination object
         """
-        # Generate ID
-        result = await self.session.execute(select(Destination))
+        # Generate ID - find the next available number for this type
+        result = await self.session.execute(
+            select(Destination).where(Destination.type == dest_type)
+        )
         existing = result.scalars().all()
-        dest_id = f"{dest_type}:{len(existing) + 1}"
+        
+        # Extract numbers from existing IDs and find max
+        max_num = 0
+        for dest in existing:
+            try:
+                num = int(dest.id.split(':')[1])
+                if num > max_num:
+                    max_num = num
+            except (IndexError, ValueError):
+                continue
+        
+        dest_id = f"{dest_type}:{max_num + 1}"
         
         # Create destination
         destination = Destination(

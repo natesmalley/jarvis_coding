@@ -27,7 +27,7 @@ class Destination(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    def to_dict(self, include_token=False):
+    def to_dict(self, include_token=False, encryption_service=None):
         """Convert to dictionary, optionally excluding sensitive data"""
         result = {
             'id': self.id,
@@ -41,9 +41,20 @@ class Destination(Base):
             result['url'] = self.url
             if include_token:
                 result['token_encrypted'] = self.token_encrypted
+            
+            # Check if destination has a real database token (not LOCAL_STORAGE placeholder)
+            if self.token_encrypted and encryption_service:
+                try:
+                    decrypted = encryption_service.decrypt(self.token_encrypted)
+                    result['has_database_token'] = (decrypted != 'LOCAL_STORAGE')
+                except:
+                    result['has_database_token'] = False
+            else:
+                result['has_database_token'] = bool(self.token_encrypted)
         elif self.type == 'syslog':
             result['ip'] = self.ip
             result['port'] = self.port
             result['protocol'] = self.protocol
+            result['has_database_token'] = None  # Not applicable for syslog
         
         return result

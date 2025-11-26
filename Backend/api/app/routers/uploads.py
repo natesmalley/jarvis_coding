@@ -8,6 +8,7 @@ import json
 import csv
 import shutil
 import uuid
+import gzip
 from pathlib import Path
 from datetime import datetime
 
@@ -54,10 +55,11 @@ async def upload_file(
     auth_info: tuple = Depends(get_api_key)
 ):
     """
-    Upload a CSV or JSON file for processing
+    Upload a file for processing
     
-    - **file**: CSV or JSON file (max 1GB)
-    - Accepted formats: .csv, .json
+    - **file**: CSV, JSON, TXT, LOG, or GZ file (max 1GB)
+    - Accepted formats: .csv, .json, .txt, .log, .gz
+    - GZ files will be automatically decompressed
     """
     # Validate file extension
     if not file.filename:
@@ -67,10 +69,11 @@ async def upload_file(
         )
     
     file_ext = Path(file.filename).suffix.lower()
-    if file_ext not in ['.csv', '.json']:
+    allowed_extensions = ['.csv', '.json', '.txt', '.log', '.gz']
+    if file_ext not in allowed_extensions:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file type '{file_ext}'. Only .csv and .json files are accepted"
+            detail=f"Invalid file type '{file_ext}'. Allowed: {', '.join(allowed_extensions)}"
         )
     
     # Generate unique ID for this upload
@@ -97,19 +100,59 @@ async def upload_file(
         
         logger.info(f"File uploaded: {safe_filename} ({total_size} bytes)")
         
+        # Handle gzip decompression
+        actual_file_type = file_ext.lstrip('.')
+        decompressed_path = file_path
+        
+        if file_ext == '.gz':
+            logger.info(f"Decompressing gzip file: {safe_filename}")
+            try:
+                # Decompress to a new file
+                decompressed_filename = safe_filename.rsplit('.gz', 1)[0]
+                decompressed_path = UPLOAD_DIR / decompressed_filename
+                
+                with gzip.open(file_path, 'rb') as f_in:
+                    with open(decompressed_path, 'wb') as f_out:
+                        shutil.copyfileobj(f_in, f_out)
+                
+                # Remove original gz file
+                file_path.unlink()
+                file_path = decompressed_path
+                safe_filename = decompressed_filename
+                
+                # Detect actual file type from decompressed filename
+                inner_ext = Path(decompressed_filename).suffix.lower()
+                if inner_ext in ['.csv', '.json', '.txt', '.log']:
+                    actual_file_type = inner_ext.lstrip('.')
+                else:
+                    actual_file_type = 'txt'  # Default to txt for unknown extensions
+                
+                logger.info(f"Decompressed to: {decompressed_filename}, detected type: {actual_file_type}")
+            except Exception as e:
+                logger.error(f"Failed to decompress gzip file: {e}")
+                if file_path.exists():
+                    file_path.unlink()
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Failed to decompress gzip file: {str(e)}"
+                )
+        
         # Count lines/records
         line_count = None
         try:
-            if file_ext == '.json':
+            if actual_file_type == 'json':
                 with open(file_path, 'r') as f:
                     data = json.load(f)
                     if isinstance(data, list):
                         line_count = len(data)
                     else:
                         line_count = 1
-            elif file_ext == '.csv':
+            elif actual_file_type == 'csv':
                 with open(file_path, 'r') as f:
                     line_count = sum(1 for _ in csv.reader(f)) - 1  # Subtract header
+            elif actual_file_type in ['txt', 'log']:
+                with open(file_path, 'r') as f:
+                    line_count = sum(1 for _ in f)
         except Exception as e:
             logger.warning(f"Could not count lines in {safe_filename}: {e}")
         
@@ -118,7 +161,7 @@ async def upload_file(
             'id': upload_id,
             'filename': file.filename,
             'safe_filename': safe_filename,
-            'file_type': file_ext.lstrip('.'),
+            'file_type': actual_file_type,
             'size': total_size,
             'line_count': line_count,
             'uploaded_at': datetime.utcnow().isoformat(),

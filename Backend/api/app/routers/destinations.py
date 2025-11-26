@@ -50,6 +50,7 @@ class DestinationResponse(BaseModel):
     protocol: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+    has_database_token: Optional[bool] = None  # True if token is in DB, False if LOCAL_STORAGE
 
 
 class DestinationWithToken(DestinationResponse):
@@ -149,7 +150,7 @@ async def list_destinations(
     service = DestinationService(session)
     destinations = await service.list_destinations()
     logger.debug(f"Listing {len(destinations)} destinations")
-    return [dest.to_dict() for dest in destinations]
+    return [dest.to_dict(encryption_service=service.encryption) for dest in destinations]
 
 
 @router.get("/{dest_id}", response_model=DestinationResponse)
@@ -168,7 +169,7 @@ async def get_destination(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Destination '{dest_id}' not found"
         )
-    return destination.to_dict()
+    return destination.to_dict(encryption_service=service.encryption)
 
 
 @router.get("/{dest_id}/token")
@@ -204,8 +205,18 @@ async def get_destination_token(
     
     try:
         token = service.decrypt_token(destination.token_encrypted)
+        
+        # Check if this is a local-storage-only destination
+        if token == 'LOCAL_STORAGE':
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This destination uses local browser storage. Please provide the token from your browser."
+            )
+        
         logger.info(f"Successfully decrypted token for destination: {dest_id}")
         return {"token": token}
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
     except Exception as e:
         logger.error(f"Failed to decrypt token: {e}")
         raise HTTPException(

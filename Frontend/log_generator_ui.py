@@ -27,6 +27,11 @@ BACKEND_API_KEY = os.environ.get('BACKEND_API_KEY')
 def index():
     return render_template('log_generator.html')
 
+@app.route('/test-token-storage')
+def test_token_storage():
+    """Token storage test page"""
+    return render_template('test_token_storage.html')
+
 def get_scripts():
     scripts = {}
     try:
@@ -164,23 +169,45 @@ def create_destination():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/destinations/<dest_id>', methods=['DELETE'])
-def delete_destination(dest_id: str):
-    """Delete destination via backend API"""
+def delete_destination(dest_id):
+    """Delete a destination"""
     try:
-        resp = requests.delete(
+        response = requests.delete(
             f"{API_BASE_URL}/api/v1/destinations/{dest_id}",
             headers=_get_api_headers(),
             timeout=10
         )
-        
-        if resp.status_code == 204:
-            return ('', 204)
-        else:
-            error_detail = resp.json().get('detail', resp.text) if resp.headers.get('content-type') == 'application/json' else resp.text
-            logger.error(f"Backend returned {resp.status_code}: {error_detail}")
-            return jsonify({'error': error_detail}), resp.status_code
+        return Response(status=response.status_code)
     except Exception as e:
         logger.error(f"Failed to delete destination: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/destinations/<dest_id>/update-token', methods=['POST'])
+def update_destination_token(dest_id):
+    """Update token for a destination in the database"""
+    try:
+        data = request.json
+        token = data.get('token')
+        
+        if not token:
+            return jsonify({'error': 'Token is required'}), 400
+        
+        # Update the destination with new token
+        response = requests.put(
+            f"{API_BASE_URL}/api/v1/destinations/{dest_id}",
+            headers=_get_api_headers(),
+            json={'token': token},
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            logger.info(f"Updated token for destination: {dest_id}")
+            return jsonify({'message': 'Token updated successfully'})
+        else:
+            return jsonify({'error': f'Backend returned {response.status_code}'}), response.status_code
+            
+    except Exception as e:
+        logger.error(f"Failed to update destination token: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/scenarios', methods=['GET'])
@@ -299,6 +326,7 @@ def run_scenario():
     trace_id = (data.get('trace_id') or '').strip()
     generate_noise = data.get('generate_noise', False)
     noise_events_count = int(data.get('noise_events_count', 1200))
+    local_token = data.get('hec_token')  # Token from browser localStorage
     
     if not scenario_id:
         return jsonify({'error': 'scenario_id is required'}), 400
@@ -322,16 +350,22 @@ def run_scenario():
         
         hec_url = chosen.get('url')
         
-        # Fetch decrypted token from backend
-        token_resp = requests.get(
-            f"{API_BASE_URL}/api/v1/destinations/{destination_id}/token",
-            headers=_get_api_headers(),
-            timeout=10
-        )
-        if token_resp.status_code != 200:
-            return jsonify({'error': 'Failed to retrieve HEC token'}), 400
-        
-        hec_token = token_resp.json().get('token')
+        # Use local token if provided, otherwise fetch from backend
+        if local_token:
+            hec_token = local_token
+            logger.info(f"Using local token from browser for destination: {destination_id}")
+        else:
+            # Fetch decrypted token from backend as fallback
+            token_resp = requests.get(
+                f"{API_BASE_URL}/api/v1/destinations/{destination_id}/token",
+                headers=_get_api_headers(),
+                timeout=10
+            )
+            if token_resp.status_code != 200:
+                return jsonify({'error': 'Failed to retrieve HEC token. Please set a local token in Settings.'}), 400
+            
+            hec_token = token_resp.json().get('token')
+            logger.info(f"Using backend token for destination: {destination_id}")
         
         if not hec_url or not hec_token:
             return jsonify({'error': 'HEC destination incomplete or token missing'}), 400
@@ -531,7 +565,7 @@ def run_scenario():
 
 @app.route('/uploads', methods=['POST'])
 def upload_file():
-    """Upload a CSV or JSON file"""
+    """Upload a CSV, JSON, TXT, LOG, or GZ file"""
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
     
@@ -540,10 +574,10 @@ def upload_file():
         return jsonify({'error': 'No file selected'}), 400
     
     # Validate file extension
-    allowed_extensions = {'.csv', '.json'}
+    allowed_extensions = {'.csv', '.json', '.txt', '.log', '.gz'}
     file_ext = os.path.splitext(file.filename)[1].lower()
     if file_ext not in allowed_extensions:
-        return jsonify({'error': f'Invalid file type. Only CSV and JSON files are allowed'}), 400
+        return jsonify({'error': f'Invalid file type. Allowed: CSV, JSON, TXT, LOG, GZ'}), 400
     
     try:
         # Forward to backend API
@@ -612,6 +646,7 @@ def process_upload():
     eps = float(data.get('eps', 10.0))
     sourcetype = data.get('sourcetype', '').strip()
     endpoint = data.get('endpoint', 'event')  # 'event' or 'raw'
+    local_token = data.get('hec_token')  # Token from browser localStorage
     
     if not upload_id:
         return jsonify({'error': 'upload_id is required'}), 400
@@ -653,17 +688,23 @@ def process_upload():
             
             hec_url = destination.get('url')
             
-            # Get decrypted token
-            token_resp = requests.get(
-                f"{API_BASE_URL}/api/v1/destinations/{destination_id}/token",
-                headers=_get_api_headers(),
-                timeout=10
-            )
-            if token_resp.status_code != 200:
-                yield "ERROR: Failed to retrieve HEC token\n"
-                return
-            
-            hec_token = token_resp.json().get('token')
+            # Use local token if provided, otherwise fetch from backend
+            if local_token:
+                hec_token = local_token
+                logger.info(f"Using local token from browser for destination: {destination_id}")
+            else:
+                # Get decrypted token from backend as fallback
+                token_resp = requests.get(
+                    f"{API_BASE_URL}/api/v1/destinations/{destination_id}/token",
+                    headers=_get_api_headers(),
+                    timeout=10
+                )
+                if token_resp.status_code != 200:
+                    yield "ERROR: Failed to retrieve HEC token. Please set a local token in Settings.\n"
+                    return
+                
+                hec_token = token_resp.json().get('token')
+                logger.info(f"Using backend token for destination: {destination_id}")
             
             yield f"INFO: Processing {file_type.upper()} file with {line_count} records\n"
             yield f"INFO: Sending to {hec_url} at {eps} EPS\n"
@@ -796,6 +837,56 @@ def process_upload():
                         except Exception as e:
                             yield f"ERROR: Failed to send event: {e}\n"
             
+            elif file_type in ['txt', 'log']:
+                # Process text/log files line by line
+                with open(file_path, 'r') as f:
+                    lines = [line.rstrip('\n') for line in f if line.strip()]
+                    
+                    for line in lines:
+                        try:
+                            if endpoint == 'event':
+                                # Send to HEC /event endpoint (wrap line in JSON)
+                                headers_local = {
+                                    'Authorization': f'Splunk {hec_token}',
+                                    'Content-Type': 'application/json'
+                                }
+                                payload = {
+                                    'event': line,
+                                    'sourcetype': sourcetype
+                                }
+                                resp = requests.post(
+                                    hec_endpoint_url,
+                                    json=payload,
+                                    headers=headers_local,
+                                    verify=True,
+                                    timeout=10
+                                )
+                            else:
+                                # Send to HEC /raw endpoint
+                                headers_local = {
+                                    'Authorization': f'Splunk {hec_token}',
+                                    'Content-Type': 'text/plain'
+                                }
+                                resp = requests.post(
+                                    hec_endpoint_url,
+                                    data=line,
+                                    headers=headers_local,
+                                    verify=True,
+                                    timeout=10
+                                )
+                            
+                            resp.raise_for_status()
+                            sent_count += 1
+                            if sent_count % 10 == 0:
+                                yield f"INFO: Sent {sent_count}/{len(lines)} events\n"
+                            time_module.sleep(delay)
+                        except Exception as e:
+                            yield f"ERROR: Failed to send event: {e}\n"
+            
+            else:
+                yield f"ERROR: Unsupported file type: {file_type}\n"
+                return
+            
             yield f"INFO: Successfully sent {sent_count} events to HEC\n"
             
         except Exception as e:
@@ -825,6 +916,8 @@ def generate_logs():
     syslog_port = int(data.get('port')) if data.get('port') is not None else None
     syslog_protocol = data.get('protocol')
     product_id = data.get('product')
+    local_hec_token = data.get('hec_token')  # Token from browser localStorage
+    metadata_fields = data.get('metadata')  # Custom metadata fields as JSON object
     # Unified destination id (preferred)
     unified_dest_id = data.get('destination_id')
     # Back-compat fields
@@ -962,17 +1055,23 @@ def generate_logs():
                     hec_url = chosen.get('url')
                     dest_id = chosen.get('id')
                     
-                    # Fetch decrypted token from backend
-                    token_resp = requests.get(
-                        f"{API_BASE_URL}/api/v1/destinations/{dest_id}/token",
-                        headers=_get_api_headers(),
-                        timeout=10
-                    )
-                    if token_resp.status_code != 200:
-                        yield "ERROR: Failed to retrieve HEC token from backend.\n"
-                        return
-                    
-                    hec_token = token_resp.json().get('token')
+                    # Use local token if provided, otherwise fetch from backend
+                    if local_hec_token:
+                        hec_token = local_hec_token
+                        logger.info(f"Using local token from browser for destination: {dest_id}")
+                    else:
+                        # Fetch decrypted token from backend as fallback
+                        token_resp = requests.get(
+                            f"{API_BASE_URL}/api/v1/destinations/{dest_id}/token",
+                            headers=_get_api_headers(),
+                            timeout=10
+                        )
+                        if token_resp.status_code != 200:
+                            yield "ERROR: Failed to retrieve HEC token from backend. Please set a local token in Settings.\n"
+                            return
+                        
+                        hec_token = token_resp.json().get('token')
+                        logger.info(f"Using backend token for destination: {dest_id}")
                     
                     if not hec_url or not hec_token:
                         yield "ERROR: Selected HEC destination is incomplete or token missing.\n"
@@ -1020,6 +1119,10 @@ def generate_logs():
                 env = os.environ.copy()
                 env['S1_HEC_TOKEN'] = hec_token
                 env['S1_HEC_URL'] = normalized_hec_url
+                # Enable TLS compatibility for older/misconfigured servers
+                env['S1_HEC_TLS_LOW'] = '1'
+                # Enable automatic insecure fallback as last resort
+                env['S1_HEC_AUTO_INSECURE'] = 'true'
                 
                 if continuous:
                     # Batch mode for continuous
@@ -1052,6 +1155,16 @@ def generate_logs():
                 # Use --verbosity info for periodic status updates instead of per-event output
                 command = ['python3', '-u', hec_sender_path, '--product', product_id, '-n', str(log_count), 
                            '--min-delay', str(delay), '--max-delay', str(delay), '--verbosity', 'info']
+                
+                # Add metadata fields if provided
+                if metadata_fields:
+                    # Metadata should be a dict, convert to JSON string for command line
+                    import json as json_module
+                    if isinstance(metadata_fields, dict):
+                        command.extend(['--metadata', json_module.dumps(metadata_fields)])
+                        logger.info(f"Adding metadata fields: {metadata_fields}")
+                    else:
+                        logger.warning(f"Invalid metadata format (expected dict): {type(metadata_fields)}")
                 
                 # Add speed mode flag
                 if speed_mode:
