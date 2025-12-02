@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   api:
     build:
@@ -15,12 +13,19 @@ services:
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
       # Authentication settings
       - DISABLE_AUTH=${DISABLE_AUTH:-false}
-      - API_KEYS_ADMIN=${API_KEYS_ADMIN}
-      - API_KEYS_READ_ONLY=${API_KEYS_READ_ONLY}
-      - API_KEYS_WRITE=${API_KEYS_WRITE}
+      - JARVIS_ADMIN_KEYS=${JARVIS_ADMIN_KEYS}
+      - JARVIS_WRITE_KEYS=${JARVIS_WRITE_KEYS}
+      - JARVIS_READ_KEYS=${JARVIS_READ_KEYS}
       # SentinelOne integration
       - S1_HEC_TOKEN=${S1_HEC_TOKEN}
+      - S1_HEC_URL=${S1_HEC_URL}
       - S1_SDL_API_TOKEN=${S1_SDL_API_TOKEN}
+      # HEC batching and configuration
+      - S1_HEC_BATCH=${S1_HEC_BATCH:-false}
+      - S1_HEC_BATCH_MAX_BYTES=${S1_HEC_BATCH_MAX_BYTES:-1048576}
+      - S1_HEC_BATCH_FLUSH_MS=${S1_HEC_BATCH_FLUSH_MS:-500}
+      - S1_HEC_DEBUG=${S1_HEC_DEBUG:-0}
+      - S1_HEC_VERIFY=${S1_HEC_VERIFY:-true}
       # Database
       - DATABASE_URL=sqlite+aiosqlite:///./data/jarvis_coding.db
     volumes:

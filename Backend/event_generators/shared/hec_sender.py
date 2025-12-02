@@ -4,6 +4,7 @@ import argparse, json, os, time, random, requests, importlib, sys
 import gzip, io, threading, queue
 from datetime import datetime
 from typing import Callable, Tuple, Optional
+from pathlib import Path
 
 # Add generator category paths to sys.path
 import os
@@ -24,108 +25,12 @@ try:
 except Exception:
     _LOADED_SOURCETYPE_MAP = {}
 
+# Load parser mappings from JSON file
+_MAPPINGS_FILE = Path(__file__).parent / "parser_mappings.json"
+with open(_MAPPINGS_FILE) as f:
+    _PARSER_MAPPINGS = json.load(f)
 
-# Marketplace parser mappings to generators
-MARKETPLACE_PARSER_MAP = {
-    # AWS parsers
-    "marketplace-awscloudtrail-latest": "aws_cloudtrail",
-    "marketplace-awscloudtrail-1.0.0": "aws_cloudtrail",
-    "marketplace-awselasticloadbalancer-latest": "aws_elasticloadbalancer",
-    "marketplace-awsguardduty-latest": "aws_guardduty",
-    "marketplace-awsvpcflowlogs-latest": "aws_vpcflowlogs",
-    "marketplace-awsvpcflowlogs-1.0.0": "aws_vpcflowlogs",
-    
-    # Check Point
-    "marketplace-checkpointfirewall-latest": "checkpoint",
-    "marketplace-checkpointfirewall-1.0.0": "checkpoint",
-    "marketplace-checkpointfirewall-1.0.1": "checkpoint",
-    
-    # Cisco parsers
-    "marketplace-ciscofirepowerthreatdefense-latest": "cisco_firewall_threat_defense",
-    "marketplace-ciscofirepowerthreatdefense-1.0.0": "cisco_firewall_threat_defense",
-    "marketplace-ciscofirepowerthreatdefense-2.0.0": "cisco_firewall_threat_defense",
-    "marketplace-ciscofirewallthreatdefense-latest": "cisco_firewall_threat_defense",
-    "marketplace-ciscofirewallthreatdefense-1.0.0": "cisco_firewall_threat_defense",
-    "marketplace-ciscofirewallthreatdefense-1.0.1": "cisco_firewall_threat_defense",
-    "marketplace-ciscofirewallthreatdefense-1.0.2": "cisco_firewall_threat_defense",
-    "marketplace-ciscofirewallthreatdefense-1.0.3": "cisco_firewall_threat_defense",
-    "marketplace-ciscoumbrella-latest": "cisco_umbrella",
-    
-    # Corelight parsers
-    "marketplace-corelight-conn-latest": "corelight_conn",
-    "marketplace-corelight-conn-1.0.0": "corelight_conn",
-    "marketplace-corelight-conn-1.0.1": "corelight_conn",
-    "marketplace-corelight-conn-2.0.0": "corelight_conn",
-    "marketplace-corelight-http-latest": "corelight_http",
-    "marketplace-corelight-http-1.0.0": "corelight_http",
-    "marketplace-corelight-http-1.0.1": "corelight_http",
-    "marketplace-corelight-http-2.0.0": "corelight_http",
-    "marketplace-corelight-ssl-latest": "corelight_ssl",
-    "marketplace-corelight-ssl-1.0.0": "corelight_ssl",
-    "marketplace-corelight-ssl-1.0.1": "corelight_ssl",
-    "marketplace-corelight-ssl-2.0.0": "corelight_ssl",
-    "marketplace-corelight-tunnel-latest": "corelight_tunnel",
-    "marketplace-corelight-tunnel-1.0.0": "corelight_tunnel",
-    "marketplace-corelight-tunnel-2.0.0": "corelight_tunnel",
-    
-    # Fortinet parsers
-    "marketplace-fortinetfortigate-latest": "fortinet_fortigate",
-    "marketplace-fortinetfortigate-1.0.0": "fortinet_fortigate",
-    "marketplace-fortinetfortigate-1.0.1": "fortinet_fortigate",
-    "marketplace-fortinetfortigate-1.0.2": "fortinet_fortigate",
-    "marketplace-fortinetfortigate-1.0.3": "fortinet_fortigate",
-    "marketplace-fortinetfortigate-1.0.4": "fortinet_fortigate",
-    "marketplace-fortinetfortigate-1.0.5": "fortinet_fortigate",
-    "marketplace-fortinetfortigate-1.0.6": "fortinet_fortigate",
-    "marketplace-fortinetfortimanager-latest": "fortimanager",
-    "marketplace-fortinetfortimanager-1.0.0": "fortimanager",
-    "marketplace-fortinetfortimanager-1.0.1": "fortimanager",
-    "marketplace-fortinetfortimanager-2.0.0": "fortimanager",
-    
-    # Infoblox
-    "marketplace-infobloxddi-latest": "infoblox_ddi",
-    "marketplace-infobloxddi-1.0.0": "infoblox_ddi",
-    "marketplace-infobloxddi-2.0.0": "infoblox_ddi",
-    
-    # Netskope
-    "marketplace-netskopecloudlogshipper-latest": "netskope",
-    "marketplace-netskopecloudlogshipper-1.0.0": "netskope",
-    "marketplace-netskopecloudlogshipper-1.0.1": "netskope",
-    "marketplace-netskopecloudlogshipper-1.0.2": "netskope",
-    "marketplace-netskopecloudlogshipper-1.0.3": "netskope",
-    "marketplace-netskopecloudlogshipperjson-latest": "netskope",
-    "marketplace-netskopecloudlogshipperjson-1.0.0": "netskope",
-    
-    # Palo Alto Networks
-    "marketplace-paloaltonetworksfirewall-latest": "paloalto_firewall",
-    "marketplace-paloaltonetworksfirewall-1.0.0": "paloalto_firewall",
-    "marketplace-paloaltonetworksfirewall-1.0.1": "paloalto_firewall",
-    "marketplace-paloaltonetworksfirewall-1.0.2": "paloalto_firewall",
-    "marketplace-paloaltonetworksfirewall-2.0.0": "paloalto_firewall",
-    "marketplace-paloaltonetworksfirewall-2.0.1": "paloalto_firewall",
-    "marketplace-paloaltonetworksfirewall-2.0.2": "paloalto_firewall",
-    "marketplace-paloaltonetworksfirewall-2.0.3": "paloalto_firewall",
-    "marketplace-paloaltonetworksfirewall-2.0.4": "paloalto_firewall",
-    "marketplace-paloaltonetworksfirewall-2.0.5": "paloalto_firewall",
-    "marketplace-paloaltonetworksfirewall-3.0.0": "paloalto_firewall",
-    "marketplace-paloaltonetworksfirewall-3.0.1": "paloalto_firewall",
-    "marketplace-paloaltonetworksfirewall-3.0.2": "paloalto_firewall",
-    "marketplace-paloaltonetworksfirewall-3.0.3": "paloalto_firewall",
-    "marketplace-paloaltonetworksprismaaccess-latest": "paloalto_prismasase",
-    "marketplace-paloaltonetworksprismaaccess-1.0.0": "paloalto_prismasase",
-    
-    # Zscaler parsers
-    "marketplace-zscalerinternetaccess-latest": "zscaler",
-    "marketplace-zscalerinternetaccess-1.0.0": "zscaler",
-    "marketplace-zscalerinternetaccess-1.0.1": "zscaler",
-    "marketplace-zscalerinternetaccess-2.0.0": "zscaler",
-    "marketplace-zscalerinternetaccess-3.0.0": "zscaler",
-    "marketplace-zscalerprivateaccess-latest": "zscaler_private_access",
-    "marketplace-zscalerprivateaccess-1.0.0": "zscaler_private_access",
-    "marketplace-zscalerprivateaccess-2.0.0": "zscaler_private_access",
-    "marketplace-zscalerprivateaccessjson-latest": "zscaler_private_access",
-    "marketplace-zscalerprivateaccessjson-1.0.0": "zscaler_private_access",
-}
+MARKETPLACE_PARSER_MAP = _PARSER_MAPPINGS["marketplace_to_product"]
 
 # Map product → (module_name, generator function names)
 PROD_MAP = {
@@ -618,7 +523,14 @@ _BATCH_FLUSH_MS = int(os.getenv("S1_HEC_BATCH_FLUSH_MS", "1000"))
 _BATCH_LOCK = threading.Lock()
 _BATCH_BUFFERS = {}  # key: (is_json:bool, product:str) -> {'lines': list[str], 'bytes': int, 'last': float}
 _BATCH_THREAD_STARTED = False
-_VERBOSITY = 'info'  # Global verbosity level, set after arg parsing
+# Set verbosity from environment variable S1_HEC_DEBUG
+_DEBUG_LEVEL = os.getenv("S1_HEC_DEBUG", "0")
+if _DEBUG_LEVEL in ("1", "true", "True", "debug"):
+    _VERBOSITY = 'debug'
+elif _DEBUG_LEVEL in ("2", "verbose"):
+    _VERBOSITY = 'verbose'
+else:
+    _VERBOSITY = 'info'  # Default verbosity level, can be overridden by arg parsing
 _BATCH_SEND_QUEUE = None  # Queue for pipelined batch sending
 _BATCH_SENDER_THREAD = None  # Background thread for sending batches
 
@@ -815,140 +727,7 @@ def _send_batch(lines: list, is_json: bool, product: str):
         print(f"[BATCH] Response: {resp.status_code} - {resp.text[:200] if resp.text else 'OK'}", flush=True)
         sys.stdout.flush()
 
-SOURCETYPE_MAP_OVERRIDES = {
-    # ===== FIXED PARSER MAPPINGS (Based on actual parser directory names) =====
-    # AWS parsers - use actual directory names
-    "aws_cloudtrail": "aws_cloudtrail-latest",
-    "aws_vpcflowlogs": "aws_vpcflowlogs-latest",
-    "aws_guardduty": "aws_guardduty_logs-latest",
-    "aws_elasticloadbalancer": "aws_elasticloadbalancer_logs-latest",
-    "aws_waf": "aws_waf-latest",
-    "aws_route53": "aws_route53-latest",
-    "aws_vpc_dns": "aws_vpc_dns_logs-latest",
-    "aws_vpcflow": "aws_vpcflow_logs-latest",
-    
-    # Network security - actual directory names
-    "fortinet_fortigate": "fortinet_fortigate_candidate_logs-latest",
-    "fortimanager": "fortinet_fortigate_fortimanager_logs-latest",
-    "checkpoint": "checkpoint_checkpoint_logs-latest",
-    "paloalto_firewall": "paloalto_firewall-latest",
-    "paloalto_prismasase": "paloalto_prismasase_logs-latest",
-    "cisco_firewall_threat_defense": "cisco_firewall_threat_defense-latest",
-    "infoblox_ddi": "infoblox_ddi-latest",
-    
-    # Zscaler products
-    "zscaler": "zscaler_logs-latest",
-    "zscaler_private_access": "zscaler_private_access-latest",
-    "zscaler_firewall": "zscaler_firewall_logs-latest",
-    "zscaler_dns_firewall": "zscaler_dns_firewall-latest",
-    
-    # Netskope
-    "netskope": "netskope_netskope_logs-latest",
-    
-    # Corelight
-    "corelight_conn": "corelight_conn_logs-latest",
-    "corelight_http": "corelight_http_logs-latest",
-    "corelight_ssl": "corelight_ssl_logs-latest",
-    "corelight_tunnel": "corelight_tunnel_logs-latest",
-    
-    # Identity and access management
-    "okta_authentication": "okta_authentication-latest",
-    "microsoft_azuread": "microsoft_azuread-latest",
-    "microsoft_azure_ad": "microsoft_azure_ad_logs-latest",
-    "microsoft_azure_ad_signin": "microsoft_azure_ad_signin-latest",
-    "beyondtrust_passwordsafe": "beyondtrust_passwordsafe_logs-latest",
-    "beyondtrust_privilegemgmt_windows": "beyondtrust_privilegemgmt_windows-latest",
-    "hashicorp_vault": "hashicorp_vault-latest",
-    "hypr_auth": "hypr_auth-latest",
-    "pingfederate": "pingfederate-latest",
-    "pingone_mfa": "pingone_mfa-latest",
-    "pingprotect": "pingprotect-latest",
-    "rsa_adaptive": "rsa_adaptive-latest",
-    "cyberark_pas": "cyberark_pas_logs-latest",
-    "cyberark_conjur": "cyberark_conjur-latest",
-    
-    # Microsoft products
-    "microsoft_365_mgmt_api": "microsoft_365_mgmt_api_logs-latest",
-    "microsoft_365_collaboration": "microsoft_365_collaboration-latest",
-    "microsoft_365_defender": "microsoft_365_defender-latest",
-    "microsoft_defender_email": "microsoft_defender_email-latest",
-    "microsoft_windows_eventlog": "microsoft_windows_eventlog-latest",
-    "microsoft_eventhub_azure_signin": "microsoft_eventhub_azure_signin_logs-latest",
-    "microsoft_eventhub_defender_email": "microsoft_eventhub_defender_email_logs-latest",
-    "microsoft_eventhub_defender_emailforcloud": "microsoft_eventhub_defender_emailforcloud_logs-latest",
-    
-    # Cisco products
-    "cisco_asa": "cisco_asa-latest",
-    "cisco_umbrella": "cisco_umbrella-latest",
-    "cisco_meraki": "cisco_meraki-latest",
-    "cisco_duo": "cisco_duo-latest",
-    "cisco_ise": "cisco_ise_logs-latest",
-    "cisco_fmc": "cisco_fmc_logs-latest",
-    "cisco_ios": "cisco_ios_logs-latest",
-    "cisco_ironport": "cisco_ironport-latest",
-    "cisco_meraki_flow": "cisco_meraki_flow_logs-latest",
-    "cisco_networks": "cisco_networks_logs-latest",
-    
-    # Endpoint security
-    "crowdstrike_falcon": "crowdstrike_falcon-latest",
-    "sentinelone_endpoint": "sentinelone_endpoint-latest",
-    "sentinelone_identity": "sentinelone_identity-latest",
-    "jamf_protect": "jamf_protect-latest",
-    
-    # Network detection
-    "darktrace": "darktrace_darktrace_logs-latest",
-    "extrahop": "extrahop_extrahop_logs-latest",
-    "vectra_ai": "vectra_ai_logs-latest",
-    "armis": "armis_armis_logs-latest",
-    
-    # Email security
-    "proofpoint": "proofpoint_proofpoint_logs-latest",
-    "mimecast": "mimecast_mimecast_logs-latest",
-    "abnormal_security": "abnormal_security_logs-latest",
-    
-    # Web security and CDN
-    "cloudflare_general": "cloudflare_general_logs-latest",
-    "cloudflare_waf": "cloudflare_waf_logs-latest",
-    "imperva_waf": "imperva_waf_logs-latest",
-    "imperva_sonar": "imperva_sonar-latest",
-    "incapsula": "incapsula_incapsula_logs-latest",
-    "akamai_cdn": "akamai_cdn-latest",
-    "akamai_dns": "akamai_dns-latest",
-    "akamai_general": "akamai_general-latest",
-    "akamai_sitedefender": "akamai_sitedefender-latest",
-    
-    # Cloud services
-    "google_workspace": "google_workspace_logs-latest",
-    "google_cloud_dns": "google_cloud_dns_logs-latest",
-    "wiz_cloud": "wiz_cloud-latest",
-    
-    # Network infrastructure
-    "apache_http": "apache_http_logs-latest",
-    "f5_networks": "f5_networks_logs-latest",
-    "f5_vpn": "f5_vpn-latest",
-    "extreme_networks": "extreme_networks_logs-latest",
-    "juniper_networks": "juniper_networks_logs-latest",
-    "ubiquiti_unifi": "ubiquiti_unifi_logs-latest",
-    "tailscale": "tailscale_tailscale_logs-latest",
-    "isc_bind": "isc_bind-latest",
-    "isc_dhcp": "isc_dhcp-latest",
-    
-    # IT management and DevOps
-    "buildkite": "buildkite_ci_logs-latest",
-    "github_audit": "github_audit-latest",
-    "harness_ci": "harness_ci-latest",
-    "teleport": "teleport_logs-latest",
-    "linux_auth": "linux_auth-latest",
-    "iis_w3c": "iis_w3c-latest",
-    "veeam_backup": "veeam_backup-latest",
-    "cohesity_backup": "cohesity_backup-latest",
-    "axway_sftp": "axway_sftp-latest",
-    "sap": "sap_logs-latest",
-    "securelink": "securelink_logs-latest",
-    "manageengine_general": "manageengine_general_logs-latest",
-    "manageengine_adauditplus": "manageengine_adauditplus_logs-latest",
-    "manch_siem": "manch_siem_logs-latest",
-}
+SOURCETYPE_MAP_OVERRIDES = _PARSER_MAPPINGS["product_to_parser"]
 
 # Merge dynamically discovered sourcetypes with explicit overrides.
 # Overrides win to preserve intentional non-standard mappings.
@@ -1113,7 +892,17 @@ def send_one(line, product: str, attr_fields: dict, event_time: float | None = N
     # Backward-compat: single URL variable (may point to /raw or /event)
     single = os.getenv("S1_HEC_URL")
     if single and not (env_event and env_raw):
-        if single.rstrip("/").endswith("/raw"):
+        # Check if this is a SentinelOne Cloud Connect endpoint
+        if "/api/v1/cloud_connect/events" in single:
+            # SentinelOne Cloud Connect uses a single endpoint for all events
+            # Strip /raw or /event suffix if present, use base endpoint
+            base = single.rstrip("/")
+            if base.endswith("/raw") or base.endswith("/event"):
+                base = base.rsplit("/", 1)[0]
+            # Both JSON and raw events go to the same endpoint
+            env_event = base
+            env_raw = base
+        elif single.rstrip("/").endswith("/raw"):
             env_raw = single.rstrip("/")
             env_event = single.rstrip("/").rsplit("/", 1)[0] + "/event"
         elif single.rstrip("/").endswith("/event"):
@@ -1127,6 +916,14 @@ def send_one(line, product: str, attr_fields: dict, event_time: float | None = N
     bases = []
     if env_event and env_raw:
         bases.append((env_event, env_raw))
+        if _VERBOSITY == 'debug':
+            print(f"[DEBUG] Using S1_HEC_URL from environment: event={env_event}, raw={env_raw}")
+            sys.stdout.flush()
+    else:
+        if _VERBOSITY == 'debug':
+            print(f"[DEBUG] S1_HEC_URL not set, using fallback URLs. S1_HEC_URL={single}")
+            sys.stdout.flush()
+    # Fallback to legacy Splunk HEC endpoints (kept for backward compatibility)
     bases.extend([
         ("https://ingest.us1.sentinelone.net/services/collector/event",
          "https://ingest.us1.sentinelone.net/services/collector/raw"),
@@ -1410,8 +1207,8 @@ if __name__ == "__main__":
     # Backward compatibility: --print-responses sets verbosity to verbose
     if args.print_responses:
         args.verbosity = 'verbose'
-    
-    # Set module-level verbosity for batch logging (no global needed since it's already module-level)
+
+    # Set module-level verbosity for batch logging (no global needed at module level)
     _VERBOSITY = args.verbosity
 
     # Handle marketplace parser name
