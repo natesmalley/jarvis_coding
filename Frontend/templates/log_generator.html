@@ -861,10 +861,16 @@
                                         if (response.ok) {
                                             alert('✓ Token stored in database');
                                         } else {
-                                            throw new Error(`Server returned ${response.status}`);
+                                            let errorMessage = `Server returned ${response.status}`;
+                                            try {
+                                                const errorData = await response.json();
+                                                if (errorData.detail) errorMessage = errorData.detail;
+                                                else if (errorData.error) errorMessage = errorData.error;
+                                            } catch {}
+                                            throw new Error(errorMessage);
                                         }
                                     } catch (err) {
-                                        alert('✗ Failed to store token in database. See console.');
+                                        alert(`✗ Failed to store token in database: ${err.message}`);
                                         console.error(err);
                                         return;
                                     }
@@ -881,8 +887,16 @@
                             try {
                                 const r = await fetch(`/destinations/${encodeURIComponent(d.id)}`, { method: 'DELETE' });
                                 if (r.status !== 204) {
-                                    const txt = await r.text();
-                                    throw new Error(`Failed to delete (${r.status}): ${txt}`);
+                                    let errorMessage = `Failed to delete (${r.status})`;
+                                    try {
+                                        const errorData = await r.json();
+                                        if (errorData.detail) errorMessage = errorData.detail;
+                                        else if (errorData.error) errorMessage = errorData.error;
+                                    } catch {
+                                        const txt = await r.text();
+                                        errorMessage += `: ${txt}`;
+                                    }
+                                    throw new Error(errorMessage);
                                 }
                                 // Also remove local token if exists
                                 if (window.tokenVault && window.tokenVault.hasToken(d.id)) {
@@ -890,7 +904,7 @@
                                 }
                                 await refreshDestinations();
                             } catch (err) {
-                                alert('Failed to delete destination. See console.');
+                                alert(err.message || 'Failed to delete destination. See console.');
                                 console.error(err);
                             }
                         });
@@ -971,9 +985,20 @@
                     });
                     
                     if (!r.ok) {
-                        const errorText = await r.text();
-                        console.error('Server error:', r.status, errorText);
-                        throw new Error(`Failed to save destination (${r.status}): ${errorText}`);
+                        let errorMessage = `Failed to save destination (${r.status})`;
+                        try {
+                            const errorData = await r.json();
+                            if (errorData.detail) {
+                                errorMessage = errorData.detail;
+                            } else if (errorData.error) {
+                                errorMessage = errorData.error;
+                            }
+                        } catch {
+                            const errorText = await r.text();
+                            errorMessage += `: ${errorText}`;
+                        }
+                        console.error('Server error:', r.status, errorMessage);
+                        throw new Error(errorMessage);
                     }
                     
                     const result = await r.json();
@@ -995,7 +1020,7 @@
                     const genBtn = document.querySelector('.nav-tab[data-target="generate-section"]');
                     if (genBtn) genBtn.click();
                 } catch (err) {
-                    alert('Failed to save destination. See console.');
+                    alert(err.message || 'Failed to save destination. See console.');
                     console.error(err);
                 }
             });
