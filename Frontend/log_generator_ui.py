@@ -269,6 +269,14 @@ def list_scenarios():
             'phases': ['Normal Behavior', 'MFA Fatigue', 'Initial Access', 'Data Exfiltration', 'Detection & Response']
         },
         {
+            'id': 'insider_cloud_download_exfiltration',
+            'name': 'Insider Data Exfiltration via Cloud Download',
+            'description': 'Insider threat scenario: anomalous large-volume M365/SharePoint downloads (180+ files), DLP classification, and removable USB media copying. Correlates Okta, M365 UAL, DLP, and EDR.',
+            'duration_days': 8,
+            'total_events': 280,
+            'phases': ['Baseline', 'Off-Hours Access', 'Cloud Download Spike', 'USB Copy', 'Detection']
+        },
+        {
             'id': 'scenario_hec_sender',
             'name': 'Scenario HEC Sender',
             'description': 'Generic scenario sender that replays a scenario JSON to HEC.',
@@ -356,6 +364,7 @@ def run_scenario():
                 'scenario_hec_sender': 'scenario_hec_sender.py',
                 'star_trek_integration_test': 'star_trek_integration_test.py',
                 'finance_mfa_fatigue_scenario': 'finance_mfa_fatigue_scenario.py',
+                'insider_cloud_download_exfiltration': 'insider_cloud_download_exfiltration.py',
             }
             scenarios_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Backend', 'scenarios'))
             # Resolve script path
@@ -425,13 +434,13 @@ def run_scenario():
                 yield "INFO: Scenario generation complete\n"
                 # If this scenario produces a JSON file, automatically replay it to HEC
                 try:
-                    if scenario_id == 'finance_mfa_fatigue_scenario':
+                    if scenario_id in ['finance_mfa_fatigue_scenario', 'insider_cloud_download_exfiltration']:
                         from os import path
                         output_dir = env.get('SCENARIO_OUTPUT_DIR', path.join(scenarios_dir, 'configs'))
-                        output_file = path.join(output_dir, 'finance_mfa_fatigue_scenario.json')
+                        output_file = path.join(output_dir, f'{scenario_id}.json')
                         if not path.exists(output_file):
                             # Fallback to scenarios/configs
-                            fallback = path.join(scenarios_dir, 'configs', 'finance_mfa_fatigue_scenario.json')
+                            fallback = path.join(scenarios_dir, 'configs', f'{scenario_id}.json')
                             if path.exists(fallback):
                                 output_file = fallback
                         if path.exists(output_file):
