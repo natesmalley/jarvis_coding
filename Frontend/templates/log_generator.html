@@ -1372,6 +1372,21 @@
 
         fetchScenarios();
 
+        // ===== TRACE ID GENERATOR =====
+        const genTraceIdBtn = document.getElementById('gen-trace-id');
+        if (genTraceIdBtn) {
+            genTraceIdBtn.addEventListener('click', () => {
+                // Generate a GUID (UUID v4)
+                const guid = ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+                    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+                );
+                const traceInput = document.getElementById('trace-id');
+                if (traceInput) {
+                    traceInput.value = guid;
+                }
+            });
+        }
+
         // ===== FILE UPLOAD FUNCTIONALITY =====
         const uploadDropzone = document.getElementById('upload-dropzone');
         const fileInput = document.getElementById('file-input');
