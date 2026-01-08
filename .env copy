@@ -8,12 +8,13 @@ DISABLE_AUTH=true
 SECRET_KEY=change-me-in-development
 
 # API keys (only used if DISABLE_AUTH=false)
-API_KEYS_ADMIN=
-API_KEYS_READ_ONLY=
-API_KEYS_WRITE=
+JARVIS_ADMIN_KEYS=
+JARVIS_READ_KEYS=
+JARVIS_WRITE_KEYS=
 
 # Integrations
 S1_SDL_API_TOKEN=
+S1_HEC_TOKEN=
 
 # Frontend -> Backend API key (not needed when DISABLE_AUTH=true)
 BACKEND_API_KEY=
