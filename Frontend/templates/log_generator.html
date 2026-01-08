@@ -1,9 +1,10 @@
-!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Synthetic Log Generator</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚀</text></svg>">
     <script src="https://cdn.tailwindcss.com/3.4.1"></script>
     <script src="{{ url_for('static', filename='js/token_vault.js') }}"></script>
     <style>
@@ -1277,16 +1278,11 @@
         });
 
         // Generate Trace ID button for scenarios
-        //const genTraceIdBtn = document.getElementById('gen-trace-id');
+        const genTraceIdBtnScenario = document.getElementById('gen-trace-id');
+        const traceIdInput = document.getElementById('trace-id');
         
-	if (!window.genTraceIdBtn) {
-  		window.genTraceIdBtn = document.getElementById("gen-trace-id");
-	}
-
-
-	const traceIdInput = document.getElementById('trace-id');
-        if (genTraceIdBtn && traceIdInput) {
-            genTraceIdBtn.addEventListener('click', () => {
+        if (genTraceIdBtnScenario && traceIdInput) {
+            genTraceIdBtnScenario.addEventListener('click', () => {
                 const guid = crypto.randomUUID();
                 traceIdInput.value = guid;
             });
@@ -1378,20 +1374,8 @@
 
         fetchScenarios();
 
-        // ===== TRACE ID GENERATOR =====
-        const genTraceIdBtn = document.getElementById('gen-trace-id');
-        if (genTraceIdBtn) {
-            genTraceIdBtn.addEventListener('click', () => {
-                // Generate a GUID (UUID v4)
-                const guid = ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
-                    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
-                );
-                const traceInput = document.getElementById('trace-id');
-                if (traceInput) {
-                    traceInput.value = guid;
-                }
-            });
-        }
+        // ===== TRACE ID GENERATOR ===== 
+        // (Already handled above to avoid duplicate event listeners)
 
         // ===== FILE UPLOAD FUNCTIONALITY =====
         const uploadDropzone = document.getElementById('upload-dropzone');
