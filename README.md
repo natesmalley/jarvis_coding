@@ -40,7 +40,7 @@ Build and start both services:
 docker compose up -d --build
 ```
 - **API**: http://localhost:8000
-- **Frontend UI**: http://localhost:9001
+- **Frontend UI**: http://localhost:9002
 - **API Docs**: http://localhost:8000/api/v1/docs
 
 ### 3. Stop Services
@@ -74,7 +74,7 @@ curl http://localhost:8000
 # API health
 curl http://localhost:8000/api/v1/health
 # Open the UI in your browser
-open http://localhost:9001
+open http://localhost:9002
 ```
 
 ## Configuration (.env)
