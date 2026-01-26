@@ -970,6 +970,8 @@ def process_upload():
     sourcetype = data.get('sourcetype', '').strip()
     endpoint = data.get('endpoint', 'event')  # 'event' or 'raw'
     local_token = data.get('hec_token')  # Token from browser localStorage
+    sync_parsers = data.get('sync_parsers', True)  # Enable parser sync by default
+    trace_id = (data.get('trace_id') or '').strip()  # Trace ID for event correlation
     
     if not upload_id:
         return jsonify({'error': 'upload_id is required'}), 400
@@ -1029,10 +1031,88 @@ def process_upload():
                 hec_token = token_resp.json().get('token')
                 logger.info(f"Using backend token for destination: {destination_id}")
             
+            # Fetch config token and URL for parser sync if available
+            config_api_url = destination.get('config_api_url')
+            config_write_token = None
+            github_repo_urls = []
+            github_token = None
+            if sync_parsers and destination.get('has_config_write_token') and config_api_url:
+                try:
+                    config_resp = requests.get(
+                        f"{API_BASE_URL}/api/v1/destinations/{destination_id}/config-tokens",
+                        headers=_get_api_headers(),
+                        timeout=10
+                    )
+                    if config_resp.status_code == 200:
+                        config_tokens = config_resp.json()
+                        config_write_token = config_tokens.get('config_write_token')
+                        logger.info(f"Retrieved config token for parser sync (API URL: {config_api_url})")
+                except Exception as ce:
+                    logger.warning(f"Failed to retrieve config token: {ce}")
+                
+                # Fetch GitHub parser repositories from settings
+                try:
+                    repos_resp = requests.get(
+                        f"{API_BASE_URL}/api/v1/settings/parser-repositories",
+                        headers=_get_api_headers(),
+                        timeout=10
+                    )
+                    if repos_resp.status_code == 200:
+                        repos_data = repos_resp.json()
+                        github_repo_urls = [url for url in repos_data.get('repositories', []) if url]
+                        github_token = repos_data.get('github_token')
+                        if github_repo_urls:
+                            logger.info(f"Retrieved {len(github_repo_urls)} GitHub parser repositories")
+                except Exception as ge:
+                    logger.warning(f"Failed to retrieve GitHub parser repositories: {ge}")
+            
+            # Parser sync: Check and upload required parser before sending events
+            if sync_parsers and config_write_token and config_api_url:
+                yield "INFO: Checking required parser in destination SIEM...\n"
+                try:
+                    # Call the parser sync API for single sourcetype
+                    sync_payload = {
+                        "sourcetype": sourcetype,
+                        "config_api_url": config_api_url,
+                        "config_write_token": config_write_token
+                    }
+                    if github_repo_urls:
+                        sync_payload["github_repo_urls"] = github_repo_urls
+                    if github_token:
+                        sync_payload["github_token"] = github_token
+                    
+                    sync_resp = requests.post(
+                        f"{API_BASE_URL}/api/v1/parser-sync/sync-single",
+                        headers=_get_api_headers(),
+                        json=sync_payload,
+                        timeout=120
+                    )
+                    if sync_resp.status_code == 200:
+                        sync_result = sync_resp.json()
+                        status = sync_result.get('status', 'unknown')
+                        message = sync_result.get('message', '')
+                        if status == 'exists':
+                            yield f"INFO: Parser exists: {sourcetype}\n"
+                        elif status == 'uploaded':
+                            yield f"INFO: Parser uploaded: {sourcetype}\n"
+                        elif status == 'failed':
+                            yield f"WARN: Parser sync failed: {sourcetype} - {message}\n"
+                        elif status == 'no_parser':
+                            yield f"WARN: No parser found for: {sourcetype}\n"
+                        yield "INFO: Parser sync complete\n"
+                    else:
+                        yield f"WARN: Parser sync API returned {sync_resp.status_code}, continuing without sync\n"
+                except Exception as pe:
+                    yield f"WARN: Parser sync failed: {pe}, continuing without sync\n"
+            elif sync_parsers:
+                yield "INFO: Parser sync skipped (missing config_api_url or config tokens for destination)\n"
+            
             yield f"INFO: Processing {file_type.upper()} file with {line_count} records\n"
             yield f"INFO: Sending to {hec_url} at {eps} EPS\n"
             yield f"INFO: Using sourcetype: {sourcetype}\n"
             yield f"INFO: HEC Endpoint: /{endpoint}\n"
+            if trace_id:
+                yield f"INFO: Trace ID: {trace_id}\n"
             
             # Read the uploaded file from backend data directory
             # Since we're in Flask, we need to read from the backend's upload directory
@@ -1081,6 +1161,9 @@ def process_upload():
                                     'event': record,
                                     'sourcetype': sourcetype
                                 }
+                                # Add trace_id as indexed field if provided
+                                if trace_id:
+                                    payload['fields'] = {'scenario.trace_id': trace_id}
                                 resp = requests.post(
                                     hec_endpoint_url,
                                     json=payload,
@@ -1094,7 +1177,9 @@ def process_upload():
                                     'Authorization': f'Splunk {hec_token}',
                                     'Content-Type': 'text/plain'
                                 }
-                                # Convert JSON to string for raw endpoint
+                                # For raw endpoint, inject trace_id into the record if it's a dict
+                                if trace_id and isinstance(record, dict):
+                                    record['scenario.trace_id'] = trace_id
                                 raw_data = json.dumps(record) if isinstance(record, dict) else str(record)
                                 resp = requests.post(
                                     hec_endpoint_url,
@@ -1129,6 +1214,9 @@ def process_upload():
                                     'event': record,
                                     'sourcetype': sourcetype
                                 }
+                                # Add trace_id as indexed field if provided
+                                if trace_id:
+                                    payload['fields'] = {'scenario.trace_id': trace_id}
                                 resp = requests.post(
                                     hec_endpoint_url,
                                     json=payload,
@@ -1142,6 +1230,9 @@ def process_upload():
                                     'Authorization': f'Splunk {hec_token}',
                                     'Content-Type': 'text/plain'
                                 }
+                                # Add trace_id to record for raw endpoint
+                                if trace_id:
+                                    record['scenario.trace_id'] = trace_id
                                 # Convert CSV row to key=value format for raw endpoint
                                 raw_data = ' '.join([f'{k}={v}' for k, v in record.items()])
                                 resp = requests.post(
@@ -1177,6 +1268,9 @@ def process_upload():
                                     'event': line,
                                     'sourcetype': sourcetype
                                 }
+                                # Add trace_id as indexed field if provided
+                                if trace_id:
+                                    payload['fields'] = {'scenario.trace_id': trace_id}
                                 resp = requests.post(
                                     hec_endpoint_url,
                                     json=payload,
@@ -1190,9 +1284,11 @@ def process_upload():
                                     'Authorization': f'Splunk {hec_token}',
                                     'Content-Type': 'text/plain'
                                 }
+                                # For raw endpoint, append trace_id to line if provided
+                                raw_line = f"{line} scenario.trace_id={trace_id}" if trace_id else line
                                 resp = requests.post(
                                     hec_endpoint_url,
-                                    data=line,
+                                    data=raw_line,
                                     headers=headers_local,
                                     verify=True,
                                     timeout=10

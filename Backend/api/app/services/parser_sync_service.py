@@ -75,6 +75,9 @@ SCENARIO_SOURCE_TO_PARSER = {
     # DevOps & CI/CD
     "github_audit": "github_audit-latest",
     "harness_ci": "harness_ci-latest",
+    
+    # CDN & Web
+    "akamai_cdn": "akamai_cdn-latest",
 }
 
 

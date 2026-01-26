@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" version="1.1">
+  <title>HELIOS Minimalist Logo</title>
+  <desc>A scalable, code-based minimalist logo representing an illuminating synthetic log generator. Features a central ring containing the prompt ">H" surrounded by eight radiating data blocks.</desc>
+  <g fill="#7c3aed" fill-rule="evenodd" stroke="none">
+    <path d="M50,18 C67.673112,18 82,32.326888 82,50 C82,67.673112 67.673112,82 50,82 C32.326888,82 18,67.673112 18,50 C18,32.326888 32.326888,18 50,18 Z M50,28 C62.1502645,28 72,37.8497355 72,50 C72,62.1502645 62.1502645,72 50,72 C37.8497355,72 28,62.1502645 28,50 C28,37.8497355 37.8497355,28 50,28 Z" id="Central-Ring"/>
+    <text x="50" y="57" font-family="monospace" font-size="20" font-weight="bold" text-anchor="middle">&gt;H</text>
+    <rect x="47" y="0" width="6" height="12" rx="1"/>
+    <rect x="47" y="88" width="6" height="12" rx="1"/>
+    <rect x="0" y="47" width="12" height="6" rx="1"/>
+    <rect x="88" y="47" width="12" height="6" rx="1"/>
+    <rect x="13.858" y="10.029" width="6" height="12" rx="1" transform="rotate(45 16.858 16.029)"/>
+    <rect x="80.142" y="78.029" width="6" height="12" rx="1" transform="rotate(45 83.142 84.029)"/>
+    <rect x="78.029" y="13.858" width="12" height="6" rx="1" transform="rotate(45 84.029 16.858)"/>
+    <rect x="10.029" y="80.142" width="12" height="6" rx="1" transform="rotate(45 16.029 83.142)"/>
+  </g>
+</svg>

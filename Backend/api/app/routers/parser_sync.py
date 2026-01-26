@@ -100,6 +100,64 @@ async def sync_parsers(
     )
 
 
+class SingleParserSyncRequest(BaseModel):
+    """Request model for syncing a single parser by sourcetype"""
+    sourcetype: str = Field(..., description="Sourcetype/parser name to sync")
+    config_api_url: str = Field(..., description="Config API URL (e.g., https://xdr.us1.sentinelone.net)")
+    config_write_token: str = Field(..., description="Config API token for reading and writing parsers")
+    github_repo_urls: Optional[List[str]] = Field(None, description="Optional GitHub repository URLs to fetch parsers from")
+    github_token: Optional[str] = Field(None, description="Optional GitHub token for private repositories")
+
+
+class SingleParserSyncResponse(BaseModel):
+    """Response model for single parser sync"""
+    sourcetype: str
+    status: str  # 'exists', 'uploaded', 'uploaded_from_github', 'failed', 'no_parser'
+    message: str
+
+
+@router.post("/sync-single", response_model=SingleParserSyncResponse)
+async def sync_single_parser(
+    request: SingleParserSyncRequest,
+    auth_info: tuple = Depends(get_api_key)
+):
+    """
+    Synchronize a single parser by sourcetype with the destination SIEM
+    
+    This endpoint is used by the Upload feature to ensure the parser exists
+    before sending events. It:
+    1. Checks if the parser exists in the destination SIEM
+    2. If not, attempts to find and upload it from local parsers or GitHub repos
+    
+    Returns the sync status for the parser.
+    """
+    # Create service with the destination's config API URL
+    service = ParserSyncService(config_api_url=request.config_api_url)
+    
+    logger.info(f"Syncing single parser for sourcetype: {request.sourcetype}")
+    
+    # Use the sourcetype as the source name for lookup
+    results = service.ensure_parsers_for_sources(
+        sources=[request.sourcetype],
+        config_write_token=request.config_write_token,
+        github_repo_urls=request.github_repo_urls,
+        github_token=request.github_token
+    )
+    
+    # Get result for the sourcetype
+    result = results.get(request.sourcetype, {})
+    status = result.get('status', 'no_parser')
+    message = result.get('message', 'Unknown status')
+    
+    logger.info(f"Single parser sync for {request.sourcetype}: {status} - {message}")
+    
+    return SingleParserSyncResponse(
+        sourcetype=request.sourcetype,
+        status=status,
+        message=message
+    )
+
+
 @router.get("/sources/{scenario_id}")
 async def get_scenario_sources(
     scenario_id: str,

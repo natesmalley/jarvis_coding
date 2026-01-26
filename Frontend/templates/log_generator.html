@@ -595,6 +595,33 @@
                         </div>
                     </div>
 
+                    <details class="bg-[#241d3a] rounded-lg p-3 border border-[#3c325c]" open>
+                        <summary class="cursor-pointer text-sm font-semibold text-[#c8b3e8]">Trace ID & Parser Sync</summary>
+                        <div class="mt-3 space-y-3 text-sm">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div class="md:col-span-2 input-group">
+                                    <label for="upload-trace-id" class="text-sm font-semibold text-[#c8b3e8]">Trace ID (Optional)</label>
+                                    <div class="flex gap-2">
+                                        <input type="text" id="upload-trace-id" placeholder="e.g. 3f2504e0-4f89-11d3-9a0c-0305e82c3301" class="flex-1">
+                                        <button type="button" id="copy-upload-trace-id" class="btn" style="width:auto; padding:0.6rem 0.8rem;" title="Copy to clipboard">📋</button>
+                                    </div>
+                                </div>
+                                <div class="flex items-end">
+                                    <button type="button" id="gen-upload-trace-id" class="btn" style="width:auto; padding:0.6rem 1rem;">Generate</button>
+                                </div>
+                            </div>
+                            <p class="text-xs text-[#b8a0d2]">Add a trace ID to correlate uploaded events in XDR searches (field: <code>scenario.trace_id</code>)</p>
+                            
+                            <div class="mt-3 pt-3 border-t border-[#3c325c]">
+                                <label class="flex items-center gap-2">
+                                    <input type="checkbox" id="upload-sync-parsers" checked>
+                                    <span class="text-[#f3e8ff]">Sync parser before sending events</span>
+                                </label>
+                                <p class="text-xs text-[#b8a0d2] mt-1">Automatically check and upload the required parser to destination SIEM (requires Config API tokens in destination settings)</p>
+                            </div>
+                        </div>
+                    </details>
+
                     <button type="submit" id="process-upload-btn" class="btn">
                         Process File
                     </button>
@@ -2302,6 +2329,35 @@
             }
         }
 
+        // Upload trace ID generate button handler
+        const genUploadTraceIdBtn = document.getElementById('gen-upload-trace-id');
+        const uploadTraceIdInput = document.getElementById('upload-trace-id');
+        
+        if (genUploadTraceIdBtn && uploadTraceIdInput) {
+            genUploadTraceIdBtn.addEventListener('click', () => {
+                const guid = crypto.randomUUID();
+                uploadTraceIdInput.value = guid;
+            });
+        }
+        
+        // Upload trace ID copy button handler
+        const copyUploadTraceIdBtn = document.getElementById('copy-upload-trace-id');
+        if (copyUploadTraceIdBtn && uploadTraceIdInput) {
+            copyUploadTraceIdBtn.addEventListener('click', async () => {
+                const traceId = uploadTraceIdInput.value.trim();
+                if (traceId) {
+                    try {
+                        await navigator.clipboard.writeText(traceId);
+                        const originalText = copyUploadTraceIdBtn.innerText;
+                        copyUploadTraceIdBtn.innerText = '✓';
+                        setTimeout(() => { copyUploadTraceIdBtn.innerText = originalText; }, 1500);
+                    } catch (err) {
+                        console.error('Failed to copy:', err);
+                    }
+                }
+            });
+        }
+
         // Process uploaded file
         uploadProcessForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -2312,6 +2368,8 @@
             const eps = parseFloat(document.getElementById('upload-eps').value);
             const sourcetype = document.getElementById('upload-sourcetype').value.trim();
             const endpoint = document.getElementById('upload-endpoint').value;
+            const traceId = (document.getElementById('upload-trace-id')?.value || '').trim();
+            const syncParsers = document.getElementById('upload-sync-parsers')?.checked !== false;
 
             if (!uploadId || !destinationId) {
                 alert('Please select both a file and a destination');
@@ -2344,7 +2402,9 @@
                         eps: eps,
                         sourcetype: sourcetype,
                         endpoint: endpoint,
-                        hec_token: localToken  // Pass local token if available
+                        hec_token: localToken,  // Pass local token if available
+                        trace_id: traceId,      // Pass trace ID for event correlation
+                        sync_parsers: syncParsers  // Enable/disable parser sync
                     })
                 });
 
