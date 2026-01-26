@@ -51,7 +51,7 @@ docker compose down
 
 ## The RoarinPenguin Guide to HELIOS 1.0 - January 2026
 In the docs directory, you will find a PDF file that provides a comprehensive guide to HELIOS 1.0. 
-Or click this link: [The RoarinPenguin Guide to HELIOS 1.0 - January 2026](docs/The%20RoarinPenguin%20Guide%20to%20HELIOS%201.0%20-%20January%202026.pdf)
+Or click this link: [The RoarinPenguin Guide to HELIOS 1.1 - January 2026](docs/The%20RoarinPenguin%20Guide%20to%20HELIOS%201.1%20-%20January%202026.pdf)
 
 ## Step-by-Step (Beginner Friendly)
 1. Build images (compiles dependencies and copies code):
