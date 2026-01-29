@@ -12,7 +12,15 @@ API_KEYS_ADMIN=
 API_KEYS_READ_ONLY=
 API_KEYS_WRITE=
 
-# Integrations
+# SentinelOne Integration
+# HEC Token for sending events (required for event generation)
+# Example format: 0Z1Fy0tyI53ipwHRnnbFS0ecWaNa1Nt_dG6/HNc/qsEQ-
+S1_HEC_TOKEN=
+
+# SentinelOne API URL (your instance URL)
+S1_API_URL=https://usea1-purple.sentinelone.net
+
+# SDL API Token for querying (optional)
 S1_SDL_API_TOKEN=
 
 # Frontend -> Backend API key (not needed when DISABLE_AUTH=true)
