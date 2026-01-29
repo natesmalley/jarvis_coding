@@ -356,7 +356,7 @@ export S1_SDL_API_TOKEN="your-read-api-token-here"
 **HEC Token Format:**
 - Length: ~40-50 characters
 - Contains alphanumeric and special characters
-- Example format: `0Z1Fy0tyI53ipwHRnnbFS0ecWaNa1Nt_dG6/HNc/qsEQ-`
+- Example format: `example_token_here`
 
 ## File Structure
 
