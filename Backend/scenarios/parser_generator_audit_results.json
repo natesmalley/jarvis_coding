@@ -1,265 +1,258 @@
 {
-  "parsers_analyzed": 100,
-  "generators_analyzed": 106,
+  "parsers_analyzed": 119,
+  "generators_analyzed": 109,
   "format_mismatches": [
     {
       "parser": "Abnormal Security",
       "parser_format": "JSON",
       "generator_format": "Key-Value",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/email_security/abnormal_security.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/email_security/abnormal_security.py",
       "priority": "MEDIUM"
     },
     {
       "parser": "Akamai Cdn",
       "parser_format": "JSON",
       "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/web_security/akamai_cdn.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/web_security/akamai_cdn.py",
       "priority": "LOW"
     },
     {
       "parser": "Akamai Dns",
       "parser_format": "JSON",
       "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/web_security/akamai_dns.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/web_security/akamai_dns.py",
       "priority": "LOW"
     },
     {
       "parser": "Akamai General",
       "parser_format": "JSON",
       "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/web_security/akamai_general.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/web_security/akamai_general.py",
       "priority": "LOW"
     },
     {
       "parser": "Akamai Sitedefender",
       "parser_format": "JSON",
       "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/web_security/akamai_sitedefender.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/web_security/akamai_sitedefender.py",
       "priority": "LOW"
-    },
-    {
-      "parser": "Aws Route53",
-      "parser_format": "JSON",
-      "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/cloud_infrastructure/aws_route53.py",
-      "priority": "HIGH"
     },
     {
       "parser": "Aws Vpc Dns",
       "parser_format": "JSON",
       "generator_format": "Key-Value",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/cloud_infrastructure/aws_vpc_dns.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/cloud_infrastructure/aws_vpc_dns.py",
+      "priority": "HIGH"
+    },
+    {
+      "parser": "Aws Vpcflowlogs",
+      "parser_format": "JSON",
+      "generator_format": "Key-Value",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/cloud_infrastructure/aws_vpcflowlogs.py",
       "priority": "HIGH"
     },
     {
       "parser": "Axway Sftp",
       "parser_format": "JSON",
       "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/infrastructure/axway_sftp.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/infrastructure/axway_sftp.py",
+      "priority": "LOW"
+    },
+    {
+      "parser": "Beyondtrust Privilegemgmt Windows",
+      "parser_format": "JSON",
+      "generator_format": "CSV",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/identity_access/beyondtrust_privilegemgmt_windows.py",
       "priority": "LOW"
     },
     {
       "parser": "Beyondtrust Privilegemgmtwindows",
       "parser_format": "JSON",
       "generator_format": "CSV",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/identity_access/beyondtrust_privilegemgmt_windows.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/identity_access/beyondtrust_privilegemgmt_windows.py",
       "priority": "LOW"
     },
     {
-      "parser": "Cisco Duo",
-      "parser_format": "JSON",
-      "generator_format": "Key-Value",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/cisco_duo.py",
-      "priority": "HIGH"
-    },
-    {
-      "parser": "Cisco Fmc",
+      "parser": "Cisco Asa",
       "parser_format": "JSON",
       "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/cisco_fmc.py",
-      "priority": "HIGH"
-    },
-    {
-      "parser": "Cisco Ironport",
-      "parser_format": "JSON",
-      "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/cisco_ironport.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/network_security/cisco_asa.py",
       "priority": "HIGH"
     },
     {
       "parser": "Cisco Isa3000",
       "parser_format": "JSON",
       "generator_format": "Key-Value",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/cisco_isa3000.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/network_security/cisco_isa3000.py",
       "priority": "HIGH"
     },
     {
       "parser": "Cisco Meraki Flow",
       "parser_format": "Syslog",
       "generator_format": "JSON",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/cisco_meraki_flow.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/network_security/cisco_meraki_flow.py",
       "priority": "HIGH"
     },
     {
       "parser": "Cisco Networks",
       "parser_format": "JSON",
       "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/cisco_networks.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/network_security/cisco_networks.py",
       "priority": "HIGH"
     },
     {
       "parser": "Cloudflare General",
       "parser_format": "JSON",
       "generator_format": "Key-Value",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/web_security/cloudflare_general.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/web_security/cloudflare_general.py",
       "priority": "HIGH"
     },
     {
       "parser": "Cohesity Backup",
       "parser_format": "JSON",
       "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/infrastructure/cohesity_backup.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/infrastructure/cohesity_backup.py",
       "priority": "LOW"
+    },
+    {
+      "parser": "Crowdstrike Falcon",
+      "parser_format": "JSON",
+      "generator_format": "Syslog",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/endpoint_security/crowdstrike_falcon.py",
+      "priority": "HIGH"
     },
     {
       "parser": "Cyberark Conjur",
       "parser_format": "JSON",
       "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/identity_access/cyberark_conjur.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/identity_access/cyberark_conjur.py",
       "priority": "MEDIUM"
     },
     {
       "parser": "Extreme Networks",
       "parser_format": "JSON",
       "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/extreme_networks.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/network_security/extreme_networks.py",
       "priority": "LOW"
     },
     {
       "parser": "F5 Networks",
       "parser_format": "JSON",
       "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/f5_networks.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/network_security/f5_networks.py",
       "priority": "LOW"
     },
     {
       "parser": "F5 Vpn",
       "parser_format": "JSON",
       "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/f5_vpn.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/network_security/f5_vpn.py",
+      "priority": "LOW"
+    },
+    {
+      "parser": "Forcepoint Firewall",
+      "parser_format": "JSON",
+      "generator_format": "Syslog",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/network_security/forcepoint_firewall.py",
       "priority": "LOW"
     },
     {
       "parser": "Google Workspace",
       "parser_format": "JSON",
       "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/cloud_infrastructure/google_workspace.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/cloud_infrastructure/google_workspace.py",
       "priority": "HIGH"
     },
     {
       "parser": "Harness Ci",
       "parser_format": "JSON",
       "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/infrastructure/harness_ci.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/infrastructure/harness_ci.py",
       "priority": "LOW"
     },
     {
       "parser": "Hypr Auth",
       "parser_format": "JSON",
       "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/identity_access/hypr_auth.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/identity_access/hypr_auth.py",
       "priority": "LOW"
     },
     {
       "parser": "Iis W3C",
       "parser_format": "JSON",
       "generator_format": "Key-Value",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/infrastructure/iis_w3c.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/infrastructure/iis_w3c.py",
+      "priority": "LOW"
+    },
+    {
+      "parser": "Infoblox Ddi",
+      "parser_format": "JSON",
+      "generator_format": "Key-Value",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/network_security/infoblox_ddi.py",
       "priority": "LOW"
     },
     {
       "parser": "Juniper Networks",
       "parser_format": "JSON",
       "generator_format": "Key-Value",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/juniper_networks.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/network_security/juniper_networks.py",
       "priority": "LOW"
     },
     {
       "parser": "Linux Auth",
       "parser_format": "JSON",
       "generator_format": "Key-Value",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/endpoint_security/linux_auth.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/endpoint_security/linux_auth.py",
       "priority": "LOW"
     },
     {
       "parser": "Manageengine General",
       "parser_format": "JSON",
       "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/infrastructure/manageengine_general.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/infrastructure/manageengine_general.py",
       "priority": "LOW"
     },
     {
       "parser": "Manch Siem",
       "parser_format": "JSON",
       "generator_format": "CSV",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/manch_siem.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/network_security/manch_siem.py",
       "priority": "LOW"
-    },
-    {
-      "parser": "Microsoft 365 Collaboration",
-      "parser_format": "JSON",
-      "generator_format": "Key-Value",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/identity_access/microsoft_365_collaboration.py",
-      "priority": "HIGH"
-    },
-    {
-      "parser": "Microsoft 365 Defender",
-      "parser_format": "JSON",
-      "generator_format": "Key-Value",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/identity_access/microsoft_365_defender.py",
-      "priority": "HIGH"
     },
     {
       "parser": "Pingfederate",
       "parser_format": "JSON",
       "generator_format": "Key-Value",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/identity_access/pingfederate.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/identity_access/pingfederate.py",
       "priority": "LOW"
     },
     {
       "parser": "Sap",
       "parser_format": "JSON",
       "generator_format": "Key-Value",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/infrastructure/sap.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/infrastructure/sap.py",
       "priority": "LOW"
     },
     {
       "parser": "Securelink",
       "parser_format": "JSON",
       "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/infrastructure/securelink.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/infrastructure/securelink.py",
       "priority": "LOW"
     },
     {
       "parser": "Teleport",
       "parser_format": "JSON",
       "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/infrastructure/teleport.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/infrastructure/teleport.py",
       "priority": "LOW"
     },
     {
       "parser": "Ubiquiti Unifi",
       "parser_format": "Key-Value",
       "generator_format": "Syslog",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/infrastructure/ubiquiti_unifi.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/infrastructure/ubiquiti_unifi.py",
       "priority": "LOW"
-    },
-    {
-      "parser": "Zscaler Dns Firewall",
-      "parser_format": "JSON",
-      "generator_format": "Key-Value",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/web_security/zscaler_dns_firewall.py",
-      "priority": "MEDIUM"
     }
   ],
   "missing_generators": [
@@ -284,148 +277,78 @@
   ],
   "missing_parsers": [
     {
-      "generator": "aws_cloudtrail",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/cloud_infrastructure/aws_cloudtrail.py",
-      "category": "cloud_infrastructure"
-    },
-    {
-      "generator": "aws_vpcflowlogs",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/cloud_infrastructure/aws_vpcflowlogs.py",
-      "category": "cloud_infrastructure"
-    },
-    {
-      "generator": "microsoft_defender_email",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/email_security/microsoft_defender_email.py",
-      "category": "email_security"
-    },
-    {
       "generator": "mimecast",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/email_security/mimecast.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/email_security/mimecast.py",
       "category": "email_security"
     },
     {
       "generator": "proofpoint",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/email_security/proofpoint.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/email_security/proofpoint.py",
       "category": "email_security"
     },
     {
-      "generator": "crowdstrike_falcon",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/endpoint_security/crowdstrike_falcon.py",
-      "category": "endpoint_security"
-    },
-    {
-      "generator": "sentinelone_endpoint",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/endpoint_security/sentinelone_endpoint.py",
-      "category": "endpoint_security"
-    },
-    {
-      "generator": "sentinelone_identity",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/endpoint_security/sentinelone_identity.py",
-      "category": "endpoint_security"
-    },
-    {
-      "generator": "beyondtrust_privilegemgmt_windows",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/identity_access/beyondtrust_privilegemgmt_windows.py",
-      "category": "identity_access"
-    },
-    {
-      "generator": "hashicorp_vault",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/identity_access/hashicorp_vault.py",
-      "category": "identity_access"
-    },
-    {
-      "generator": "microsoft_azure_ad_signin",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/identity_access/microsoft_azure_ad_signin.py",
-      "category": "identity_access"
-    },
-    {
-      "generator": "microsoft_azuread",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/identity_access/microsoft_azuread.py",
-      "category": "identity_access"
-    },
-    {
-      "generator": "okta_authentication",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/identity_access/okta_authentication.py",
-      "category": "identity_access"
-    },
-    {
       "generator": "buildkite",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/infrastructure/buildkite.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/infrastructure/buildkite.py",
       "category": "infrastructure"
     },
     {
       "generator": "tailscale",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/infrastructure/tailscale.py",
-      "category": "infrastructure"
-    },
-    {
-      "generator": "zscaler",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/infrastructure/zscaler.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/infrastructure/tailscale.py",
       "category": "infrastructure"
     },
     {
       "generator": "armis",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/armis.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/network_security/armis.py",
       "category": "network_security"
     },
     {
       "generator": "checkpoint",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/checkpoint.py",
-      "category": "network_security"
-    },
-    {
-      "generator": "cisco_asa",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/cisco_asa.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/network_security/checkpoint.py",
       "category": "network_security"
     },
     {
       "generator": "darktrace",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/darktrace.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/network_security/darktrace.py",
       "category": "network_security"
     },
     {
       "generator": "extrahop",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/extrahop.py",
-      "category": "network_security"
-    },
-    {
-      "generator": "forcepoint_firewall",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/forcepoint_firewall.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/network_security/extrahop.py",
       "category": "network_security"
     },
     {
       "generator": "fortimanager",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/fortimanager.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/network_security/fortimanager.py",
       "category": "network_security"
     },
     {
       "generator": "fortinet_fortigate",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/fortinet_fortigate.py",
-      "category": "network_security"
-    },
-    {
-      "generator": "infoblox_ddi",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/infoblox_ddi.py",
-      "category": "network_security"
-    },
-    {
-      "generator": "paloalto_firewall",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/network_security/paloalto_firewall.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/network_security/fortinet_fortigate.py",
       "category": "network_security"
     },
     {
       "generator": "incapsula",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/web_security/incapsula.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/web_security/incapsula.py",
       "category": "web_security"
     },
     {
       "generator": "netskope",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/web_security/netskope.py",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/web_security/netskope.py",
       "category": "web_security"
     },
     {
-      "generator": "zscaler_private_access",
-      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/event_generators/web_security/zscaler_private_access.py",
+      "generator": "zscaler-trigger-detections",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/web_security/zscaler-trigger-detections.py",
+      "category": "web_security"
+    },
+    {
+      "generator": "zscaler_dns",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/web_security/zscaler_dns.py",
+      "category": "web_security"
+    },
+    {
+      "generator": "zscaler_web",
+      "generator_path": "/Users/nathanial.smalley/projects/jarvis_coding/Backend/event_generators/web_security/zscaler_web.py",
       "category": "web_security"
     }
   ],
@@ -457,13 +380,23 @@
       "priority": "LOW"
     },
     {
+      "generator": "aws_cloudtrail",
+      "has_star_trek": false,
+      "priority": "HIGH"
+    },
+    {
       "generator": "aws_route53",
-      "has_star_trek": true,
+      "has_star_trek": false,
       "priority": "HIGH"
     },
     {
       "generator": "aws_vpc_dns",
-      "has_star_trek": true,
+      "has_star_trek": false,
+      "priority": "HIGH"
+    },
+    {
+      "generator": "aws_vpcflowlogs",
+      "has_star_trek": false,
       "priority": "HIGH"
     },
     {
@@ -482,8 +415,18 @@
       "priority": "LOW"
     },
     {
-      "generator": "cisco_duo",
+      "generator": "beyondtrust_privilegemgmt_windows",
       "has_star_trek": false,
+      "priority": "LOW"
+    },
+    {
+      "generator": "cisco_asa",
+      "has_star_trek": false,
+      "priority": "HIGH"
+    },
+    {
+      "generator": "cisco_duo",
+      "has_star_trek": true,
       "priority": "HIGH"
     },
     {
@@ -498,7 +441,7 @@
     },
     {
       "generator": "cisco_ironport",
-      "has_star_trek": false,
+      "has_star_trek": true,
       "priority": "HIGH"
     },
     {
@@ -528,13 +471,18 @@
     },
     {
       "generator": "cloudflare_general",
-      "has_star_trek": false,
+      "has_star_trek": true,
       "priority": "HIGH"
     },
     {
       "generator": "cohesity_backup",
       "has_star_trek": false,
       "priority": "LOW"
+    },
+    {
+      "generator": "crowdstrike_falcon",
+      "has_star_trek": true,
+      "priority": "HIGH"
     },
     {
       "generator": "cyberark_conjur",
@@ -557,19 +505,29 @@
       "priority": "LOW"
     },
     {
+      "generator": "forcepoint_firewall",
+      "has_star_trek": false,
+      "priority": "LOW"
+    },
+    {
       "generator": "github_audit",
       "has_star_trek": false,
       "priority": "LOW"
     },
     {
       "generator": "google_workspace",
-      "has_star_trek": false,
+      "has_star_trek": true,
       "priority": "HIGH"
     },
     {
       "generator": "harness_ci",
       "has_star_trek": false,
       "priority": "LOW"
+    },
+    {
+      "generator": "hashicorp_vault",
+      "has_star_trek": false,
+      "priority": "MEDIUM"
     },
     {
       "generator": "hypr_auth",
@@ -583,6 +541,11 @@
     },
     {
       "generator": "imperva_sonar",
+      "has_star_trek": false,
+      "priority": "LOW"
+    },
+    {
+      "generator": "infoblox_ddi",
       "has_star_trek": false,
       "priority": "LOW"
     },
@@ -632,6 +595,31 @@
       "priority": "HIGH"
     },
     {
+      "generator": "microsoft_azure_ad_signin",
+      "has_star_trek": false,
+      "priority": "HIGH"
+    },
+    {
+      "generator": "microsoft_azuread",
+      "has_star_trek": true,
+      "priority": "HIGH"
+    },
+    {
+      "generator": "microsoft_defender_email",
+      "has_star_trek": false,
+      "priority": "HIGH"
+    },
+    {
+      "generator": "okta_authentication",
+      "has_star_trek": false,
+      "priority": "HIGH"
+    },
+    {
+      "generator": "paloalto_firewall",
+      "has_star_trek": false,
+      "priority": "LOW"
+    },
+    {
       "generator": "pingfederate",
       "has_star_trek": false,
       "priority": "LOW"
@@ -662,6 +650,16 @@
       "priority": "LOW"
     },
     {
+      "generator": "sentinelone_endpoint",
+      "has_star_trek": true,
+      "priority": "HIGH"
+    },
+    {
+      "generator": "sentinelone_identity",
+      "has_star_trek": false,
+      "priority": "HIGH"
+    },
+    {
       "generator": "teleport",
       "has_star_trek": false,
       "priority": "LOW"
@@ -678,11 +676,16 @@
     },
     {
       "generator": "zscaler_dns_firewall",
-      "has_star_trek": false,
+      "has_star_trek": true,
       "priority": "MEDIUM"
     },
     {
       "generator": "zscaler_firewall",
+      "has_star_trek": false,
+      "priority": "MEDIUM"
+    },
+    {
+      "generator": "zscaler_private_access",
       "has_star_trek": false,
       "priority": "MEDIUM"
     }
@@ -794,6 +797,11 @@
       "issue": "Error parsing config: Expecting property name enclosed in double quotes: line 2 column 5 (char 6)"
     },
     {
+      "type": "missing_config",
+      "parser": "Fortinet Fortigate Candidate",
+      "issue": "No JSON configuration file found"
+    },
+    {
       "type": "parse_error",
       "parser": "Fortinet Fortigate Fortimanager",
       "issue": "Error parsing config: Expecting property name enclosed in double quotes: line 2 column 5 (char 6)"
@@ -856,7 +864,7 @@
     {
       "type": "parse_error",
       "parser": "Microsoft Windows Eventlog",
-      "issue": "Error parsing config: Expecting value: line 1 column 1 (char 0)"
+      "issue": "Error parsing config: Expecting property name enclosed in double quotes: line 2 column 5 (char 6)"
     },
     {
       "type": "parse_error",
@@ -882,6 +890,11 @@
       "type": "parse_error",
       "parser": "Paloalto Alternate",
       "issue": "Error parsing config: Expecting property name enclosed in double quotes: line 2 column 5 (char 6)"
+    },
+    {
+      "type": "missing_config",
+      "parser": "Paloalto Firewall Csv",
+      "issue": "No JSON configuration file found"
     },
     {
       "type": "parse_error",
@@ -917,12 +930,17 @@
       "type": "parse_error",
       "parser": "Wiz Cloud",
       "issue": "Error parsing config: Expecting property name enclosed in double quotes: line 9 column 3 (char 216)"
+    },
+    {
+      "type": "missing_config",
+      "parser": "Zscaler",
+      "issue": "No JSON configuration file found"
     }
   ],
   "recommendations": [],
   "metadata": {
-    "audit_date": "2025-09-02T10:12:12.576761",
-    "project_root": "/Users/nathanial.smalley/projects/jarvis_coding",
-    "total_issues": 69
+    "audit_date": "2026-01-29T09:36:21.761822",
+    "project_root": "/Users/nathanial.smalley/projects/jarvis_coding/Backend",
+    "total_issues": 54
   }
 }
