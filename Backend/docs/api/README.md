@@ -127,7 +127,7 @@ export S1_HEC_BATCH_FLUSH_MS=500
 **Token Format:**
 - Typically 40+ characters
 - Alphanumeric with special characters
-- Example format: `0Z1Fy0tyI53ipwHRnnbFS0ecWaNa1Nt_dG6/HNc/qsEQ-`
+- Example format: `Your-SDL-WRITE-TOKEN`
 - Store securely in `.env` file or secret manager
 
 ## 🎯 Common Use Cases
