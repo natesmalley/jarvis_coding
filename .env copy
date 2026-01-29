@@ -13,8 +13,7 @@ API_KEYS_READ_ONLY=
 API_KEYS_WRITE=
 
 # SentinelOne Integration
-# HEC Token for sending events (required for event generation)
-# Example format: 0Z1Fy0tyI53ipwHRnnbFS0ecWaNa1Nt_dG6/HNc/qsEQ-
+# HEC Token for sending events (required for event generation) 
 S1_HEC_TOKEN=
 
 # SentinelOne API URL (your instance URL)
