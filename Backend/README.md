@@ -49,10 +49,10 @@ API_BASE_URL=http://localhost:8000 python log_generator_ui.py  # http://localhos
 
 # Send events to HEC (configure token first)
 # Create .env file with your token (recommended)
-echo 'S1_HEC_TOKEN="your-token-here"' >> Backend/event_generators/shared/.env
+echo 'S1_HEC_TOKEN="Your-SDL-WRITE-TOKEN"' >> Backend/event_generators/shared/.env
 
 # Or export directly for quick testing
-export S1_HEC_TOKEN="your-token-here"
+export S1_HEC_TOKEN="Your-SDL-WRITE-TOKEN"
 export S1_API_URL="https://usea1-purple.sentinelone.net"
 
 # Send events
@@ -237,7 +237,7 @@ source ../../.venv/bin/activate
 python enterprise_attack_scenario.py
 
 # Send scenario events to HEC
-export S1_HEC_TOKEN="your-token-here"
+export S1_HEC_TOKEN="Your-SDL-WRITE-TOKEN"
 python enterprise_scenario_sender.py --product aws_waf --count 10
 
 # Run 10-minute version
@@ -288,7 +288,7 @@ python format_validator.py
 ```bash
 # Send events to SentinelOne HEC
 cd Backend/event_generators/shared
-export S1_HEC_TOKEN="your-token-here"
+export S1_HEC_TOKEN="Your-SDL-WRITE-TOKEN"
 python hec_sender.py --product aws_waf --count 5
 
 # Use safe HEC sender with retries
@@ -330,7 +330,7 @@ Each parser directory contains:
 
 ### For Event Generation & HEC Sending
 ```bash
-export S1_HEC_TOKEN="your-hec-token-here"
+export S1_HEC_TOKEN="Your-SDL-WRITE-TOKEN"
 ```
 
 ### For SentinelOne Integration
@@ -342,11 +342,11 @@ export S1_HEC_TOKEN="your-hec-token-here"
 
 ```bash
 # Option 1: Using .env file (recommended)
-echo 'S1_HEC_TOKEN="your-token-here"' >> .env
+echo 'S1_HEC_TOKEN="Your-SDL-WRITE-TOKEN"' >> .env
 echo 'S1_API_URL="https://usea1-purple.sentinelone.net"' >> .env
 
 # Option 2: Export directly (for testing only)
-export S1_HEC_TOKEN="your-hec-token-here"
+export S1_HEC_TOKEN="Your-SDL-WRITE-TOKEN"
 export S1_API_URL="https://usea1-purple.sentinelone.net"
 
 # Optional: SDL API token for querying
