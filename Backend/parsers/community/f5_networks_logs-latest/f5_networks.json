@@ -1,26 +1,159 @@
 {
   "attributes": {
-    "class_uid": "5002",
-    "category_uid": "4",
-    "severity_id": "0",
-    "class_name": "F5 Web Traffic",
-    "category_name": "F5 HTTP Access Logs",
-    "metadata.product.name": "F5 BIG-IP",
-    "metadata.product.vendor_name": "F5 Networks",
+    "dataSource.vendor": "F5",
+    "dataSource.name": "F5 Networks",
     "dataSource.category": "security",
-    "dataSource.name": "F5 BIG-IP",
-    "dataSource.vendor": "F5"
+    "dataSource.technology": "load_balancer",
+    "source": "f5_networks"
   },
+  
   "patterns": {
-    "keyPattern": "[\\w\\.]+",
-    "valuePattern": "[^,]*"
+    "timestamp": "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?[+-]\\d{2}:\\d{2}",
+    "ip_address": "\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}",
+    "hostname": "[a-zA-Z0-9\\-_]+",
+    "port": "\\d+",
+    "field_value": "[^\\s]+",
+    "quoted_string": "\"[^\"]*\""
   },
+  
   "formats": [
     {
-      "format": ".*$_=keyPattern$=$_=valuePattern$(?:,|$)",
-      "repeat": true
+      "id": "f5_networks_security",
+      "format": "$timestamp$ F5Networks hostname=$quoted_string{name=hostname}$ deviceIp=$ip_address{name=device_ip}$ module=$quoted_string{name=module}$ eventType=$quoted_string{name=event_type}$ severity=$quoted_string{name=severity}$ clientIp=$ip_address{name=client_ip}$ serverIp=$ip_address{name=server_ip}$ clientPort=$port{name=client_port}$ serverPort=$port{name=server_port}$ virtualServer=$quoted_string{name=virtual_server}$ pool=$quoted_string{name=pool}$ protocol=$quoted_string{name=protocol}$",
+      "attributes": {
+        "dataSource.app": "F5 BIG-IP Security",
+        "class_uid": 4001,
+        "class_name": "Network Activity",
+        "category_uid": 4,
+        "category_name": "Network Activity",
+        "type_uid": 400101,
+        "activity_id": 6,
+        "activity_name": "Traffic",
+        "severity_id": 3
+      },
+      "rewrites": [
+        {
+          "input": "timestamp",
+          "output": "time",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "hostname",
+          "output": "device.hostname",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "device_ip",
+          "output": "device.ip",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "client_ip",
+          "output": "src_endpoint.ip",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "server_ip",
+          "output": "dst_endpoint.ip",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "client_port",
+          "output": "src_endpoint.port",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "server_port",
+          "output": "dst_endpoint.port",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "module",
+          "output": "metadata.product.name",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "event_type",
+          "output": "type_name",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "virtual_server",
+          "output": "dst_endpoint.name",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "pool",
+          "output": "resource.name",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "protocol",
+          "output": "connection_info.protocol_name",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "severity",
+          "output": "severity_id",
+          "match": "(?i)(CRITICAL)",
+          "replace": "5"
+        },
+        {
+          "input": "severity",
+          "output": "severity_id",
+          "match": "(?i)(ERROR|WARNING)",
+          "replace": "3"
+        },
+        {
+          "input": "severity",
+          "output": "severity_id",
+          "match": "(?i)(INFO)",
+          "replace": "1"
+        },
+        {
+          "input": "event_type",
+          "output": "status_id",
+          "match": "(?i)(UP|SUCCESS|ESTABLISHED|ACCEPTED)",
+          "replace": "1"
+        },
+        {
+          "input": "event_type",
+          "output": "status_id",
+          "match": "(?i)(DOWN|FAILURE|BLOCKED|DENIED|DETECTED|EXCEEDED)",
+          "replace": "2"
+        },
+        {
+          "input": "module",
+          "output": "activity_id",
+          "match": "(?i)(ASM|AFM)",
+          "replace": "2"
+        },
+        {
+          "input": "module",
+          "output": "activity_id",
+          "match": "(?i)(APM)",
+          "replace": "1"
+        },
+        {
+          "input": "hostname",
+          "output": "observables",
+          "match": ".*",
+          "replace": "[{\"name\":\"hostname\",\"type\":\"Hostname\",\"value\":\"$0\"}]"
+        }
+      ],
+      "halt": true
     }
   ]
 }
-
-
