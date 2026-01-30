@@ -24,22 +24,40 @@ cp ".env copy" .env
 docker-compose up --build
 ```
 - API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
-- Frontend UI: http://localhost:9001
+- API Docs: http://localhost:8000/api/v1/docs
+- Frontend UI: http://localhost:9002
 
 **Note**: The default `.env` has `DISABLE_AUTH=true` for easy local development. No API keys needed!
 
 ### Local Python Development
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
+# Create and activate virtual environment
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
 pip install -r api/requirements.txt
+pip install -r event_generators/shared/requirements.txt
 
-# Run API
-python api/start_api.py  # http://localhost:8000
+# Run API (from Backend/api directory)
+cd Backend/api
+DISABLE_AUTH=true python start_api.py  # http://localhost:8000
 
-# Send events to HEC (set env first)
-export S1_HEC_TOKEN=...  # and optionally S1_HEC_URL
-python event_generators/shared/hec_sender.py --product crowdstrike_falcon -n 3
+# Run Frontend (from Frontend directory)
+cd Frontend
+API_BASE_URL=http://localhost:8000 python log_generator_ui.py  # http://localhost:9001
+
+# Send events to HEC (configure token first)
+# Create .env file with your token (recommended)
+echo 'S1_HEC_TOKEN="Your-SDL-WRITE-TOKEN"' >> Backend/event_generators/shared/.env
+
+# Or export directly for quick testing
+export S1_HEC_TOKEN="Your-SDL-WRITE-TOKEN"
+export S1_API_URL="https://usea1-purple.sentinelone.net"
+
+# Send events
+cd Backend/event_generators/shared
+python hec_sender.py --product crowdstrike_falcon --count 3
 ```
 
 ## Configuration
@@ -58,8 +76,19 @@ By default, authentication is **disabled** for local development:
 For production environments, enable authentication:
 ```bash
 DISABLE_AUTH=false
-API_KEYS_ADMIN=your-secure-api-key-here
-BACKEND_API_KEY=your-secure-api-key-here  # Used by frontend
+API_KEYS_ADMIN=your-secure-admin-key-here
+API_KEYS_WRITE=your-secure-write-key-here
+API_KEYS_READ_ONLY=your-secure-readonly-key-here
+BACKEND_API_KEY=your-secure-api-key-here  # Used by frontend to communicate with API
+```
+
+**Using API Keys:**
+```bash
+# Header authentication (recommended)
+curl -H "X-API-Key: your-api-key" http://localhost:8000/api/v1/generators
+
+# Query parameter authentication
+curl "http://localhost:8000/api/v1/generators?api_key=your-api-key"
 ```
 
 Generate secure API keys using:
@@ -198,21 +227,28 @@ docker-compose down && docker-compose up -d
 
 ## Attack Scenario Generation
 
-### Quick Scenarios
-Generate focused attack scenarios for testing:
+### Enterprise Attack Scenario
+Generate comprehensive multi-phase attack scenarios:
 ```bash
-python event_python_writer/quick_scenario.py
+cd Backend/scenarios
+source ../../.venv/bin/activate
+
+# Run the enterprise attack scenario
+python enterprise_attack_scenario.py
+
+# Send scenario events to HEC
+export S1_HEC_TOKEN="Your-SDL-WRITE-TOKEN"
+python enterprise_scenario_sender.py --product aws_waf --count 10
+
+# Run 10-minute version
+python enterprise_attack_scenario_10min.py
 ```
-Available scenarios: `phishing_attack`, `insider_threat`, `malware_outbreak`, `credential_stuffing`, `data_breach`
 
-### Full APT Campaign Simulation
-Generate comprehensive 14-day attack campaigns:
-```bash
-# Generate a complete attack campaign
-python event_python_writer/attack_scenario_orchestrator.py
-
-# Send generated scenario to HEC with timing control
-python event_python_writer/scenario_hec_sender.py
+### Available Scenarios
+- `enterprise_attack_scenario.json` - Full APT campaign simulation
+- `showcase_attack_scenario.json` - Demo scenario for presentations
+- Finance MFA fatigue scenarios
+- Insider cloud download exfiltration
 ```
 
 ### Scenario Features
@@ -234,25 +270,30 @@ The comprehensive testing framework validates parser effectiveness in production
 
 ### Key Testing Tools
 
-#### Complete Pipeline Testing
+#### Parser-Generator Validation
 ```bash
-# Test all parsers with full HEC → SDL API validation
-python event_python_writer/end_to_end_pipeline_tester.py
+cd Backend/scenarios
 
-# Test specific parser subset
-python event_python_writer/end_to_end_pipeline_tester.py --parsers aws_waf,cisco_duo
+# Validate parser-generator alignment
+python parser_generator_audit.py
+
+# Validate enterprise scenario
+python enterprise_scenario_validator.py
+
+# Check format compliance
+python format_validator.py
 ```
 
-#### Comprehensive Analysis (Without API Dependency)
+#### Sending Test Events
 ```bash
-# Analyze all parsers for effectiveness without API calls
-python event_python_writer/comprehensive_parser_effectiveness_tester.py
-```
+# Send events to SentinelOne HEC
+cd Backend/event_generators/shared
+export S1_HEC_TOKEN="Your-SDL-WRITE-TOKEN"
+python hec_sender.py --product aws_waf --count 5
 
-#### Field Mapping Analysis
-```bash
-# Analyze field matching between generators and parsers
-python event_python_writer/comprehensive_field_matcher.py
+# Use safe HEC sender with retries
+cd Backend/scenarios
+python safe_hec_sender.py --product cisco_duo --count 3
 ```
 
 ### Testing Results Summary (Latest: September 2025)
@@ -289,13 +330,33 @@ Each parser directory contains:
 
 ### For Event Generation & HEC Sending
 ```bash
-export S1_HEC_TOKEN="your-hec-token-here"
+export S1_HEC_TOKEN="Your-SDL-WRITE-TOKEN"
 ```
 
-### For SDL API Querying (Parser Testing)
+### For SentinelOne Integration
+
+⚠️ **Security Best Practices:**
+- Never commit tokens to version control
+- Use `.env` files (already in `.gitignore`)
+- Or use environment variables from secure vaults
+
 ```bash
+# Option 1: Using .env file (recommended)
+echo 'S1_HEC_TOKEN="Your-SDL-WRITE-TOKEN"' >> .env
+echo 'S1_API_URL="https://usea1-purple.sentinelone.net"' >> .env
+
+# Option 2: Export directly (for testing only)
+export S1_HEC_TOKEN="Your-SDL-WRITE-TOKEN"
+export S1_API_URL="https://usea1-purple.sentinelone.net"
+
+# Optional: SDL API token for querying
 export S1_SDL_API_TOKEN="your-read-api-token-here"
 ```
+
+**HEC Token Format:**
+- Length: ~40-50 characters
+- Contains alphanumeric and special characters
+- Example format: `example_token_here`
 
 ## File Structure
 

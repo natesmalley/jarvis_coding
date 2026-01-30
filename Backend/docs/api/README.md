@@ -11,25 +11,37 @@ The Jarvis Coding REST API provides programmatic access to the security event ge
 
 ### Authentication
 
-```bash
-# Get API token
-curl -X POST https://api.jarvis-coding.io/api/v1/auth/token \
-  -H "Content-Type: application/json" \
-  -d '{"username": "your-username", "password": "your-password"}'
+The API uses simple API key authentication. Include your API key in requests:
 
-# Use token in requests
-curl -H "Authorization: Bearer YOUR_TOKEN" \
-  https://api.jarvis-coding.io/api/v1/generators
+```bash
+# Using header (recommended)
+curl -H "X-API-Key: YOUR_API_KEY" \
+  http://localhost:8000/api/v1/generators
+
+# Using query parameter
+curl "http://localhost:8000/api/v1/generators?api_key=YOUR_API_KEY"
 ```
+
+For local development, you can disable authentication:
+```bash
+export DISABLE_AUTH=true
+python start_api.py
+```
+
+**Important Security Notes:**
+- Never commit API keys or HEC tokens to version control
+- Use environment variables or secure secret management
+- Rotate tokens regularly
+- Keep tokens in `.env` files (which should be in `.gitignore`)
 
 ### Generate Events
 
 ```bash
 # Generate 10 CrowdStrike Falcon events
-curl -X POST https://api.jarvis-coding.io/api/v1/generators/crowdstrike_falcon/execute \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+curl -X POST http://localhost:8000/api/v1/generators/crowdstrike_falcon/execute \
+  -H "X-API-Key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"count": 10, "format": "json"}'
+  -d '{"count": 10}'
 ```
 
 ## 📚 API References
@@ -42,11 +54,21 @@ curl -X POST https://api.jarvis-coding.io/api/v1/generators/crowdstrike_falcon/e
 
 ## 🔑 Authentication
 
-The API uses JWT (JSON Web Token) authentication:
+The API uses simple API key authentication with role-based access control:
 
-1. **Get Token**: POST to `/auth/token` with credentials
-2. **Use Token**: Include in `Authorization: Bearer TOKEN` header
-3. **Refresh Token**: POST to `/auth/refresh` before expiration
+1. **API Key Types**:
+   - **Admin**: Full access to all endpoints
+   - **Write**: Can execute generators and scenarios
+   - **Read-Only**: Can view generators and parsers only
+
+2. **Using API Keys**:
+   - Include in `X-API-Key` header (recommended)
+   - Or pass as `api_key` query parameter
+
+3. **Configuration**:
+   - Set keys in environment variables: `API_KEYS_ADMIN`, `API_KEYS_WRITE`, `API_KEYS_READ_ONLY`
+   - Multiple keys per role supported (comma-separated)
+   - Disable auth for development with `DISABLE_AUTH=true`
 
 ## 📊 Response Format
 
@@ -85,6 +107,29 @@ The API uses JWT (JSON Web Token) authentication:
 }
 ```
 
+## 🔐 HEC Token Configuration
+
+To send events to SentinelOne, configure your HEC token:
+
+```bash
+# Set HEC token (example format - use your actual token)
+export S1_HEC_TOKEN="your-40-character-token-here"
+
+# Set API URL for your SentinelOne instance
+export S1_API_URL="https://usea1-purple.sentinelone.net"
+
+# Optional: Configure batching
+export S1_HEC_BATCH=true
+export S1_HEC_BATCH_MAX_BYTES=1048576
+export S1_HEC_BATCH_FLUSH_MS=500
+```
+
+**Token Format:**
+- Typically 40+ characters
+- Alphanumeric with special characters
+- Example format: `Your-SDL-WRITE-TOKEN`
+- Store securely in `.env` file or secret manager
+
 ## 🎯 Common Use Cases
 
 ### 1. Generate Events for Testing
@@ -94,41 +139,45 @@ import requests
 
 # Generate events
 response = requests.post(
-    "https://api.jarvis-coding.io/api/v1/generators/aws_cloudtrail/execute",
-    headers={"Authorization": f"Bearer {token}"},
-    json={"count": 50, "format": "json"}
+    "http://localhost:8000/api/v1/generators/aws_cloudtrail/execute",
+    headers={"X-API-Key": api_key},
+    json={"count": 50}
 )
 
-events = response.json()["data"]["events"]
+if response.status_code == 200:
+    events = response.json()["data"]["events"]
 ```
 
-### 2. Validate Parser Compatibility
+### 2. List Available Parsers
 
 ```python
-# Check if generator works with parser
-response = requests.post(
-    "https://api.jarvis-coding.io/api/v1/validation/check",
-    headers={"Authorization": f"Bearer {token}"},
-    json={
-        "generator_id": "crowdstrike_falcon",
-        "parser_id": "marketplace-crowdstrike-latest"
-    }
+# Get available parsers
+response = requests.get(
+    "http://localhost:8000/api/v1/parsers",
+    headers={"X-API-Key": api_key}
 )
 
-compatibility = response.json()["data"]["compatibility_score"]
+if response.status_code == 200:
+    parsers = response.json()["data"]["parsers"]
+    print(f"Found {len(parsers)} parsers")
 ```
 
 ### 3. Execute Attack Scenario
 
 ```python
-# Run phishing attack scenario
-response = requests.post(
-    "https://api.jarvis-coding.io/api/v1/scenarios/phishing_attack/execute",
-    headers={"Authorization": f"Bearer {token}"},
-    json={"speed": "realtime"}
+# Get available scenarios
+response = requests.get(
+    "http://localhost:8000/api/v1/scenarios",
+    headers={"X-API-Key": api_key}
 )
 
-scenario_id = response.json()["data"]["execution_id"]
+if response.status_code == 200:
+    scenarios = response.json()["data"]["scenarios"]
+    # Execute a specific scenario
+    response = requests.post(
+        f"http://localhost:8000/api/v1/scenarios/{scenarios[0]['id']}/execute",
+        headers={"X-API-Key": api_key}
+    )
 ```
 
 ## 🔒 Rate Limiting
@@ -142,24 +191,19 @@ Rate limit headers:
 - `X-RateLimit-Remaining`: Requests remaining
 - `X-RateLimit-Reset`: Reset timestamp
 
-## 📡 WebSocket Events
+## 📡 Available Endpoints
 
-Real-time event streaming via WebSocket:
+### Core Endpoints
+- `GET /api/v1/health` - Health check (no auth required)
+- `GET /api/v1/generators` - List all generators
+- `POST /api/v1/generators/{id}/execute` - Execute a generator
+- `GET /api/v1/parsers` - List all parsers
+- `GET /api/v1/scenarios` - List available scenarios
+- `POST /api/v1/scenarios/{id}/execute` - Execute a scenario
 
-```javascript
-const ws = new WebSocket('wss://api.jarvis-coding.io/api/v1/events');
-
-ws.on('message', (data) => {
-  const event = JSON.parse(data);
-  console.log('New event:', event);
-});
-
-// Subscribe to specific generators
-ws.send(JSON.stringify({
-  action: 'subscribe',
-  generators: ['crowdstrike_falcon', 'aws_cloudtrail']
-}));
-```
+### Documentation
+- `GET /api/v1/docs` - Swagger UI documentation
+- `GET /api/v1/redoc` - ReDoc documentation
 
 ## 🏷️ HTTP Status Codes
 
@@ -199,49 +243,51 @@ Response includes:
 
 ## 🔧 SDK Support
 
-### Python SDK
+### Python Example
 
 ```python
-from jarvis_coding import JarvisClient
+import requests
 
-client = JarvisClient(api_key="your-api-key")
+class JarvisAPI:
+    def __init__(self, base_url="http://localhost:8000", api_key=None):
+        self.base_url = base_url
+        self.headers = {"X-API-Key": api_key} if api_key else {}
+    
+    def list_generators(self):
+        return requests.get(
+            f"{self.base_url}/api/v1/generators",
+            headers=self.headers
+        ).json()
+    
+    def execute_generator(self, generator_id, count=10):
+        return requests.post(
+            f"{self.base_url}/api/v1/generators/{generator_id}/execute",
+            headers=self.headers,
+            json={"count": count}
+        ).json()
 
-# Generate events
-events = client.generators.execute(
-    "crowdstrike_falcon",
-    count=10
-)
-
-# Run scenario
-result = client.scenarios.run("phishing_attack")
+# Usage
+api = JarvisAPI(api_key="your-api-key")
+generators = api.list_generators()
+events = api.execute_generator("crowdstrike_falcon", count=5)
 ```
 
-### JavaScript SDK
+## 📝 API Status
 
-```javascript
-import { JarvisClient } from '@jarvis-coding/sdk';
+### Current Features (v2.0.0)
+- ✅ 114 generator endpoints available
+- ✅ 119 parsers available
+- ✅ Simple API key authentication
+- ✅ Role-based access control (Admin/Write/Read-Only)
+- ✅ Health monitoring endpoint
+- ✅ Swagger UI documentation
+- ✅ Scenario execution support
 
-const client = new JarvisClient({ apiKey: 'your-api-key' });
-
-// Generate events
-const events = await client.generators.execute('crowdstrike_falcon', {
-  count: 10,
-  format: 'json'
-});
-```
-
-## 📝 API Changelog
-
-### Version 2.0.0 (Current)
-- Initial REST API release
-- 100+ generator endpoints
-- WebSocket support
-- JWT authentication
-
-### Version 2.1.0 (Planned)
-- Field validation endpoints
-- Batch operations
-- Webhook support
+### In Development
+- 🔄 Field validation system
+- 🔄 Batch operations
+- 🔄 WebSocket streaming
+- 🔄 Advanced parser management
 
 ## 🤝 Support
 
