@@ -50,6 +50,7 @@ SCENARIO_SOURCE_TO_PARSER = {
     # Network Security
     "darktrace": "darktrace_darktrace_logs-latest",
     "paloalto_firewall": "paloalto_firewall-latest",
+    "f5_networks": "f5_networks_logs-latest",
     "fortinet_fortigate": "fortinet_fortigate_candidate_logs-latest",
     "zscaler": "zscaler_logs-latest",
     
@@ -69,8 +70,8 @@ SCENARIO_SOURCE_TO_PARSER = {
     
     # Network & Infrastructure (additional)
     "cisco_umbrella": "cisco_umbrella-latest",
-    # Note: cisco_ise, f5_networks, fortinet_fortigate, microsoft_windows_eventlog, zscaler
-    # are excluded - parsers use incompatible syntax or don't have JSON definitions
+    # Add mapping for Cisco ISE (local parser exists under parsers/community/cisco_ise_logs-latest)
+    "cisco_ise": "cisco_ise_logs-latest",
     
     # DevOps & CI/CD
     "github_audit": "github_audit-latest",
