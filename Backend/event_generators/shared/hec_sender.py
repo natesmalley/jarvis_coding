@@ -1012,7 +1012,6 @@ JSON_PRODUCTS = {
     "cloudflare_general",
     "cloudflare_waf",
     "extreme_networks",
-    "f5_networks",
     "google_cloud_dns",
     "imperva_waf",
     "juniper_networks",
@@ -1075,7 +1074,6 @@ JSON_PRODUCTS = {
     # Additional JSON products for enterprise attack scenario
     "cisco_duo",
     "pingone_mfa",
-    "f5_networks",
     "imperva_waf",
     "pingprotect",
 }

@@ -1,0 +1,26 @@
+{
+  "attributes": {
+    "class_uid": "5002",
+    "category_uid": "4",
+    "severity_id": "0",
+    "class_name": "F5 Web Traffic",
+    "category_name": "F5 HTTP Access Logs",
+    "metadata.product.name": "F5 BIG-IP",
+    "metadata.product.vendor_name": "F5 Networks",
+    "dataSource.category": "security",
+    "dataSource.name": "F5 BIG-IP",
+    "dataSource.vendor": "F5"
+  },
+  "patterns": {
+    "keyPattern": "[\\w\\.]+",
+    "valuePattern": "[^,]*"
+  },
+  "formats": [
+    {
+      "format": ".*$_=keyPattern$=$_=valuePattern$(?:,|$)",
+      "repeat": true
+    }
+  ]
+}
+
+
