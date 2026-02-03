@@ -125,9 +125,9 @@ class ParserSyncService:
             sourcetype: The parser sourcetype (e.g., 'okta_authentication-latest')
             
         Returns:
-            The parser path in SIEM (e.g., '/logParsers/okta_authentication-latest')
+            The parser path in SIEM (e.g., '/parsers/okta_authentication-latest')
         """
-        return f"/logParsers/{sourcetype}"
+        return f"/parsers/{sourcetype}"
     
     def load_local_parser(self, sourcetype: str) -> Optional[str]:
         """
