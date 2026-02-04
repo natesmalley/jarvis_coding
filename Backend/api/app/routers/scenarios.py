@@ -109,6 +109,15 @@ async def get_scenario_templates(
             "generators": ["aws_guardduty", "aws_cloudtrail", "aws_vpc_dns"],
             "severity": "high",
             "mitre_tactics": ["T1078.004", "T1580", "T1530"]
+        },
+        {
+            "id": "hr_phishing_pdf_c2",
+            "name": "HR Phishing PDF -> PowerShell -> Scheduled Task -> C2",
+            "description": "HR spearphish leading to PDF execution, persistence, and C2 beacons across Proofpoint, M365, SentinelOne, and Palo Alto.",
+            "duration_minutes": 15,
+            "generators": ["proofpoint", "microsoft_365_collaboration", "sentinelone_endpoint", "paloalto_firewall"],
+            "severity": "high",
+            "mitre_tactics": ["T1566.002", "T1204.002", "T1059.001", "T1053.005", "T1071.001"]
         }
     ]
     

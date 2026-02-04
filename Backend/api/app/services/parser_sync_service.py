@@ -49,7 +49,7 @@ SCENARIO_SOURCE_TO_PARSER = {
     
     # Network Security
     "darktrace": "darktrace_darktrace_logs-latest",
-    "paloalto_firewall": "paloalto_firewall-latest",
+    "paloalto_firewall": "paloalto_logs-latest",
     "f5_networks": "f5_networks_logs-latest",
     "fortinet_fortigate": "fortinet_fortigate_candidate_logs-latest",
     "zscaler": "zscaler_logs-latest",
