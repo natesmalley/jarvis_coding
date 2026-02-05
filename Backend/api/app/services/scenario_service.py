@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 class ScenarioService:
     def __init__(self):
         self.running_scenarios = {}
+        # Path works both locally and in Docker container
+        api_root = Path(__file__).parent.parent.parent
+        self.configs_dir = api_root / "scenarios" / "configs"
         self.scenario_templates = {
             "phishing_campaign": {
                 "id": "phishing_campaign",
@@ -138,6 +141,56 @@ class ScenarioService:
                 ]
             }
         }
+        self._load_json_scenarios()
+    
+    def _load_json_scenarios(self):
+        """Load scenario metadata from JSON files in configs directory"""
+        logger.info(f"Attempting to load scenarios from: {self.configs_dir}")
+        
+        if not self.configs_dir.exists():
+            logger.warning(f"Scenarios configs directory not found: {self.configs_dir}")
+            return
+        
+        logger.info(f"Configs directory exists, scanning for JSON files...")
+        json_files = list(self.configs_dir.glob("*.json"))
+        logger.info(f"Found {len(json_files)} JSON files in configs directory")
+        
+        for json_file in json_files:
+            try:
+                scenario_id = json_file.stem
+                
+                # Skip if already in templates (hardcoded ones take precedence)
+                if scenario_id in self.scenario_templates:
+                    continue
+                
+                # Load JSON to get event count and metadata
+                with open(json_file, 'r') as f:
+                    events = json.load(f)
+                
+                # Extract unique phases
+                phases = []
+                seen_phases = set()
+                for event in events:
+                    phase = event.get("phase", "unknown")
+                    if phase not in seen_phases:
+                        seen_phases.add(phase)
+                        phases.append({"name": phase.replace("_", " ").title(), "generators": [], "duration": 10})
+                
+                # Create scenario metadata
+                self.scenario_templates[scenario_id] = {
+                    "id": scenario_id,
+                    "name": scenario_id.replace("_", " ").title(),
+                    "description": f"Generated scenario with {len(events)} events across {len(phases)} phases",
+                    "phases": phases,
+                    "event_count": len(events),
+                    "json_file": str(json_file),
+                    "is_generated": True
+                }
+                
+                logger.info(f"Loaded scenario: {scenario_id} ({len(events)} events)")
+                
+            except Exception as e:
+                logger.error(f"Failed to load scenario from {json_file}: {e}")
     
     async def list_scenarios(
         self, 

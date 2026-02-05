@@ -322,6 +322,14 @@ def list_scenarios():
             'phases': ['Baseline', 'Off-Hours Access', 'Cloud Download Spike', 'USB Copy', 'Detection']
         },
         {
+            'id': 'asyncrat_phishing_scenario',
+            'name': 'AsyncRAT Phishing Campaign - Operation Silent Schedule',
+            'description': 'Comprehensive AsyncRAT malware campaign via weaponized PDF exploiting CVE-2023-21608. Multi-stage payload execution, process injection, persistence, reconnaissance, C2 communication, lateral movement, and data exfiltration preparation with full detection and response.',
+            'duration_days': 6,
+            'total_events': 83,
+            'phases': ['Normal Baseline', 'Phishing Delivery', 'PDF Exploitation', 'PowerShell Execution', 'Payload Download', 'Process Injection', 'Persistence', 'Reconnaissance', 'C2 Communication', 'Lateral Movement', 'Data Exfiltration Prep', 'Detection & Response']
+        },
+        {
             'id': 'scenario_hec_sender',
             'name': 'Scenario HEC Sender',
             'description': 'Generic scenario sender that replays a scenario JSON to HEC.',
@@ -336,6 +344,14 @@ def list_scenarios():
             'duration_minutes': 3,
             'total_events': 20,
             'phases': ['Test']
+        },
+        {
+            'id': 'apollo_ransomware_scenario',
+            'name': 'Apollo Ransomware - STARFLEET Attack (Proofpoint & M365)',
+            'description': 'Generates Proofpoint and M365 events for Apollo ransomware attack. Phishing XLSX to Bridge machine, brute force attempts, lateral movement to Enterprise. Correlates with existing EDR/WEL data.',
+            'duration_minutes': 20,
+            'total_events': 24,
+            'phases': ['Phishing Delivery', 'Email Interaction', 'Brute Force']
         }
         ,
         {
