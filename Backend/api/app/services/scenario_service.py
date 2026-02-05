@@ -10,6 +10,7 @@ import logging
 import os
 import sys
 import importlib
+import json
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -166,7 +167,16 @@ class ScenarioService:
                 
                 # Load JSON to get event count and metadata
                 with open(json_file, 'r') as f:
-                    events = json.load(f)
+                    data = json.load(f)
+                
+                # Handle both formats: {"events": [...]} and direct array
+                if isinstance(data, dict) and "events" in data:
+                    events = data["events"]
+                elif isinstance(data, list):
+                    events = data
+                else:
+                    logger.warning(f"Unexpected format in {json_file}")
+                    continue
                 
                 # Extract unique phases
                 phases = []
