@@ -1,124 +1,77 @@
 {
-  "attributes": {
-    "dataSource.vendor": "Cisco",
-    "dataSource.name": "Cisco Identity Services Engine",
+  attributes: {
     "dataSource.category": "security",
-    "dataSource.technology": "network_access_control",
-    "source": "cisco_ise"
+    "dataSource.name": "Cisco ISE",
+    "dataSource.vendor": "Cisco",
+    "metadata.product.name": "Cisco Identity Services Engine",
+    "metadata.product.vendor_name": "Cisco",
+    "metadata.version": "1.0.0"
   },
-  
-  "patterns": {
-    "timestamp": "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?[+-]\\d{2}:\\d{2}",
-    "mac_address": "([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})",
-    "ip_address": "\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}",
-    "username": "[a-zA-Z0-9._\\-@]+",
-    "session_id": "[a-zA-Z0-9\\-_]+",
-    "field_value": "[^\\s,]+",
-    "quoted_string": "\"[^\"]*\""
+  patterns: {
+    timestamp: "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?[+-]\\d{2}:\\d{2}|\\w{3}\\s+\\d{1,2}\\s+\\d{2}:\\d{2}:\\d{2}",
+    ipv4: "(?:\\d{1,3}\\.){3}\\d{1,3}",
+    macaddr: "([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}"
   },
-  
-  "formats": [
+  formats: [
     {
-      "id": "cisco_ise_authentication",
-      "format": "$timestamp$ CiscoISE sessionId=$quoted_string{name=session_id}$ username=$username{name=username}$ deviceMAC=$mac_address{name=device_mac}$ clientIP=$ip_address{name=client_ip}$ nasIP=$ip_address{name=nas_ip}$ result=$quoted_string{name=result}$ authMethod=$quoted_string{name=auth_method}$ policySet=$quoted_string{name=policy_set}$ authProfile=$quoted_string{name=auth_profile}$",
-      "attributes": {
-        "dataSource.app": "Cisco ISE Authentication",
-        "class_uid": 3002,
-        "class_name": "Authentication",
-        "category_uid": 3,
-        "category_name": "Identity & Access Management",
-        "type_uid": 300201,
-        "activity_id": 1,
-        "activity_name": "Logon",
-        "severity_id": 2
+      attributes: {
+        class_uid: "3002",
+        category_uid: "3",
+        severity_id: "1",
+        class_name: "Authentication",
+        category_name: "Identity & Access Management",
+        "metadata.product.name": "Cisco Identity Services Engine",
+        "metadata.product.vendor_name": "Cisco",
+        "dataSource.category": "security",
+        "dataSource.name": "Cisco ISE",
+        "dataSource.vendor": "Cisco"
       },
-      "rewrites": [
-        {
-          "input": "timestamp",
-          "output": "time",
-          "match": ".*",
-          "replace": "$0"
-        },
-        {
-          "input": "username",
-          "output": "user.name",
-          "match": ".*",
-          "replace": "$0"
-        },
-        {
-          "input": "client_ip",
-          "output": "src_endpoint.ip",
-          "match": ".*",
-          "replace": "$0"
-        },
-        {
-          "input": "nas_ip",
-          "output": "dst_endpoint.ip",
-          "match": ".*",
-          "replace": "$0"
-        },
-        {
-          "input": "device_mac",
-          "output": "src_endpoint.mac",
-          "match": ".*",
-          "replace": "$0"
-        },
-        {
-          "input": "session_id",
-          "output": "session.uid",
-          "match": ".*",
-          "replace": "$0"
-        },
-        {
-          "input": "auth_method",
-          "output": "auth_protocol",
-          "match": ".*",
-          "replace": "$0"
-        },
-        {
-          "input": "policy_set",
-          "output": "policy.name",
-          "match": ".*",
-          "replace": "$0"
-        },
-        {
-          "input": "auth_profile",
-          "output": "authorization.name",
-          "match": ".*",
-          "replace": "$0"
-        },
-        {
-          "input": "result",
-          "output": "status_id",
-          "match": "(?i)(success|passed|allowed)",
-          "replace": "1"
-        },
-        {
-          "input": "result",
-          "output": "status_id",
-          "match": "(?i)(fail|denied|rejected|blocked)",
-          "replace": "2"
-        },
-        {
-          "input": "result",
-          "output": "severity_id",
-          "match": "(?i)(fail|denied|rejected|blocked)",
-          "replace": "3"
-        },
-        {
-          "input": "result",
-          "output": "severity_id",
-          "match": "(?i)(success|passed|allowed)",
-          "replace": "1"
-        },
-        {
-          "input": "username",
-          "output": "observables",
-          "match": ".*",
-          "replace": "[{\"name\":\"user_name\",\"type\":\"User Name\",\"value\":\"$0\"},{\"name\":\"client_ip\",\"type\":\"IP Address\",\"value\":\"${client_ip}\"},{\"name\":\"device_mac\",\"type\":\"MAC Address\",\"value\":\"${device_mac}\"}]"
-        }
-      ],
-      "halt": true
+      format: "$timestamp=timestamp$ $hostname$ CISE_System_Alarms $log_id$,$log_id2$,$severity$,$category$,$message$,$user$,$ip=ipv4$,$mac=macaddr$,$endpoint_id$,$auth_method$,$auth_protocol$"
+    },
+    {
+      attributes: {
+        class_uid: "3002",
+        category_uid: "3",
+        severity_id: "2",
+        class_name: "Authentication",
+        category_name: "Identity & Access Management",
+        "metadata.product.name": "Cisco Identity Services Engine",
+        "metadata.product.vendor_name": "Cisco",
+        "dataSource.category": "security",
+        "dataSource.name": "Cisco ISE",
+        "dataSource.vendor": "Cisco"
+      },
+      format: "$timestamp=timestamp$ $hostname$ CISE_Passed_Authentications $log_id$,$log_id2$,$severity$,$category$,User-Name=$user$,NAS-IP-Address=$nas_ip=ipv4$,Calling-Station-Id=$mac=macaddr$,Framed-IP-Address=$ip=ipv4$,Authentication passed"
+    },
+    {
+      attributes: {
+        class_uid: "3002",
+        category_uid: "3",
+        severity_id: "4",
+        class_name: "Authentication",
+        category_name: "Identity & Access Management",
+        "metadata.product.name": "Cisco Identity Services Engine",
+        "metadata.product.vendor_name": "Cisco",
+        "dataSource.category": "security",
+        "dataSource.name": "Cisco ISE",
+        "dataSource.vendor": "Cisco"
+      },
+      format: "$timestamp=timestamp$ $hostname$ CISE_Failed_Attempts $log_id$,$log_id2$,$severity$,$category$,User-Name=$user$,NAS-IP-Address=$nas_ip=ipv4$,Calling-Station-Id=$mac=macaddr$,Authentication failed,$failure_reason$"
+    },
+    {
+      attributes: {
+        class_uid: "3001",
+        category_uid: "3",
+        severity_id: "2",
+        class_name: "Account Change",
+        category_name: "Identity & Access Management",
+        "metadata.product.name": "Cisco Identity Services Engine",
+        "metadata.product.vendor_name": "Cisco",
+        "dataSource.category": "security",
+        "dataSource.name": "Cisco ISE",
+        "dataSource.vendor": "Cisco"
+      },
+      format: "$timestamp=timestamp$ $hostname$ CISE_Administrator $log_id$,$log_id2$,$severity$,$category$,Admin-Name=$admin_user$,Admin-Session-Id=$session_id$,Object-Name=$object_name$,Change-Type=$change_type$,Object-Type=$object_type$"
     }
   ]
 }

@@ -7,8 +7,9 @@ import time
 import asyncio
 from datetime import datetime
 import logging
-import json
-from pathlib import Path
+import os
+import sys
+import importlib
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +126,20 @@ class ScenarioService:
                     {"name": "Detection Alerts", "generators": ["proofpoint", "sentinelone_endpoint"], "duration": 1}
                 ]
             }
+            ,
+            "hr_phishing_pdf_c2": {
+                "id": "hr_phishing_pdf_c2",
+                "name": "HR Phishing PDF -> PowerShell -> Scheduled Task -> C2",
+                "description": "HR spearphish leading to PDF execution, persistence, and C2 beacons across Proofpoint, M365, SentinelOne, and Palo Alto.",
+                "phases": [
+                    {"name": "Normal Behavior Baseline", "generators": ["proofpoint", "microsoft_365_collaboration", "sentinelone_endpoint"], "duration": 5},
+                    {"name": "Phishing Delivery", "generators": ["proofpoint"], "duration": 1},
+                    {"name": "Email Interaction & Download", "generators": ["microsoft_365_collaboration", "paloalto_firewall"], "duration": 1},
+                    {"name": "Execution & Persistence", "generators": ["sentinelone_endpoint"], "duration": 1},
+                    {"name": "Command & Control", "generators": ["sentinelone_endpoint", "paloalto_firewall"], "duration": 1},
+                    {"name": "Detection & Response", "generators": ["proofpoint", "sentinelone_endpoint"], "duration": 1}
+                ]
+            }
         }
         self._load_json_scenarios()
     
@@ -237,6 +252,28 @@ class ScenarioService:
     async def _execute_scenario(self, execution_id: str, scenario: Dict[str, Any]):
         """Execute scenario in background"""
         try:
+            # Special handling: invoke sender for HR phishing scenario to generate and send real events
+            if scenario.get("id") == "hr_phishing_pdf_c2":
+                # Compute repo root and add scenarios path for import
+                base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+                scenarios_dir = os.path.join(base_dir, "scenarios")
+                if scenarios_dir not in sys.path:
+                    sys.path.insert(0, scenarios_dir)
+                try:
+                    sender = importlib.import_module("hr_phishing_pdf_c2_sender")
+                    workers_env = os.getenv("S1_HEC_WORKERS", "8")
+                    workers = int(workers_env) if workers_env.isdigit() else 8
+                    # Run the blocking sender in a thread to avoid blocking the event loop
+                    await asyncio.to_thread(sender.send_hr_phishing_pdf_c2, workers)
+                    self.running_scenarios[execution_id]["status"] = "completed"
+                    self.running_scenarios[execution_id]["completed_at"] = datetime.utcnow().isoformat()
+                    return
+                except Exception as e:
+                    logger.error(f"Failed to run HR phishing scenario sender: {e}")
+                    self.running_scenarios[execution_id]["status"] = "failed"
+                    self.running_scenarios[execution_id]["error"] = str(e)
+                    return
+
             phases = scenario.get("phases", [])
             
             for i, phase in enumerate(phases):

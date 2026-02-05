@@ -208,6 +208,8 @@ def generate_pdf_download(base_time: datetime) -> List[Dict]:
 
     # Firewall traffic entry (CSV string); include as raw line in event
     pa_line = paloalto_firewall_log()
+    if pa_line.startswith(","):
+        pa_line = pa_line[1:]
     events.append(create_event(dl_time, "paloalto_firewall", "delivery_interaction", {"raw": pa_line}))
 
     return events
@@ -282,6 +284,8 @@ def generate_c2_beacons(base_time: datetime) -> List[Dict]:
 
         # Palo Alto raw log (traffic/threat)
         pa_line = paloalto_firewall_log()
+        if pa_line.startswith(","):
+            pa_line = pa_line[1:]
         events.append(create_event(b_time, "paloalto_firewall", "command_and_control", {"raw": pa_line}))
 
     return events
@@ -454,6 +458,15 @@ def generate_hr_phishing_pdf_c2_scenario():
     # Sort by timestamp
     all_events.sort(key=lambda x: x["timestamp"])
 
+    # Precompute phase counts for summary (avoids complex inline expressions)
+    normal_cnt = sum(1 for e in all_events if e["phase"] == "normal_behavior")
+    phish_cnt = sum(1 for e in all_events if e["phase"] == "phishing_delivery")
+    interact_cnt = sum(1 for e in all_events if e["phase"] == "delivery_interaction")
+    exec_cnt = sum(1 for e in all_events if e["phase"] == "execution")
+    persist_cnt = sum(1 for e in all_events if e["phase"] == "persistence")
+    c2_cnt = sum(1 for e in all_events if e["phase"] == "command_and_control")
+    detect_cnt = sum(1 for e in all_events if e["phase"] in ("detection", "incident_response"))
+
     # Summary
     scenario_summary = {
         "scenario_name": "HR Phishing PDF -> PowerShell -> Scheduled Task -> C2",
@@ -463,13 +476,13 @@ def generate_hr_phishing_pdf_c2_scenario():
         "timeline_end": (base_time + timedelta(days=6)).isoformat(),
         "total_events": len(all_events),
         "phases": [
-            {"name": "Normal Behavior Baseline", "days": "1-5", "events": len([e for e in all_events if e["phase"] == "normal_behavior"])},
-            {"name": "Phishing Delivery", "day": "6", "events": len([e for e in all_events if e["phase"] == "phishing_delivery"])},
-            {"name": "Delivery Interaction", "day": "6", "events": len([e for e in all_events if e["phase"] == "delivery_interaction"])},
-            {"name": "Execution", "day": "6", "events": len([e for e in all_events if e["phase"] == "execution"])},
-            {"name": "Persistence", "day": "6", "events": len([e for e in all_events if e["phase"] == "persistence"])},
-            {"name": "Command & Control", "day": "6", "events": len([e for e in all_events if e["phase"] == "command_and_control"])},
-            {"name": "Detection & Response", "day": "6", "events": len([e for e in all_events if e["phase"] in ["detection", "incident_response"])},
+            {"name": "Normal Behavior Baseline", "days": "1-5", "events": normal_cnt},
+            {"name": "Phishing Delivery", "day": "6", "events": phish_cnt},
+            {"name": "Delivery Interaction", "day": "6", "events": interact_cnt},
+            {"name": "Execution", "day": "6", "events": exec_cnt},
+            {"name": "Persistence", "day": "6", "events": persist_cnt},
+            {"name": "Command & Control", "day": "6", "events": c2_cnt},
+            {"name": "Detection & Response", "day": "6", "events": detect_cnt},
         ],
         "detections": [
             "Phishing Email (Proofpoint)",
