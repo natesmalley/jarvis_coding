@@ -215,34 +215,83 @@ def generate_m365_email_interaction(base_time: datetime) -> List[Dict]:
     return events
 
 
-def generate_m365_suspicious_activity(base_time: datetime) -> List[Dict]:
-    """Generate M365 events showing suspicious activity after compromise"""
+def generate_m365_sharepoint_bruteforce(base_time: datetime) -> List[Dict]:
+    """Generate M365 events for SharePoint brute force (failed access attempts to sensitive sites)"""
     events = []
     
-    # Multiple failed logins (brute force) - starts ~15 min after initial compromise
-    for i in range(20):
-        login_time = get_scenario_time(base_time, 15 + (i // 5), (i % 5) * 10)
-        target_users = [
-            "worf.security@starfleet.com",
-            "data.android@starfleet.com", 
-            "william.riker@starfleet.com",
-            "beverly.crusher@starfleet.com",
-        ]
-        target_user = target_users[i % len(target_users)]
-        m365_failed_login = microsoft_365_collaboration_log()
-        m365_failed_login['TimeStamp'] = login_time
-        m365_failed_login['UserId'] = target_user
-        m365_failed_login['ClientIP'] = VICTIM_PROFILE['client_ip']
-        m365_failed_login['Operation'] = 'UserLoginFailed'
-        m365_failed_login['Workload'] = 'AzureActiveDirectory'
-        m365_failed_login['Details'] = f"Failed login attempt from compromised host {VICTIM_PROFILE['machine_bridge']} ({VICTIM_PROFILE['client_ip']}) targeting {target_user}"
-        m365_failed_login['ObjectId'] = f"/AzureAD/Users/{target_user}"
-        m365_failed_login['FileName'] = ''
-        m365_failed_login['SiteUrl'] = 'https://login.microsoftonline.com'
-        # Parser-mapped fields for OCSF synthetic columns
-        m365_failed_login['RequestedBy'] = VICTIM_PROFILE['name']  # -> actor.user.name (attacker/source)
-        m365_failed_login['TargetUser'] = target_user  # -> user.email_addr (target)
-        events.append(create_event(login_time, "microsoft_365_collaboration", "brute_force", m365_failed_login))
+    # Attacker probes restricted SharePoint sites - starts ~10 min after macro execution
+    restricted_sites = [
+        ("/sites/Executive/Shared Documents/Board-Meetings/", "Executive Board site"),
+        ("/sites/Finance/Shared Documents/Payroll/", "Finance Payroll site"),
+        ("/sites/IT-Admin/Shared Documents/Credentials/", "IT Admin Credentials site"),
+        ("/sites/Legal/Shared Documents/Contracts/", "Legal Contracts site"),
+        ("/sites/Security/Shared Documents/Incident-Response/", "Security IR site"),
+    ]
+    
+    for i, (site_path, site_desc) in enumerate(restricted_sites):
+        # Multiple failed access attempts per site
+        for attempt in range(3):
+            fail_time = get_scenario_time(base_time, 10 + i, attempt * 15)
+            m365_denied = microsoft_365_collaboration_log()
+            m365_denied['TimeStamp'] = fail_time
+            m365_denied['UserId'] = VICTIM_PROFILE['email']
+            m365_denied['ClientIP'] = VICTIM_PROFILE['client_ip']
+            m365_denied['Operation'] = 'AccessDenied'
+            m365_denied['Workload'] = 'SharePoint'
+            m365_denied['ObjectId'] = site_path
+            m365_denied['FileName'] = ''
+            m365_denied['SiteUrl'] = f"https://starfleet.sharepoint.com{site_path.rsplit('/', 2)[0]}"
+            m365_denied['Details'] = f"Access denied: User {VICTIM_PROFILE['email']} attempted to access restricted {site_desc}"
+            m365_denied['RequestedBy'] = VICTIM_PROFILE['name']
+            m365_denied['ResultStatus'] = 'Failed'
+            events.append(create_event(fail_time, "microsoft_365_collaboration", "sharepoint_bruteforce", m365_denied))
+    
+    return events
+
+
+def generate_m365_sharepoint_exfil(base_time: datetime) -> List[Dict]:
+    """Generate M365 events for SharePoint data exfiltration (successful access after finding open site)"""
+    events = []
+    
+    # Attacker finds accessible SharePoint site and downloads sensitive docs - ~20 min after compromise
+    sensitive_docs = [
+        ("Starfleet-Personnel-Records.xlsx", "/sites/HR/Shared Documents/Personnel/"),
+        ("Command-Codes-Q1-2026.docx", "/sites/Operations/Shared Documents/Classified/"),
+        ("Enterprise-Schematics-NCC1701D.pdf", "/sites/Engineering/Shared Documents/Blueprints/"),
+        ("Security-Protocols-Alpha.docx", "/sites/Security/Shared Documents/Protocols/"),
+        ("Medical-Research-Classified.xlsx", "/sites/Medical/Shared Documents/Research/"),
+    ]
+    
+    for i, (doc_name, doc_path) in enumerate(sensitive_docs):
+        # Access event
+        access_time = get_scenario_time(base_time, 20 + i, 0)
+        m365_access = microsoft_365_collaboration_log()
+        m365_access['TimeStamp'] = access_time
+        m365_access['UserId'] = VICTIM_PROFILE['email']
+        m365_access['ClientIP'] = VICTIM_PROFILE['client_ip']
+        m365_access['Operation'] = 'FileAccessed'
+        m365_access['Workload'] = 'SharePoint'
+        m365_access['ObjectId'] = f"{doc_path}{doc_name}"
+        m365_access['FileName'] = doc_name
+        m365_access['SiteUrl'] = f"https://starfleet.sharepoint.com{doc_path.rsplit('/', 2)[0]}"
+        m365_access['Details'] = f"User {VICTIM_PROFILE['email']} accessed sensitive document {doc_name}"
+        m365_access['RequestedBy'] = VICTIM_PROFILE['name']
+        events.append(create_event(access_time, "microsoft_365_collaboration", "sharepoint_access", m365_access))
+        
+        # Download event - 30 seconds after access
+        download_time = get_scenario_time(base_time, 20 + i, 30)
+        m365_download = microsoft_365_collaboration_log()
+        m365_download['TimeStamp'] = download_time
+        m365_download['UserId'] = VICTIM_PROFILE['email']
+        m365_download['ClientIP'] = VICTIM_PROFILE['client_ip']
+        m365_download['Operation'] = 'FileDownloaded'
+        m365_download['Workload'] = 'SharePoint'
+        m365_download['ObjectId'] = f"{doc_path}{doc_name}"
+        m365_download['FileName'] = doc_name
+        m365_download['SiteUrl'] = f"https://starfleet.sharepoint.com{doc_path.rsplit('/', 2)[0]}"
+        m365_download['Details'] = f"User {VICTIM_PROFILE['email']} downloaded sensitive document {doc_name} - potential data exfiltration"
+        m365_download['RequestedBy'] = VICTIM_PROFILE['name']
+        events.append(create_event(download_time, "microsoft_365_collaboration", "sharepoint_exfil", m365_download))
     
     return events
 
@@ -268,8 +317,9 @@ def generate_apollo_ransomware_scenario() -> Dict:
     
     phases = [
         ("📧 PHASE 1: Phishing Email Delivery", generate_proofpoint_phishing_delivery, "Malicious XLSX delivered via Proofpoint"),
-        ("📬 PHASE 2: Email Interaction", generate_m365_email_interaction, "User opens email and downloads attachment"),
-        ("🔓 PHASE 3: Brute Force Attempts", generate_m365_suspicious_activity, "Failed login attempts to other accounts"),
+        ("📬 PHASE 2: Email Interaction", generate_m365_email_interaction, "User opens email and downloads TestBook.xlsm"),
+        ("� PHASE 3: SharePoint Recon", generate_m365_sharepoint_bruteforce, "Failed access attempts to restricted SharePoint sites"),
+        ("📤 PHASE 4: Data Exfiltration", generate_m365_sharepoint_exfil, "Downloading sensitive documents from SharePoint"),
     ]
     
     for phase_name, generator_func, description in phases:
@@ -299,10 +349,28 @@ def generate_apollo_ransomware_scenario() -> Dict:
             "c2_server": ATTACKER_PROFILE["c2_server"],
             "attachment": ATTACKER_PROFILE["malicious_xlsx"],
         },
-        "phases": [
+        "full_attack_chain": [
+            {"phase": 1, "step": "Phishing Email Delivered", "log_source": "Proofpoint", "event_type": "EmailDelivered", "description": f"Phishing email with {ATTACKER_PROFILE['malicious_xlsx']} from {ATTACKER_PROFILE['sender_email']} sent to {VICTIM_PROFILE['email']}", "generated": True},
+            {"phase": 2, "step": "Email Opened", "log_source": "M365", "event_type": "MailItemsAccessed", "description": f"User {VICTIM_PROFILE['email']} opened phishing email containing {ATTACKER_PROFILE['malicious_xlsx']}", "generated": True},
+            {"phase": 3, "step": "Attachment Downloaded", "log_source": "M365", "event_type": "FileDownloaded", "description": f"User {VICTIM_PROFILE['email']} downloaded {ATTACKER_PROFILE['malicious_xlsx']} (SHA1: {ATTACKER_PROFILE['xlsx_sha1']})", "generated": True},
+            {"phase": 4, "step": "Malicious File Opened", "log_source": "M365", "event_type": "FileAccessed", "description": f"User opened macro-enabled {ATTACKER_PROFILE['malicious_xlsx']} at {ATTACKER_PROFILE['xlsx_path']}", "generated": True},
+            {"phase": 5, "step": "PowerShell Spawned", "log_source": "EDR/WEL", "event_type": "ProcessCreate_4688", "description": f"EXCEL.EXE spawned powershell.exe with encoded command on {VICTIM_PROFILE['machine_bridge']}", "generated": False},
+            {"phase": 6, "step": "Scheduled Task Created (Initial)", "log_source": "EDR/WEL", "event_type": "ScheduledTaskCreated_4698", "description": f"Persistence task 'WindowsUpdate' created on {VICTIM_PROFILE['machine_bridge']} to run {ATTACKER_PROFILE['malware_name']}", "generated": False},
+            {"phase": 7, "step": "Initial C2 Beacon", "log_source": "EDR/Firewall", "event_type": "NetworkConnection", "description": f"{ATTACKER_PROFILE['malware_name']} on {VICTIM_PROFILE['machine_bridge']} connected to C2 {ATTACKER_PROFILE['c2_server']}:{ATTACKER_PROFILE['c2_port']}", "generated": False},
+            {"phase": 8, "step": "Credential Dump (Mimikatz)", "log_source": "EDR/WEL", "event_type": "ProcessCreate_4688/LSASS_4663", "description": f"Mimikatz executed on {VICTIM_PROFILE['machine_bridge']} - LSASS memory accessed for credential extraction", "generated": False},
+            {"phase": 9, "step": "Brute Force (Domain Auth)", "log_source": "WEL", "event_type": "FailedLogon_4625", "description": f"Multiple failed logon attempts from {VICTIM_PROFILE['machine_bridge']} ({VICTIM_PROFILE['client_ip']}) against domain accounts", "generated": False},
+            {"phase": 10, "step": "Lateral Movement", "log_source": "WEL", "event_type": "SuccessfulLogon_4624", "description": f"Type 3 network logon from {VICTIM_PROFILE['machine_bridge']} to {VICTIM_PROFILE['machine_enterprise']} DC using stolen credentials", "generated": False},
+            {"phase": 11, "step": "Scheduled Task Created (Lateral)", "log_source": "EDR/WEL", "event_type": "ScheduledTaskCreated_4698", "description": f"Persistence task created on {VICTIM_PROFILE['machine_enterprise']} Domain Controller to run {ATTACKER_PROFILE['malware_name']}", "generated": False},
+            {"phase": 12, "step": "Lateral C2 Beacon", "log_source": "EDR/Firewall", "event_type": "NetworkConnection", "description": f"{ATTACKER_PROFILE['malware_name']} on {VICTIM_PROFILE['machine_enterprise']} connected to C2 {ATTACKER_PROFILE['c2_server']}:{ATTACKER_PROFILE['c2_port']}", "generated": False},
+            {"phase": 13, "step": "SharePoint Recon", "log_source": "M365", "event_type": "AccessDenied", "description": f"User {VICTIM_PROFILE['email']} attempted access to restricted SharePoint sites (Executive, Finance, IT-Admin, Legal, Security)", "generated": True},
+            {"phase": 14, "step": "SharePoint Data Access", "log_source": "M365", "event_type": "FileAccessed", "description": f"User {VICTIM_PROFILE['email']} accessed sensitive SharePoint documents (Personnel Records, Command Codes, Schematics)", "generated": True},
+            {"phase": 15, "step": "SharePoint Data Exfil", "log_source": "M365", "event_type": "FileDownloaded", "description": f"User {VICTIM_PROFILE['email']} downloaded sensitive documents from SharePoint - data exfiltration", "generated": True},
+        ],
+        "generated_phases": [
             {"name": "Phishing Delivery", "source": "proofpoint", "events": len([e for e in all_events if e["phase"] == "phishing_delivery"])},
             {"name": "Email Interaction", "source": "microsoft_365", "events": len([e for e in all_events if e["phase"] in ["email_interaction", "file_access"]])},
-            {"name": "Brute Force", "source": "microsoft_365", "events": len([e for e in all_events if e["phase"] == "brute_force"])},
+            {"name": "SharePoint Recon", "source": "microsoft_365", "events": len([e for e in all_events if e["phase"] == "sharepoint_bruteforce"])},
+            {"name": "Data Exfiltration", "source": "microsoft_365", "events": len([e for e in all_events if e["phase"] in ["sharepoint_access", "sharepoint_exfil"]])},
         ],
         "events": all_events,
     }
