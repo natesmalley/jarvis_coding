@@ -831,7 +831,7 @@ SOURCETYPE_MAP_OVERRIDES = {
     "fortinet_fortigate": "fortinet_fortigate_candidate_logs-latest",
     "fortimanager": "fortinet_fortigate_fortimanager_logs-latest",
     "checkpoint": "checkpoint_checkpoint_logs-latest",
-    "paloalto_firewall": "paloalto_firewall-latest",
+    "paloalto_firewall": "paloalto_logs-latest",
     "paloalto_prismasase": "paloalto_prismasase_logs-latest",
     "cisco_firewall_threat_defense": "cisco_firewall_threat_defense-latest",
     "infoblox_ddi": "infoblox_ddi-latest",
@@ -1012,7 +1012,6 @@ JSON_PRODUCTS = {
     "cloudflare_general",
     "cloudflare_waf",
     "extreme_networks",
-    "f5_networks",
     "google_cloud_dns",
     "imperva_waf",
     "juniper_networks",
@@ -1075,7 +1074,6 @@ JSON_PRODUCTS = {
     # Additional JSON products for enterprise attack scenario
     "cisco_duo",
     "pingone_mfa",
-    "f5_networks",
     "imperva_waf",
     "pingprotect",
 }

@@ -337,6 +337,15 @@ def list_scenarios():
             'total_events': 20,
             'phases': ['Test']
         }
+        ,
+        {
+            'id': 'hr_phishing_pdf_c2',
+            'name': 'HR Phishing PDF → PowerShell → Task → C2',
+            'description': 'HR spearphish to malicious PDF, PowerShell execution, scheduled task persistence, and C2 beacons (Proofpoint, M365, S1, Palo Alto).',
+            'duration_minutes': 15,
+            'total_events': 100,
+            'phases': ['Baseline', 'Phishing Delivery', 'Email Interaction', 'Download', 'Execution & Persistence', 'C2', 'Detection & Response']
+        }
     ]
     
     # Filter out hidden scenarios
@@ -377,7 +386,8 @@ def list_all_scenarios():
         {'id': 'finance_mfa_fatigue_scenario', 'name': 'Finance Employee MFA Fatigue Attack'},
         {'id': 'insider_cloud_download_exfiltration', 'name': 'Insider Data Exfiltration via Cloud Download'},
         {'id': 'scenario_hec_sender', 'name': 'Scenario HEC Sender'},
-        {'id': 'star_trek_integration_test', 'name': 'Integration Test (Star Trek)'}
+        {'id': 'star_trek_integration_test', 'name': 'Integration Test (Star Trek)'},
+        {'id': 'hr_phishing_pdf_c2', 'name': 'HR Phishing PDF → PowerShell → Task → C2'}
     ]
     return jsonify(scenarios)
 
@@ -635,12 +645,13 @@ def run_scenario():
                         for source, info in sync_result.get('results', {}).items():
                             status = info.get('status', 'unknown')
                             message = info.get('message', '')
+                            sourcetype = info.get('sourcetype', 'unknown')
                             if status == 'exists':
-                                yield f"INFO: Parser exists: {source}\n"
-                            elif status == 'uploaded':
-                                yield f"INFO: Parser uploaded: {source}\n"
+                                yield f"INFO: Parser exists: {source} -> {sourcetype}\n"
+                            elif status in ('uploaded', 'uploaded_from_github'):
+                                yield f"INFO: Parser uploaded: {source} -> {sourcetype}\n"
                             elif status == 'failed':
-                                yield f"WARN: Parser sync failed: {source} - {message}\n"
+                                yield f"WARN: Parser sync failed: {source} -> {sourcetype} - {message}\n"
                             elif status == 'no_parser':
                                 yield f"WARN: No parser mapping: {source}\n"
                         yield "INFO: Parser sync complete\n"
@@ -666,6 +677,7 @@ def run_scenario():
                 'star_trek_integration_test': 'star_trek_integration_test.py',
                 'finance_mfa_fatigue_scenario': 'finance_mfa_fatigue_scenario.py',
                 'insider_cloud_download_exfiltration': 'insider_cloud_download_exfiltration.py',
+                'hr_phishing_pdf_c2': 'hr_phishing_pdf_c2_sender.py',
             }
             scenarios_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Backend', 'scenarios'))
             # Resolve script path
