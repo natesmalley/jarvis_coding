@@ -1321,6 +1321,9 @@
                         console.log(`Token stored locally for destination: ${destinationId}`);
                     }
                     
+                    // Refresh destinations AFTER storing local token to avoid race condition
+                    await refreshDestinations();
+                    
                     // Clear token fields
                     const tokenEl = document.getElementById('dest-token'); 
                     if (tokenEl) tokenEl.value = '';
@@ -1328,8 +1331,6 @@
                     if (configApiUrlEl) configApiUrlEl.value = 'https://xdr.us1.sentinelone.net';
                     const configWriteEl = document.getElementById('dest-config-write-token');
                     if (configWriteEl) configWriteEl.value = '';
-                    
-                    await refreshDestinations();
                     
                     // Switch to Generate tab to use it
                     const genBtn = document.querySelector('.nav-tab[data-target="generate-section"]');
