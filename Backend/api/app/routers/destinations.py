@@ -26,6 +26,7 @@ class DestinationCreate(BaseModel):
     # Config API for parser management
     config_api_url: Optional[str] = Field(None, description="Config API URL for parser management (e.g., https://xdr.us1.sentinelone.net)")
     config_write_token: Optional[str] = Field(None, description="Config API token for reading and writing parsers")
+    powerquery_read_token: Optional[str] = Field(None, description="PowerQuery Log Read Access token for querying SIEM data")
     
     # Syslog fields
     ip: Optional[str] = Field(None, description="Syslog IP (required for syslog destinations)")
@@ -40,6 +41,7 @@ class DestinationUpdate(BaseModel):
     token: Optional[str] = None
     config_api_url: Optional[str] = None
     config_write_token: Optional[str] = None
+    powerquery_read_token: Optional[str] = None
     ip: Optional[str] = None
     port: Optional[int] = None
     protocol: Optional[str] = None
@@ -59,6 +61,7 @@ class DestinationResponse(BaseModel):
     has_database_token: Optional[bool] = None  # True if token is in DB, False if LOCAL_STORAGE
     config_api_url: Optional[str] = None  # Config API URL for parser management
     has_config_write_token: Optional[bool] = None  # True if config API token is set
+    has_powerquery_read_token: Optional[bool] = None  # True if PowerQuery read token is set
 
 
 class DestinationWithToken(DestinationResponse):
@@ -135,6 +138,7 @@ async def create_destination(
             token=destination.token,
             config_api_url=destination.config_api_url,
             config_write_token=destination.config_write_token,
+            powerquery_read_token=destination.powerquery_read_token,
             ip=destination.ip,
             port=destination.port,
             protocol=destination.protocol
@@ -267,6 +271,7 @@ async def update_destination(
             token=update.token,
             config_api_url=update.config_api_url,
             config_write_token=update.config_write_token,
+            powerquery_read_token=update.powerquery_read_token,
             ip=update.ip,
             port=update.port,
             protocol=update.protocol

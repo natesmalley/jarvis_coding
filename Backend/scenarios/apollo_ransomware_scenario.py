@@ -32,7 +32,7 @@ import sys
 import uuid
 import threading
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 backend_dir = os.path.dirname(script_dir)
@@ -47,7 +47,7 @@ HEC_AVAILABLE = False
 try:
     from hec_sender import send_one
     HEC_AVAILABLE = True
-except ImportError:
+except (ImportError, RuntimeError):
     pass
 
 # Attack Profile - correlates with existing OCSF alert data
@@ -78,6 +78,136 @@ VICTIM_PROFILE = {
     "machine_enterprise": "Enterprise",
     "client_ip": "10.50.1.100",
 }
+
+CORRELATION_CONFIG = {
+    "scenario_id": "apollo_ransomware_scenario",
+    "name": "Apollo Ransomware - STARFLEET Attack",
+    "description": "Correlates Proofpoint and M365 events with existing EDR/WEL data for the Apollo ransomware attack chain targeting STARFLEET.",
+    
+    "default_query": """dataSource.name in ('SentinelOne','Windows Event Logs') endpoint.name contains ("Enterprise", "bridge")
+| group newest_timestamp = newest(timestamp), oldest_timestamp = oldest(timestamp) by event.type, src.process.user, endpoint.name, src.endpoint.ip.address, dst.ip.address
+| sort newest_timestamp
+| columns event.type, src.process.user, endpoint.name, oldest_timestamp, newest_timestamp, src.endpoint.ip.address, dst.ip.address""",
+    
+    "time_anchors": [
+        {
+            "id": "bridge_first_activity",
+            "name": "Bridge First Activity",
+            "description": "First EDR/WEL activity on the bridge machine (initial compromise)",
+            "query_match": {"endpoint.name": "bridge"},
+            "use_field": "oldest_timestamp",
+            "required": True
+        },
+        {
+            "id": "bridge_last_activity",
+            "name": "Bridge Last Activity",
+            "description": "Last EDR/WEL activity on bridge before lateral movement",
+            "query_match": {"endpoint.name": "bridge"},
+            "use_field": "newest_timestamp",
+            "required": False
+        },
+        {
+            "id": "enterprise_first_activity",
+            "name": "Enterprise First Activity",
+            "description": "First activity on Enterprise (lateral movement target)",
+            "query_match": {"endpoint.name": "Enterprise"},
+            "use_field": "oldest_timestamp",
+            "required": False
+        }
+    ],
+    
+    "phase_mapping": {
+        "phishing_delivery": {
+            "anchor": "bridge_first_activity",
+            "offset_minutes": -5,
+            "description": "Phishing email arrives ~5 min before first EDR activity"
+        },
+        "email_interaction": {
+            "anchor": "bridge_first_activity",
+            "offset_minutes": -2,
+            "description": "User opens email and downloads attachment ~2 min before EDR sees XLSX open"
+        },
+        "sharepoint_bruteforce": {
+            "anchor": "bridge_first_activity",
+            "offset_minutes": 15,
+            "description": "SharePoint recon begins after initial compromise established"
+        },
+        "sharepoint_exfil": {
+            "anchor": "bridge_first_activity",
+            "offset_minutes": 20,
+            "description": "Data exfiltration from SharePoint after recon"
+        }
+    },
+    
+    "fallback_behavior": "offset_from_now"
+}
+
+
+def resolve_time_anchors(siem_context: Dict, anchors_config: List[Dict]) -> Dict[str, datetime]:
+    """Resolve time anchors from SIEM query results or pre-resolved anchors"""
+    resolved = {}
+    
+    # Check if anchors are already pre-resolved (from frontend/API)
+    pre_resolved = siem_context.get("anchors", {})
+    if pre_resolved:
+        for anchor_id, anchor_data in pre_resolved.items():
+            timestamp_str = anchor_data.get("timestamp") if isinstance(anchor_data, dict) else anchor_data
+            if timestamp_str:
+                try:
+                    if isinstance(timestamp_str, str):
+                        parsed = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                    else:
+                        parsed = timestamp_str
+                    resolved[anchor_id] = parsed
+                except (ValueError, TypeError):
+                    continue
+        if resolved:
+            return resolved
+    
+    # Fall back to resolving from raw results
+    for anchor in anchors_config:
+        anchor_id = anchor["id"]
+        query_match = anchor["query_match"]
+        use_field = anchor["use_field"]
+        
+        for row in siem_context.get("results", []):
+            match = True
+            for key, value in query_match.items():
+                row_value = row.get(key, "")
+                if isinstance(value, str) and value.lower() not in str(row_value).lower():
+                    match = False
+                    break
+            
+            if match:
+                timestamp_str = row.get(use_field)
+                if timestamp_str:
+                    try:
+                        if isinstance(timestamp_str, str):
+                            parsed = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                        else:
+                            parsed = timestamp_str
+                        resolved[anchor_id] = parsed
+                        break
+                    except (ValueError, TypeError):
+                        continue
+    
+    return resolved
+
+
+def calculate_phase_times(anchors: Dict[str, datetime], phase_mapping: Dict) -> Dict[str, datetime]:
+    """Calculate phase start times based on resolved anchors"""
+    phase_times = {}
+    
+    for phase_name, mapping in phase_mapping.items():
+        anchor_id = mapping["anchor"]
+        offset_minutes = mapping["offset_minutes"]
+        
+        if anchor_id in anchors:
+            phase_times[phase_name] = anchors[anchor_id] + timedelta(minutes=offset_minutes)
+        else:
+            phase_times[phase_name] = None
+    
+    return phase_times
 
 
 def get_scenario_time(base_time: datetime, minutes_offset: int, seconds_offset: int = 0) -> str:
@@ -296,13 +426,44 @@ def generate_m365_sharepoint_exfil(base_time: datetime) -> List[Dict]:
     return events
 
 
-def generate_apollo_ransomware_scenario() -> Dict:
-    """Generate the complete Apollo ransomware scenario (Proofpoint + M365 only)"""
+def generate_apollo_ransomware_scenario(siem_context: Optional[Dict] = None) -> Dict:
+    """Generate the complete Apollo ransomware scenario (Proofpoint + M365 only)
     
-    # Use current time as base, adjusted to correlate with existing alerts
-    # The OCSF alert timestamp 1770236573000 ms = some point in time
-    # We'll generate events leading up to that
-    base_time = datetime.now(timezone.utc).replace(hour=9, minute=0, second=0, microsecond=0)
+    Args:
+        siem_context: Optional dict with SIEM query results for timestamp correlation.
+                      Expected format: {"results": [...], "anchors": {...}}
+                      If provided, timestamps are calculated relative to existing EDR/WEL data.
+                      If None, falls back to offset from current time.
+    """
+    
+    # Determine base time based on SIEM context or fallback
+    use_correlation = False
+    resolved_anchors = {}
+    phase_times = {}
+    
+    if siem_context and siem_context.get("results"):
+        resolved_anchors = resolve_time_anchors(siem_context, CORRELATION_CONFIG["time_anchors"])
+        if resolved_anchors:
+            phase_times = calculate_phase_times(resolved_anchors, CORRELATION_CONFIG["phase_mapping"])
+            use_correlation = True
+            # Use phishing_delivery phase time as base, or first resolved anchor
+            base_time = phase_times.get("phishing_delivery") or list(resolved_anchors.values())[0]
+            print("\n" + "=" * 80)
+            print("🔗 CORRELATION MODE - Using SIEM context for timestamps")
+            print("=" * 80)
+            print("Resolved Anchors:")
+            for anchor_id, anchor_time in resolved_anchors.items():
+                print(f"  • {anchor_id}: {anchor_time.isoformat()}")
+            print("\nPhase Times:")
+            for phase_name, phase_time in phase_times.items():
+                if phase_time:
+                    print(f"  • {phase_name}: {phase_time.isoformat()}")
+            print("=" * 80)
+        else:
+            print("\n⚠️  No anchors resolved from SIEM context, falling back to offset mode")
+            base_time = datetime.now(timezone.utc).replace(hour=9, minute=0, second=0, microsecond=0)
+    else:
+        base_time = datetime.now(timezone.utc).replace(hour=9, minute=0, second=0, microsecond=0)
     
     print("\n" + "=" * 80)
     print("🚀 APOLLO RANSOMWARE SCENARIO - PROOFPOINT & M365 EVENTS")
@@ -311,21 +472,41 @@ def generate_apollo_ransomware_scenario() -> Dict:
     print(f"Machine: {VICTIM_PROFILE['machine_bridge']} → {VICTIM_PROFILE['machine_enterprise']}")
     print(f"Domain: {VICTIM_PROFILE['domain']}")
     print(f"Malware: {ATTACKER_PROFILE['malware_name']}")
+    print(f"Mode: {'Correlation' if use_correlation else 'Offset from now'}")
+    print(f"Base Time: {base_time.isoformat()}")
     print("=" * 80 + "\n")
     
     all_events = []
     
-    phases = [
-        ("📧 PHASE 1: Phishing Email Delivery", generate_proofpoint_phishing_delivery, "Malicious XLSX delivered via Proofpoint"),
-        ("📬 PHASE 2: Email Interaction", generate_m365_email_interaction, "User opens email and downloads TestBook.xlsm"),
-        ("� PHASE 3: SharePoint Recon", generate_m365_sharepoint_bruteforce, "Failed access attempts to restricted SharePoint sites"),
-        ("📤 PHASE 4: Data Exfiltration", generate_m365_sharepoint_exfil, "Downloading sensitive documents from SharePoint"),
-    ]
+    # Build phases with appropriate base times
+    if use_correlation and phase_times:
+        phases = [
+            ("📧 PHASE 1: Phishing Email Delivery", generate_proofpoint_phishing_delivery, 
+             "Malicious XLSX delivered via Proofpoint", phase_times.get("phishing_delivery", base_time)),
+            ("📬 PHASE 2: Email Interaction", generate_m365_email_interaction, 
+             "User opens email and downloads TestBook.xlsm", phase_times.get("email_interaction", base_time)),
+            ("🔍 PHASE 3: SharePoint Recon", generate_m365_sharepoint_bruteforce, 
+             "Failed access attempts to restricted SharePoint sites", phase_times.get("sharepoint_bruteforce", base_time)),
+            ("📤 PHASE 4: Data Exfiltration", generate_m365_sharepoint_exfil, 
+             "Downloading sensitive documents from SharePoint", phase_times.get("sharepoint_exfil", base_time)),
+        ]
+    else:
+        phases = [
+            ("📧 PHASE 1: Phishing Email Delivery", generate_proofpoint_phishing_delivery, 
+             "Malicious XLSX delivered via Proofpoint", base_time),
+            ("📬 PHASE 2: Email Interaction", generate_m365_email_interaction, 
+             "User opens email and downloads TestBook.xlsm", base_time),
+            ("🔍 PHASE 3: SharePoint Recon", generate_m365_sharepoint_bruteforce, 
+             "Failed access attempts to restricted SharePoint sites", base_time),
+            ("📤 PHASE 4: Data Exfiltration", generate_m365_sharepoint_exfil, 
+             "Downloading sensitive documents from SharePoint", base_time),
+        ]
     
-    for phase_name, generator_func, description in phases:
+    for phase_name, generator_func, description, phase_base_time in phases:
         print(f"\n{phase_name}")
         print(f"   {description}")
-        phase_events = generator_func(base_time)
+        print(f"   Base: {phase_base_time.isoformat()}")
+        phase_events = generator_func(phase_base_time)
         all_events.extend(phase_events)
         print(f"   ✓ Generated {len(phase_events)} events")
     
@@ -415,7 +596,17 @@ def send_to_hec(event_data: dict, event_type: str, trace_id: str = None, phase: 
 
 
 if __name__ == "__main__":
-    scenario = generate_apollo_ransomware_scenario()
+    # Check for SIEM context from environment (passed by correlation scenario runner)
+    siem_context = None
+    siem_context_json = os.getenv('SIEM_CONTEXT')
+    if siem_context_json:
+        try:
+            siem_context = json.loads(siem_context_json)
+            print("📥 Loaded SIEM context from environment")
+        except json.JSONDecodeError as e:
+            print(f"⚠️  Failed to parse SIEM_CONTEXT: {e}")
+    
+    scenario = generate_apollo_ransomware_scenario(siem_context=siem_context)
     
     hec_token = os.getenv('S1_HEC_TOKEN')
     if HEC_AVAILABLE and hec_token:

@@ -9,12 +9,24 @@ import json
 from datetime import datetime, timedelta
 from pathlib import Path as PathLib
 
+from pydantic import BaseModel
+
 from app.models.responses import BaseResponse
 from app.core.config import settings
 from app.core.simple_auth import require_read_access, require_write_access
 from app.services.scenario_service import ScenarioService
+from app.services.siem_query_service import siem_query_service
 
 router = APIRouter()
+
+
+class SIEMQueryRequest(BaseModel):
+    """Request model for SIEM query execution"""
+    config_api_url: str
+    config_read_token: str
+    query: str
+    time_range_hours: int = 168  # Default 7 days
+    anchor_configs: Optional[List[Dict[str, Any]]] = None
 
 # Initialize scenario service
 scenario_service = ScenarioService()
@@ -349,6 +361,142 @@ async def execute_batch_scenarios(
                 "executions": results,
                 "parallel": parallel,
                 "total": len(results)
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# CORRELATION SCENARIOS ENDPOINTS
+# =============================================================================
+
+@router.get("/correlation", response_model=BaseResponse)
+async def list_correlation_scenarios(
+    _: str = Depends(require_read_access)
+):
+    """
+    List all scenarios that support SIEM correlation.
+    These scenarios can use existing SIEM data to determine timestamps.
+    """
+    import sys
+    import os
+    
+    # Add scenarios directory to path
+    scenarios_dir = PathLib(__file__).parent.parent.parent.parent / "scenarios"
+    if str(scenarios_dir) not in sys.path:
+        sys.path.insert(0, str(scenarios_dir))
+    
+    correlation_scenarios = []
+    
+    # Apollo Ransomware Scenario
+    try:
+        from apollo_ransomware_scenario import CORRELATION_CONFIG
+        correlation_scenarios.append({
+            "id": CORRELATION_CONFIG["scenario_id"],
+            "name": CORRELATION_CONFIG["name"],
+            "description": CORRELATION_CONFIG["description"],
+            "default_query": CORRELATION_CONFIG["default_query"],
+            "time_anchors": CORRELATION_CONFIG["time_anchors"],
+            "phase_mapping": CORRELATION_CONFIG["phase_mapping"],
+            "fallback_behavior": CORRELATION_CONFIG.get("fallback_behavior", "offset_from_now")
+        })
+    except ImportError as e:
+        pass  # Scenario not available
+    
+    # Add more correlation scenarios here as they are created
+    
+    return BaseResponse(
+        success=True,
+        data={
+            "correlation_scenarios": correlation_scenarios,
+            "total": len(correlation_scenarios)
+        }
+    )
+
+
+@router.get("/correlation/{scenario_id}", response_model=BaseResponse)
+async def get_correlation_scenario(
+    scenario_id: str = Path(..., description="Correlation scenario identifier"),
+    _: str = Depends(require_read_access)
+):
+    """Get detailed correlation configuration for a specific scenario"""
+    import sys
+    
+    scenarios_dir = PathLib(__file__).parent.parent.parent.parent / "scenarios"
+    if str(scenarios_dir) not in sys.path:
+        sys.path.insert(0, str(scenarios_dir))
+    
+    # Map scenario IDs to their modules
+    scenario_modules = {
+        "apollo_ransomware_scenario": "apollo_ransomware_scenario"
+    }
+    
+    if scenario_id not in scenario_modules:
+        raise HTTPException(status_code=404, detail=f"Correlation scenario '{scenario_id}' not found")
+    
+    try:
+        module = __import__(scenario_modules[scenario_id])
+        config = getattr(module, "CORRELATION_CONFIG", None)
+        
+        if not config:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Scenario '{scenario_id}' does not have correlation configuration"
+            )
+        
+        return BaseResponse(
+            success=True,
+            data={
+                "scenario_id": scenario_id,
+                "correlation_config": config
+            }
+        )
+    except ImportError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load scenario: {str(e)}")
+
+
+@router.post("/correlation/query", response_model=BaseResponse)
+async def execute_siem_query(
+    request: SIEMQueryRequest,
+    _: str = Depends(require_write_access)
+):
+    """
+    Execute a SIEM query to discover existing events for correlation.
+    Returns query results and extracted time anchors.
+    """
+    try:
+        # Execute the query
+        result = await siem_query_service.execute_query(
+            config_api_url=request.config_api_url,
+            config_read_token=request.config_read_token,
+            query=request.query,
+            time_range_hours=request.time_range_hours
+        )
+        
+        if not result.get("success"):
+            return BaseResponse(
+                success=False,
+                data={
+                    "error": result.get("error", "Query failed"),
+                    "results": []
+                }
+            )
+        
+        # Extract anchors if anchor configs provided
+        anchors = {}
+        if request.anchor_configs and result.get("results"):
+            anchors = siem_query_service.extract_anchors_from_results(
+                result["results"],
+                request.anchor_configs
+            )
+        
+        return BaseResponse(
+            success=True,
+            data={
+                "results": result.get("results", []),
+                "anchors": anchors,
+                "metadata": result.get("metadata", {})
             }
         )
     except Exception as e:
