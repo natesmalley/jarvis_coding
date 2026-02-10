@@ -18,9 +18,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Production stage
 FROM python:3.11-slim
 
-# Install gosu for user switching in entrypoint
-RUN apt-get update && apt-get install -y gosu && rm -rf /var/lib/apt/lists/*
-
 # Set working directory
 WORKDIR /app
 
@@ -55,10 +52,13 @@ RUN apt-get update && apt-get install -y dos2unix && \
     apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
+# Create non-root user and set ownership
 RUN useradd -m -u 1000 jarvis && \
     chown -R jarvis:jarvis /app && \
     chmod +x /app/entrypoint.sh
+
+# Switch to non-root user
+USER jarvis
 
 # Expose port
 EXPOSE 8000
