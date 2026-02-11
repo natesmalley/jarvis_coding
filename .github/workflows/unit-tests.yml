@@ -38,7 +38,7 @@ jobs:
         run: |
           cd Backend
           if [ -d "event_generators/tests/" ]; then
-            python3 event_generators/tests/run_tests.py
+            python event_generators/tests/run_tests.py
           else
             echo "No test directory found - skipping tests"
           fi
