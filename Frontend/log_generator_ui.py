@@ -143,6 +143,23 @@ def list_destinations():
         logger.error(f"Failed to fetch destinations: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/destinations/<dest_id>', methods=['GET'])
+def get_destination(dest_id):
+    """Get a single destination by ID"""
+    try:
+        resp = requests.get(
+            f"{API_BASE_URL}/api/v1/destinations/{dest_id}",
+            headers=_get_api_headers(),
+            timeout=10
+        )
+        if resp.status_code == 200:
+            return jsonify(resp.json())
+        else:
+            return jsonify({'error': f'Backend error: {resp.status_code}'}), resp.status_code
+    except Exception as e:
+        logger.error(f"Failed to fetch destination {dest_id}: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/destinations', methods=['POST'])
 def create_destination():
     """Create destination via backend API"""
@@ -229,6 +246,8 @@ def update_destination(dest_id):
             payload['config_read_token'] = data['config_read_token']
         if data.get('config_write_token'):
             payload['config_write_token'] = data['config_write_token']
+        if data.get('powerquery_read_token'):
+            payload['powerquery_read_token'] = data['powerquery_read_token']
         
         if not payload:
             return jsonify({'error': 'No fields provided to update'}), 400
@@ -406,6 +425,242 @@ def list_all_scenarios():
         {'id': 'hr_phishing_pdf_c2', 'name': 'HR Phishing PDF → PowerShell → Task → C2'}
     ]
     return jsonify(scenarios)
+
+
+# =============================================================================
+# CORRELATION SCENARIOS ENDPOINTS
+# =============================================================================
+
+@app.route('/correlation-scenarios', methods=['GET'])
+def list_correlation_scenarios():
+    """List scenarios that support SIEM correlation"""
+    try:
+        headers = _get_api_headers()
+        res = requests.get(f"{API_BASE_URL}/api/v1/scenarios/correlation", headers=headers, timeout=10)
+        if res.status_code == 200:
+            return jsonify(res.json().get('data', {}))
+        else:
+            return jsonify({'correlation_scenarios': [], 'total': 0})
+    except Exception as e:
+        logger.error(f"Failed to fetch correlation scenarios: {e}")
+        return jsonify({'correlation_scenarios': [], 'total': 0})
+
+
+@app.route('/correlation-scenarios/<scenario_id>', methods=['GET'])
+def get_correlation_scenario(scenario_id):
+    """Get correlation config for a specific scenario"""
+    try:
+        headers = _get_api_headers()
+        res = requests.get(f"{API_BASE_URL}/api/v1/scenarios/correlation/{scenario_id}", headers=headers, timeout=10)
+        if res.status_code == 200:
+            return jsonify(res.json().get('data', {}))
+        else:
+            return jsonify({'error': f'Scenario not found: {scenario_id}'}), 404
+    except Exception as e:
+        logger.error(f"Failed to fetch correlation scenario: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/correlation-scenarios/query', methods=['POST'])
+def execute_correlation_query():
+    """Execute a SIEM query for correlation scenarios.
+    
+    Accepts destination_id and resolves config_api_url + powerquery_read_token
+    from the destination settings stored in the backend.
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+        headers = _get_api_headers()
+        headers['Content-Type'] = 'application/json'
+        
+        destination_id = payload.pop('destination_id', None)
+        
+        # If destination_id provided, resolve config_api_url and powerquery_read_token
+        if destination_id:
+            # Get destination details for config_api_url
+            dest_resp = requests.get(
+                f"{API_BASE_URL}/api/v1/destinations/{destination_id}",
+                headers=_get_api_headers(),
+                timeout=10
+            )
+            if dest_resp.status_code != 200:
+                return jsonify({'error': 'Failed to fetch destination details', 'results': []}), 400
+            dest = dest_resp.json()
+            
+            config_api_url = dest.get('config_api_url')
+            if not config_api_url:
+                return jsonify({'error': 'No Config API URL configured for this destination', 'results': []}), 400
+            
+            # Get decrypted powerquery read token
+            token_resp = requests.get(
+                f"{API_BASE_URL}/api/v1/destinations/{destination_id}/powerquery-token",
+                headers=_get_api_headers(),
+                timeout=10
+            )
+            if token_resp.status_code != 200:
+                return jsonify({'error': 'No PowerQuery Read Token configured for this destination', 'results': []}), 400
+            
+            powerquery_token = token_resp.json().get('token')
+            if not powerquery_token:
+                return jsonify({'error': 'PowerQuery Read Token is empty', 'results': []}), 400
+            
+            payload['config_api_url'] = config_api_url
+            payload['config_read_token'] = powerquery_token
+        
+        res = requests.post(
+            f"{API_BASE_URL}/api/v1/scenarios/correlation/query",
+            headers=headers,
+            json=payload,
+            timeout=120  # Long timeout for queries
+        )
+        
+        if res.status_code == 200:
+            return jsonify(res.json().get('data', {}))
+        else:
+            error_msg = res.json().get('detail', res.text) if res.headers.get('content-type') == 'application/json' else res.text
+            return jsonify({'error': error_msg, 'results': []}), res.status_code
+    except Exception as e:
+        logger.error(f"Failed to execute correlation query: {e}")
+        return jsonify({'error': str(e), 'results': []}), 500
+
+
+@app.route('/correlation-scenarios/run', methods=['POST'])
+def run_correlation_scenario():
+    """Execute a correlation scenario with SIEM context"""
+    data = request.json
+    scenario_id = data.get('scenario_id')
+    destination_id = data.get('destination_id')
+    siem_context = data.get('siem_context')  # Results from SIEM query
+    worker_count = int(data.get('workers', 10))
+    tag_phase = data.get('tag_phase', True)
+    tag_trace = data.get('tag_trace', True)
+    trace_id = (data.get('trace_id') or '').strip()
+    local_token = data.get('hec_token')
+    
+    if not scenario_id:
+        return jsonify({'error': 'scenario_id is required'}), 400
+    if not destination_id:
+        return jsonify({'error': 'destination_id is required'}), 400
+    
+    # Resolve destination
+    try:
+        dest_resp = requests.get(
+            f"{API_BASE_URL}/api/v1/destinations/{destination_id}",
+            headers=_get_api_headers(),
+            timeout=10
+        )
+        if dest_resp.status_code != 200:
+            return jsonify({'error': 'Destination not found'}), 404
+        
+        chosen = dest_resp.json()
+        if chosen.get('type') != 'hec':
+            return jsonify({'error': 'Correlation scenarios only support HEC destinations'}), 400
+        
+        hec_url = chosen.get('url')
+        
+        if local_token:
+            hec_token = local_token
+        else:
+            token_resp = requests.get(
+                f"{API_BASE_URL}/api/v1/destinations/{destination_id}/token",
+                headers=_get_api_headers(),
+                timeout=10
+            )
+            if token_resp.status_code != 200:
+                return jsonify({'error': 'Failed to retrieve HEC token'}), 400
+            hec_token = token_resp.json().get('token')
+        
+        if not hec_url or not hec_token:
+            return jsonify({'error': 'HEC destination incomplete'}), 400
+            
+    except Exception as e:
+        return jsonify({'error': f'Failed to resolve destination: {str(e)}'}), 500
+    
+    def generate_and_stream():
+        try:
+            yield "INFO: Starting correlation scenario execution...\n"
+            
+            if siem_context and siem_context.get('results'):
+                yield f"INFO: Using SIEM context with {len(siem_context.get('results', []))} results\n"
+                if siem_context.get('anchors'):
+                    yield "INFO: Resolved anchors:\n"
+                    for anchor_id, anchor_data in siem_context.get('anchors', {}).items():
+                        yield f"  • {anchor_id}: {anchor_data.get('timestamp', 'N/A')}\n"
+            else:
+                yield "INFO: No SIEM context provided, using offset-from-now mode\n"
+            
+            scenarios_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Backend', 'scenarios'))
+            
+            # Map scenario IDs to files
+            id_to_file = {
+                'apollo_ransomware_scenario': 'apollo_ransomware_scenario.py',
+            }
+            
+            filename = id_to_file.get(scenario_id, f"{scenario_id}.py")
+            script_path = os.path.join(scenarios_dir, filename)
+            
+            if not os.path.exists(script_path):
+                yield f"ERROR: Scenario script not found: {filename}\n"
+                return
+            
+            # Prepare environment
+            env = os.environ.copy()
+            env['S1_HEC_TOKEN'] = hec_token
+            clean_url = hec_url.rstrip('/')
+            if '/services/collector' not in clean_url:
+                clean_url = clean_url + '/services/collector'
+            env['S1_HEC_URL'] = clean_url
+            env['S1_HEC_WORKERS'] = str(worker_count)
+            env['S1_HEC_BATCH'] = '0'
+            env['SCENARIO_OUTPUT_DIR'] = '/app/data/scenarios/configs'
+            env['S1_TAG_PHASE'] = '1' if tag_phase else '0'
+            env['S1_TAG_TRACE'] = '1' if tag_trace else '0'
+            if trace_id:
+                env['S1_TRACE_ID'] = trace_id
+            
+            # Pass SIEM context as JSON env var
+            if siem_context:
+                env['SIEM_CONTEXT'] = json.dumps(siem_context)
+            
+            # Set PYTHONPATH
+            event_generators_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Backend', 'event_generators'))
+            python_paths = [event_generators_dir]
+            categories = ['cloud_infrastructure', 'network_security', 'endpoint_security', 
+                         'identity_access', 'email_security', 'web_security', 'infrastructure', 'shared']
+            for category in categories:
+                category_path = os.path.join(event_generators_dir, category)
+                if os.path.exists(category_path):
+                    python_paths.append(category_path)
+            env['PYTHONPATH'] = ':'.join(python_paths)
+            
+            yield f"INFO: Executing {filename}...\n"
+            
+            import subprocess
+            process = subprocess.Popen(
+                ['python', script_path],
+                cwd=scenarios_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                env=env
+            )
+            
+            for line in iter(process.stdout.readline, ''):
+                if not line:
+                    break
+                yield line
+            
+            process.wait()
+            rc = process.returncode
+            if rc == 0:
+                yield "INFO: Correlation scenario complete\n"
+            else:
+                yield f"ERROR: Scenario exited with code {rc}\n"
+                
+        except Exception as e:
+            yield f"ERROR: Scenario execution failed: {e}\n"
+    
+    return Response(stream_with_context(generate_and_stream()), mimetype='text/plain')
 
 
 @app.route('/api/v1/settings/hidden-scenarios', methods=['PUT'])

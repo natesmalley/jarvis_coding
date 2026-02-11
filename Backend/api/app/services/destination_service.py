@@ -26,10 +26,32 @@ async_session_maker = sessionmaker(
 
 
 async def init_db():
-    """Initialize database tables"""
+    """Initialize database tables and migrate schema if needed"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        
+        # Migrate existing tables: add any missing columns
+        await conn.run_sync(_migrate_destinations_table)
+    
     logger.info("Destinations database initialized")
+
+
+def _migrate_destinations_table(conn):
+    """Add missing columns to the destinations table for schema evolution"""
+    import sqlalchemy as sa
+    
+    inspector = sa.inspect(conn)
+    if not inspector.has_table("destinations"):
+        return
+    
+    existing_cols = {col["name"] for col in inspector.get_columns("destinations")}
+    model_cols = {col.name: col for col in Destination.__table__.columns}
+    
+    for col_name, col_obj in model_cols.items():
+        if col_name not in existing_cols:
+            col_type = col_obj.type.compile(dialect=conn.dialect)
+            logger.info(f"Migrating destinations table: adding column '{col_name}' ({col_type})")
+            conn.execute(sa.text(f"ALTER TABLE destinations ADD COLUMN {col_name} {col_type}"))
 
 
 async def get_session() -> AsyncSession:
@@ -53,6 +75,7 @@ class DestinationService:
         token: Optional[str] = None,
         config_api_url: Optional[str] = None,
         config_write_token: Optional[str] = None,
+        powerquery_read_token: Optional[str] = None,
         ip: Optional[str] = None,
         port: Optional[int] = None,
         protocol: Optional[str] = None
@@ -67,6 +90,7 @@ class DestinationService:
             token: HEC token (for HEC destinations, will be encrypted)
             config_api_url: Config API URL for parser management (e.g., https://xdr.us1.sentinelone.net)
             config_write_token: Config API token for reading and writing parsers (will be encrypted)
+            powerquery_read_token: PowerQuery Log Read Access token for querying SIEM data (will be encrypted)
             ip: Syslog IP (for syslog destinations)
             port: Syslog port (for syslog destinations)
             protocol: 'UDP' or 'TCP' (for syslog destinations)
@@ -107,6 +131,8 @@ class DestinationService:
                 destination.config_api_url = config_api_url.rstrip('/')
             if config_write_token:
                 destination.config_write_token_encrypted = self.encryption.encrypt(config_write_token)
+            if powerquery_read_token:
+                destination.powerquery_read_token_encrypted = self.encryption.encrypt(powerquery_read_token)
         elif dest_type == 'syslog':
             destination.ip = ip
             destination.port = port
@@ -146,6 +172,7 @@ class DestinationService:
         token: Optional[str] = None,
         config_api_url: Optional[str] = None,
         config_write_token: Optional[str] = None,
+        powerquery_read_token: Optional[str] = None,
         ip: Optional[str] = None,
         port: Optional[int] = None,
         protocol: Optional[str] = None
@@ -167,6 +194,8 @@ class DestinationService:
                 destination.config_api_url = config_api_url.rstrip('/')
             if config_write_token:
                 destination.config_write_token_encrypted = self.encryption.encrypt(config_write_token)
+            if powerquery_read_token:
+                destination.powerquery_read_token_encrypted = self.encryption.encrypt(powerquery_read_token)
         elif destination.type == 'syslog':
             if ip:
                 destination.ip = ip
