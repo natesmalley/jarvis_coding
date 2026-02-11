@@ -313,6 +313,48 @@ async def delete_destination(
     return None
 
 
+@router.get("/{dest_id}/powerquery-token")
+async def get_destination_powerquery_token(
+    dest_id: str,
+    session: AsyncSession = Depends(get_session),
+    auth_info: tuple = Depends(get_api_key)
+):
+    """
+    Get decrypted PowerQuery read token for a destination (internal use only)
+    
+    Returns the decrypted PowerQuery Log Read Access token for querying SIEM data
+    """
+    service = DestinationService(session)
+    destination = await service.get_destination(dest_id)
+    if not destination:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Destination '{dest_id}' not found"
+        )
+    
+    if destination.type != 'hec':
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only HEC destinations have PowerQuery tokens"
+        )
+    
+    if not destination.powerquery_read_token_encrypted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No PowerQuery Read Token found for this destination"
+        )
+    
+    try:
+        token = service.decrypt_token(destination.powerquery_read_token_encrypted)
+        return {"token": token}
+    except Exception as e:
+        logger.error(f"Failed to decrypt PowerQuery token: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to decrypt PowerQuery token"
+        )
+
+
 @router.get("/{dest_id}/config-tokens")
 async def get_destination_config_tokens(
     dest_id: str,

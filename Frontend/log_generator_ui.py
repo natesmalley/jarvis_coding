@@ -143,6 +143,23 @@ def list_destinations():
         logger.error(f"Failed to fetch destinations: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/destinations/<dest_id>', methods=['GET'])
+def get_destination(dest_id):
+    """Get a single destination by ID"""
+    try:
+        resp = requests.get(
+            f"{API_BASE_URL}/api/v1/destinations/{dest_id}",
+            headers=_get_api_headers(),
+            timeout=10
+        )
+        if resp.status_code == 200:
+            return jsonify(resp.json())
+        else:
+            return jsonify({'error': f'Backend error: {resp.status_code}'}), resp.status_code
+    except Exception as e:
+        logger.error(f"Failed to fetch destination {dest_id}: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/destinations', methods=['POST'])
 def create_destination():
     """Create destination via backend API"""
@@ -446,11 +463,49 @@ def get_correlation_scenario(scenario_id):
 
 @app.route('/correlation-scenarios/query', methods=['POST'])
 def execute_correlation_query():
-    """Execute a SIEM query for correlation scenarios"""
+    """Execute a SIEM query for correlation scenarios.
+    
+    Accepts destination_id and resolves config_api_url + powerquery_read_token
+    from the destination settings stored in the backend.
+    """
     try:
         payload = request.get_json(silent=True) or {}
         headers = _get_api_headers()
         headers['Content-Type'] = 'application/json'
+        
+        destination_id = payload.pop('destination_id', None)
+        
+        # If destination_id provided, resolve config_api_url and powerquery_read_token
+        if destination_id:
+            # Get destination details for config_api_url
+            dest_resp = requests.get(
+                f"{API_BASE_URL}/api/v1/destinations/{destination_id}",
+                headers=_get_api_headers(),
+                timeout=10
+            )
+            if dest_resp.status_code != 200:
+                return jsonify({'error': 'Failed to fetch destination details', 'results': []}), 400
+            dest = dest_resp.json()
+            
+            config_api_url = dest.get('config_api_url')
+            if not config_api_url:
+                return jsonify({'error': 'No Config API URL configured for this destination', 'results': []}), 400
+            
+            # Get decrypted powerquery read token
+            token_resp = requests.get(
+                f"{API_BASE_URL}/api/v1/destinations/{destination_id}/powerquery-token",
+                headers=_get_api_headers(),
+                timeout=10
+            )
+            if token_resp.status_code != 200:
+                return jsonify({'error': 'No PowerQuery Read Token configured for this destination', 'results': []}), 400
+            
+            powerquery_token = token_resp.json().get('token')
+            if not powerquery_token:
+                return jsonify({'error': 'PowerQuery Read Token is empty', 'results': []}), 400
+            
+            payload['config_api_url'] = config_api_url
+            payload['config_read_token'] = powerquery_token
         
         res = requests.post(
             f"{API_BASE_URL}/api/v1/scenarios/correlation/query",

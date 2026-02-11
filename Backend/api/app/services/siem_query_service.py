@@ -27,7 +27,8 @@ class SIEMQueryService:
         config_api_url: str,
         config_read_token: str,
         query: str,
-        time_range_hours: int = 24 * 7  # Default 7 days
+        start_time_hours: int = 24,
+        end_time_hours: int = 0
     ) -> Dict[str, Any]:
         """
         Execute a PowerQuery against the Singularity Data Lake and return results.
@@ -36,7 +37,8 @@ class SIEMQueryService:
             config_api_url: Base URL for the Console (e.g., https://xdr.us1.sentinelone.net)
             config_read_token: Log Read Access API key (Bearer token)
             query: PowerQuery string to execute
-            time_range_hours: How far back to search (default 7 days)
+            start_time_hours: How far back to start searching (default 24h)
+            end_time_hours: How far back to stop searching (default 0 = now)
             
         Returns:
             Dict with 'results' list and 'metadata'
@@ -54,16 +56,19 @@ class SIEMQueryService:
             "Accept": "application/json"
         }
         
-        # Build startTime string (e.g., "168h" for 7 days)
-        start_time = f"{time_range_hours}h"
+        # Build startTime and endTime strings (e.g., "24h" and "0h")
+        start_time = f"{start_time_hours}h"
+        end_time = f"{end_time_hours}h"
         
         payload = {
             "query": query,
             "startTime": start_time,
             "priority": "low"  # Use low priority for generous rate limits
         }
+        if end_time_hours > 0:
+            payload["endTime"] = end_time
         
-        logger.info(f"Executing PowerQuery: {query[:100]}... (startTime: {start_time})")
+        logger.info(f"Executing PowerQuery: {query[:100]}... (startTime: {start_time}, endTime: {end_time})")
         
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -112,7 +117,8 @@ class SIEMQueryService:
                             "omitted_events": data.get("omittedEvents", 0),
                             "columns": columns,
                             "query": query,
-                            "time_range_hours": time_range_hours
+                            "start_time_hours": start_time_hours,
+                            "end_time_hours": end_time_hours
                         }
                     }
                 elif response.status_code == 401:
@@ -183,14 +189,18 @@ class SIEMQueryService:
         except (ValueError, TypeError):
             pass
         
-        # Try unix milliseconds
+        # Try unix timestamp (seconds, milliseconds, microseconds, or nanoseconds)
         try:
             if isinstance(timestamp_str, (int, float)) or str(timestamp_str).isdigit():
                 ts = int(timestamp_str)
-                if ts > 1e12:  # milliseconds
-                    ts = ts / 1000
+                if ts > 1e18:  # nanoseconds
+                    ts = ts / 1e9
+                elif ts > 1e15:  # microseconds
+                    ts = ts / 1e6
+                elif ts > 1e12:  # milliseconds
+                    ts = ts / 1e3
                 return datetime.utcfromtimestamp(ts)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, OSError):
             pass
         
         # Try human readable format "Feb 3 · 9:28:40.100 am"
@@ -244,10 +254,19 @@ class SIEMQueryService:
         """
         anchors = {}
         
+        if results:
+            sample_row = results[0]
+            logger.info(f"Anchor extraction: {len(results)} result rows, columns: {list(sample_row.keys())}")
+            logger.info(f"Anchor extraction: sample row: {sample_row}")
+        else:
+            logger.warning("Anchor extraction: no results to extract from")
+        
         for anchor in anchor_configs:
             anchor_id = anchor["id"]
             query_match = anchor.get("query_match", {})
             use_field = anchor.get("use_field", "oldest_timestamp")
+            
+            logger.info(f"Anchor '{anchor_id}': looking for query_match={query_match}, use_field='{use_field}'")
             
             for row in results:
                 # Check if row matches the query criteria
@@ -265,6 +284,7 @@ class SIEMQueryService:
                 
                 if match:
                     timestamp_str = row.get(use_field)
+                    logger.info(f"Anchor '{anchor_id}': matched row, use_field='{use_field}' -> raw value: {repr(timestamp_str)}")
                     parsed_ts = self.parse_timestamp(timestamp_str)
                     
                     if parsed_ts:
@@ -273,7 +293,13 @@ class SIEMQueryService:
                             "timestamp_raw": timestamp_str,
                             "matched_row": row
                         }
+                        logger.info(f"Anchor '{anchor_id}': resolved to {parsed_ts.isoformat()}")
                         break  # Use first match for this anchor
+                    else:
+                        logger.warning(f"Anchor '{anchor_id}': matched row but failed to parse timestamp: {repr(timestamp_str)}")
+            
+            if anchor_id not in anchors:
+                logger.warning(f"Anchor '{anchor_id}': no matching row found in {len(results)} results")
         
         return anchors
 

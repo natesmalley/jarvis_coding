@@ -26,10 +26,32 @@ async_session_maker = sessionmaker(
 
 
 async def init_db():
-    """Initialize database tables"""
+    """Initialize database tables and migrate schema if needed"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        
+        # Migrate existing tables: add any missing columns
+        await conn.run_sync(_migrate_destinations_table)
+    
     logger.info("Destinations database initialized")
+
+
+def _migrate_destinations_table(conn):
+    """Add missing columns to the destinations table for schema evolution"""
+    import sqlalchemy as sa
+    
+    inspector = sa.inspect(conn)
+    if not inspector.has_table("destinations"):
+        return
+    
+    existing_cols = {col["name"] for col in inspector.get_columns("destinations")}
+    model_cols = {col.name: col for col in Destination.__table__.columns}
+    
+    for col_name, col_obj in model_cols.items():
+        if col_name not in existing_cols:
+            col_type = col_obj.type.compile(dialect=conn.dialect)
+            logger.info(f"Migrating destinations table: adding column '{col_name}' ({col_type})")
+            conn.execute(sa.text(f"ALTER TABLE destinations ADD COLUMN {col_name} {col_type}"))
 
 
 async def get_session() -> AsyncSession:
