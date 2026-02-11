@@ -13,9 +13,7 @@
 # =============================
 # Keep ALL testing local only - don't push to remote
 testing/
-tests/
 test/
-*test*.py
 *test*.json
 *validation*.py
 *validation*.json
@@ -34,6 +32,12 @@ comprehensive_*.json
 api/*.log
 api/*.html
 testing/results/
+
+# Allow event_generators tests
+!event_generators/tests/
+!event_generators/**/test_*.py
+!api/tests/
+!api/**/test_*.py
 
 # Security and Sensitive Data
 # ==========================
