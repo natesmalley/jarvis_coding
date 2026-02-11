@@ -37,7 +37,14 @@ jobs:
       - name: Run unit tests
         run: |
           cd Backend
+          echo "Current directory: $(pwd)"
+          echo "Listing Backend directory:"
+          ls -la
+          echo "Checking for test directory:"
           if [ -d "event_generators/tests/" ]; then
+            echo "Test directory found, listing contents:"
+            ls -la event_generators/tests/
+            echo "Running tests..."
             python event_generators/tests/run_tests.py
           else
             echo "No test directory found - skipping tests"
