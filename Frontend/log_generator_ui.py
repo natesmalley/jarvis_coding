@@ -584,6 +584,26 @@ def run_correlation_scenario():
     except Exception as e:
         return jsonify({'error': f'Failed to resolve destination: {str(e)}'}), 500
     
+    # Resolve UAM credentials for alert detonation
+    uam_ingest_url = ''
+    uam_account_id = ''
+    uam_site_id = ''
+    uam_service_token = ''
+    try:
+        uam_resp = requests.get(
+            f"{API_BASE_URL}/api/v1/destinations/{destination_id}/uam-token",
+            headers=_get_api_headers(),
+            timeout=10
+        )
+        if uam_resp.status_code == 200:
+            uam_data = uam_resp.json()
+            uam_ingest_url = uam_data.get('uam_ingest_url', '')
+            uam_account_id = uam_data.get('account_id', '')
+            uam_site_id = uam_data.get('site_id', '')
+            uam_service_token = uam_data.get('token', '')
+    except Exception as e:
+        logger.warning(f"Could not resolve UAM credentials for alerts: {e}")
+    
     def generate_and_stream():
         try:
             yield "INFO: Starting correlation scenario execution...\n"
@@ -625,6 +645,18 @@ def run_correlation_scenario():
             env['S1_TAG_TRACE'] = '1' if tag_trace else '0'
             if trace_id:
                 env['S1_TRACE_ID'] = trace_id
+            
+            # Pass UAM credentials for alert detonation
+            if uam_ingest_url and uam_account_id and uam_service_token:
+                env['SCENARIO_ALERTS_ENABLED'] = 'true'
+                env['UAM_INGEST_URL'] = uam_ingest_url
+                env['UAM_ACCOUNT_ID'] = uam_account_id
+                env['UAM_SERVICE_TOKEN'] = uam_service_token
+                if uam_site_id:
+                    env['UAM_SITE_ID'] = uam_site_id
+                yield "INFO: 🚨 Alert detonation enabled (UAM credentials found)\n"
+            else:
+                yield "INFO: ⚠️ Alert detonation disabled (no UAM credentials on destination)\n"
             
             # Pass SIEM context as JSON env var
             if siem_context:
@@ -894,6 +926,26 @@ def run_scenario():
         logger.error(f"Failed to resolve destination: {e}")
         return jsonify({'error': f'Failed to resolve destination: {str(e)}'}), 500
     
+    # Resolve UAM credentials for alert detonation
+    uam_ingest_url = ''
+    uam_account_id = ''
+    uam_site_id = ''
+    uam_service_token = ''
+    try:
+        uam_resp = requests.get(
+            f"{API_BASE_URL}/api/v1/destinations/{destination_id}/uam-token",
+            headers=_get_api_headers(),
+            timeout=10
+        )
+        if uam_resp.status_code == 200:
+            uam_data = uam_resp.json()
+            uam_ingest_url = uam_data.get('uam_ingest_url', '')
+            uam_account_id = uam_data.get('account_id', '')
+            uam_site_id = uam_data.get('site_id', '')
+            uam_service_token = uam_data.get('token', '')
+    except Exception as e:
+        logger.warning(f"Could not resolve UAM credentials for alerts: {e}")
+    
     def generate_and_stream():
         try:
             yield "INFO: Starting scenario execution...\n"
@@ -986,6 +1038,18 @@ def run_scenario():
             env['S1_TAG_TRACE'] = '1' if tag_trace else '0'
             if trace_id:
                 env['S1_TRACE_ID'] = trace_id
+            
+            # Pass UAM credentials for alert detonation
+            if uam_ingest_url and uam_account_id and uam_service_token:
+                env['SCENARIO_ALERTS_ENABLED'] = 'true'
+                env['UAM_INGEST_URL'] = uam_ingest_url
+                env['UAM_ACCOUNT_ID'] = uam_account_id
+                env['UAM_SERVICE_TOKEN'] = uam_service_token
+                if uam_site_id:
+                    env['UAM_SITE_ID'] = uam_site_id
+                yield "INFO: 🚨 Alert detonation enabled (UAM credentials found)\n"
+            else:
+                yield "INFO: ⚠️ Alert detonation disabled (no UAM credentials on destination)\n"
             
             # Add event generators and all category subdirectories to Python path
             event_generators_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Backend', 'event_generators'))

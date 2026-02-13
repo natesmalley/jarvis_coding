@@ -1,8 +1,8 @@
 {
     "finding_info": {
         "uid": "placeholder_uid",
-        "title": "Proofpoint Malicious Email Link Clicked",
-        "desc": "A user clicked a malicious URL in an email flagged by Proofpoint TAP. The link was classified as phishing and has been observed in active campaigns targeting enterprise credentials."
+        "title": "Office 365 Spike Application Activity",
+        "desc": "Spike application activity detected. Review for authorized email marketing."
     },
     "resources": [
         {
@@ -10,7 +10,7 @@
             "name": "jeanluc@starfleet.com"
         }
     ],
-    "severity": "high",
+    "severity": "medium",
     "category_uid": 2,
     "class_uid": 99602001,
     "class_name": "S1 Security Alert",
@@ -26,15 +26,17 @@
             "version": "0.1.0"
         },
         "product": {
-            "name": "Proofpoint TAP",
-            "vendor_name": "Proofpoint"
+            "name": "Microsoft 365",
+            "vendor_name": "Microsoft"
         },
         "logged_time": "DYNAMIC",
         "modified_time": "DYNAMIC"
     },
     "time": "DYNAMIC",
-    "attack_surface_ids": [1],
-    "severity_id": 4,
+    "attack_surface_ids": [
+        1
+    ],
+    "severity_id": 3,
     "state_id": 1,
     "s1_classification_id": 1
 }

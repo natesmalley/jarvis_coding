@@ -14,6 +14,7 @@ import uuid
 import time
 import copy
 import logging
+from datetime import datetime
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 
@@ -68,6 +69,68 @@ class AlertService:
     def get_template(self, template_id: str) -> Optional[Dict[str, Any]]:
         """Get a specific alert template by ID"""
         return self.templates.get(template_id)
+
+    def prepare_scenario_alert(
+        self,
+        template_id: str,
+        event_time: datetime,
+        user_email: str,
+        overrides: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Prepare alert with scenario-specific timestamp and user context
+        
+        Args:
+            template_id: Template ID to use
+            event_time: When the alert should be timestamped (datetime object)
+            user_email: User email to associate with the alert
+            overrides: Additional field overrides
+            
+        Returns:
+            Prepared alert dict ready for egress
+        """
+        template = self.get_template(template_id)
+        if not template:
+            raise ValueError(f"Template {template_id} not found")
+        
+        alert = copy.deepcopy(template)
+        
+        # Inject fresh UID
+        if "finding_info" not in alert:
+            alert["finding_info"] = {}
+        alert["finding_info"]["uid"] = str(uuid.uuid4())
+        
+        # Set scenario-specific timestamp (milliseconds since epoch)
+        time_ms = int(event_time.timestamp() * 1000)
+        alert["time"] = time_ms
+        
+        # Update metadata timestamps
+        if "metadata" not in alert:
+            alert["metadata"] = {}
+        alert["metadata"]["logged_time"] = time_ms
+        alert["metadata"]["modified_time"] = time_ms
+        
+        # Set user as the resource
+        alert["resources"] = [{
+            "uid": user_email,
+            "name": user_email
+        }]
+        
+        # Apply additional overrides
+        if overrides:
+            for key, value in overrides.items():
+                if "." in key:
+                    # Handle nested keys like "finding_info.title"
+                    keys = key.split(".")
+                    current = alert
+                    for k in keys[:-1]:
+                        if k not in current:
+                            current[k] = {}
+                        current = current[k]
+                    current[keys[-1]] = value
+                else:
+                    alert[key] = value
+        
+        return alert
 
     def prepare_alert(
         self,
@@ -279,6 +342,38 @@ class AlertService:
 
         scope = self.build_scope(account_id, site_id)
         return self.egress_alert(alert, scope, token, uam_ingest_url)
+
+    def send_prepared_alert(self, alert: Dict[str, Any], destination: Dict[str, Any]) -> Dict[str, Any]:
+        """Send a prepared alert to a UAM destination
+        
+        Args:
+            alert: Prepared alert dict
+            destination: Destination dict with UAM credentials
+            
+        Returns:
+            Dict with success status and response details
+        """
+        # Extract UAM credentials from destination
+        token = destination.get('uam_service_token')
+        account_id = destination.get('uam_account_id')
+        site_id = destination.get('uam_site_id')
+        ingest_url = destination.get('uam_ingest_url')
+        
+        if not all([token, account_id, ingest_url]):
+            return {
+                "success": False,
+                "status": 0,
+                "error": "Missing required UAM credentials (token, account_id, or ingest_url)"
+            }
+        
+        # Build scope
+        scope = self.build_scope(account_id, site_id)
+        
+        # Send alert
+        result = self.egress_alert(alert, scope, token, ingest_url)
+        
+        # The egress_alert already returns success field
+        return result
 
 
 # Singleton instance

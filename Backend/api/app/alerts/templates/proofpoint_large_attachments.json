@@ -1,8 +1,8 @@
 {
     "finding_info": {
         "uid": "placeholder_uid",
-        "title": "Proofpoint Malicious Email Link Clicked",
-        "desc": "A user clicked a malicious URL in an email flagged by Proofpoint TAP. The link was classified as phishing and has been observed in active campaigns targeting enterprise credentials."
+        "title": "Proofpoint High Volume of Large Attachments to Recipient",
+        "desc": "Unusual volume of large email attachments detected to a single recipient. Pattern may indicate data exfiltration or bulk malicious file distribution."
     },
     "resources": [
         {
@@ -10,7 +10,7 @@
             "name": "jeanluc@starfleet.com"
         }
     ],
-    "severity": "high",
+    "severity": "medium",
     "category_uid": 2,
     "class_uid": 99602001,
     "class_name": "S1 Security Alert",
@@ -34,7 +34,7 @@
     },
     "time": "DYNAMIC",
     "attack_surface_ids": [1],
-    "severity_id": 4,
+    "severity_id": 3,
     "state_id": 1,
     "s1_classification_id": 1
 }

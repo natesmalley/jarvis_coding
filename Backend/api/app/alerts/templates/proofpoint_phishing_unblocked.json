@@ -1,8 +1,8 @@
 {
     "finding_info": {
         "uid": "placeholder_uid",
-        "title": "Proofpoint Malicious Email Link Clicked",
-        "desc": "A user clicked a malicious URL in an email flagged by Proofpoint TAP. The link was classified as phishing and has been observed in active campaigns targeting enterprise credentials."
+        "title": "Proofpoint Phishing Email Unblocked",
+        "desc": "Phishing email was delivered after policy override. High risk of credential theft or account compromise."
     },
     "resources": [
         {
@@ -36,5 +36,5 @@
     "attack_surface_ids": [1],
     "severity_id": 4,
     "state_id": 1,
-    "s1_classification_id": 1
+    "s1_classification_id": 28
 }
