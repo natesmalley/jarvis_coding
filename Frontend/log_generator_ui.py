@@ -248,6 +248,14 @@ def update_destination(dest_id):
             payload['config_write_token'] = data['config_write_token']
         if data.get('powerquery_read_token'):
             payload['powerquery_read_token'] = data['powerquery_read_token']
+        if data.get('uam_ingest_url'):
+            payload['uam_ingest_url'] = data['uam_ingest_url']
+        if data.get('uam_account_id'):
+            payload['uam_account_id'] = data['uam_account_id']
+        if 'uam_site_id' in data:
+            payload['uam_site_id'] = data['uam_site_id']
+        if data.get('uam_service_token'):
+            payload['uam_service_token'] = data['uam_service_token']
         
         if not payload:
             return jsonify({'error': 'No fields provided to update'}), 400
@@ -1979,6 +1987,127 @@ def generate_logs():
                 sock.close()
 
     return Response(stream_with_context(generate_and_stream()), mimetype='text/plain')
+
+# =============================================================================
+# ALERTS ENDPOINTS (UAM Ingest API)
+# =============================================================================
+
+@app.route('/alerts/templates', methods=['GET'])
+def list_alert_templates():
+    """List available alert templates"""
+    try:
+        resp = requests.get(
+            f"{API_BASE_URL}/api/v1/alerts/templates",
+            headers=_get_api_headers(),
+            timeout=10
+        )
+        if resp.status_code == 200:
+            return jsonify(resp.json().get('data', {}))
+        else:
+            return jsonify({'templates': [], 'total': 0})
+    except Exception as e:
+        logger.error(f"Failed to fetch alert templates: {e}")
+        return jsonify({'templates': [], 'total': 0})
+
+
+@app.route('/alerts/templates/<template_id>', methods=['GET'])
+def get_alert_template(template_id):
+    """Get a specific alert template"""
+    try:
+        resp = requests.get(
+            f"{API_BASE_URL}/api/v1/alerts/templates/{template_id}",
+            headers=_get_api_headers(),
+            timeout=10
+        )
+        if resp.status_code == 200:
+            return jsonify(resp.json().get('data', {}))
+        else:
+            return jsonify({'error': f'Template not found: {template_id}'}), 404
+    except Exception as e:
+        logger.error(f"Failed to fetch alert template: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/alerts/send', methods=['POST'])
+def send_alert():
+    """Send alert(s) from a template to the UAM ingest API"""
+    try:
+        payload = request.get_json(silent=True) or {}
+        headers = _get_api_headers()
+        headers['Content-Type'] = 'application/json'
+
+        resp = requests.post(
+            f"{API_BASE_URL}/api/v1/alerts/send",
+            headers=headers,
+            json=payload,
+            timeout=60
+        )
+
+        if resp.status_code == 200:
+            return jsonify(resp.json().get('data', {}))
+        else:
+            error_msg = resp.text
+            try:
+                error_msg = resp.json().get('detail', resp.text)
+            except Exception:
+                pass
+            return jsonify({'error': error_msg}), resp.status_code
+    except Exception as e:
+        logger.error(f"Failed to send alert: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/alerts/send-custom', methods=['POST'])
+def send_custom_alert():
+    """Send a custom alert JSON to the UAM ingest API"""
+    try:
+        payload = request.get_json(silent=True) or {}
+        headers = _get_api_headers()
+        headers['Content-Type'] = 'application/json'
+
+        resp = requests.post(
+            f"{API_BASE_URL}/api/v1/alerts/send-custom",
+            headers=headers,
+            json=payload,
+            timeout=60
+        )
+
+        if resp.status_code == 200:
+            return jsonify(resp.json().get('data', {}))
+        else:
+            error_msg = resp.text
+            try:
+                error_msg = resp.json().get('detail', resp.text)
+            except Exception:
+                pass
+            return jsonify({'error': error_msg}), resp.status_code
+    except Exception as e:
+        logger.error(f"Failed to send custom alert: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/alerts/resolve-uam/<dest_id>', methods=['GET'])
+def resolve_uam_credentials(dest_id):
+    """Resolve UAM credentials (token, account_id, site_id, ingest_url) from a destination"""
+    try:
+        resp = requests.get(
+            f"{API_BASE_URL}/api/v1/destinations/{dest_id}/uam-token",
+            headers=_get_api_headers(),
+            timeout=10
+        )
+        if resp.status_code == 200:
+            return jsonify(resp.json())
+        else:
+            error_msg = resp.text
+            try:
+                error_msg = resp.json().get('detail', resp.text)
+            except Exception:
+                pass
+            return jsonify({'error': error_msg}), resp.status_code
+    except Exception as e:
+        logger.error(f"Failed to resolve UAM credentials: {e}")
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8000)

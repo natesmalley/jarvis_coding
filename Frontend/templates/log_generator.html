@@ -303,6 +303,10 @@
                 <div class="nav-tab-icon">🔗</div>
                 <div class="nav-tab-label">Correlation</div>
             </button>
+            <button type="button" data-target="alerts-section" class="nav-tab">
+                <div class="nav-tab-icon">🚨</div>
+                <div class="nav-tab-label">Alerts</div>
+            </button>
             <button type="button" data-target="settings-section" class="nav-tab">
                 <div class="nav-tab-icon">⚙️</div>
                 <div class="nav-tab-label">Settings</div>
@@ -775,6 +779,149 @@
         </div>
     </div>
 
+    <!-- ALERTS SECTION (UAM Ingest API) -->
+    <div id="alerts-section" class="grid grid-cols-1 lg:grid-cols-12 gap-6" style="display:none;">
+        <!-- LEFT: Alert Template Selection -->
+        <div class="lg:col-span-3">
+            <div class="flow-panel space-y-4">
+                <span class="flow-label">① Alert Template</span>
+                <div class="input-group">
+                    <label for="alert-template-select" class="text-sm font-semibold text-[#c8b3e8]">Select Template</label>
+                    <select id="alert-template-select" name="alert-template-select" required>
+                        <option value="" disabled selected>Loading templates...</option>
+                    </select>
+                </div>
+                
+                <div id="alert-template-details" class="space-y-3" style="display:none;">
+                    <h4 class="text-base font-bold text-[#f3e8ff]" id="alert-template-title"></h4>
+                    <div class="space-y-2 text-xs">
+                        <div>
+                            <span class="font-semibold text-[#c8b3e8]">Class:</span>
+                            <span class="text-[#f3e8ff]" id="alert-template-class"></span>
+                        </div>
+                        <div>
+                            <span class="font-semibold text-[#c8b3e8]">Severity:</span>
+                            <span class="text-[#f3e8ff]" id="alert-template-severity"></span>
+                        </div>
+                        <div>
+                            <span class="font-semibold text-[#c8b3e8]">Finding:</span>
+                            <span class="text-[#f3e8ff]" id="alert-template-finding"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-2 bg-[#241d3a] rounded-lg border border-[#3c325c]">
+                    <p class="text-xs text-[#8b7a9f]">
+                        <span class="text-[#a78bfa]">ⓘ</span> Alerts use the UAM ingest API, which requires a <strong class="text-[#c8b3e8]">Service Account</strong> token (separate from HEC).
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- MIDDLE: Configuration & Output -->
+        <div class="lg:col-span-6">
+            <div class="flow-panel space-y-6">
+                <span class="flow-label">② Configuration & Output</span>
+                
+                <form id="alert-form" class="space-y-6">
+                    <div class="input-group">
+                        <label for="alert-count" class="text-sm font-semibold text-[#c8b3e8]">Number of Alerts</label>
+                        <input type="number" id="alert-count" name="alert-count" value="1" min="1" max="100" required>
+                        <p class="text-xs text-[#b8a0d2] mt-1">Each alert gets a unique UID and fresh timestamp</p>
+                    </div>
+
+                    <details class="bg-[#241d3a] rounded-lg p-3 border border-[#3c325c]">
+                        <summary class="cursor-pointer text-sm font-semibold text-[#c8b3e8]">Override Fields (Optional)</summary>
+                        <div class="mt-3 space-y-3 text-sm">
+                            <div class="input-group">
+                                <label for="alert-override-title" class="text-sm font-semibold text-[#c8b3e8]">Alert Title</label>
+                                <input type="text" id="alert-override-title" placeholder="Override the alert title">
+                            </div>
+                            <div class="input-group">
+                                <label for="alert-override-finding-title" class="text-sm font-semibold text-[#c8b3e8]">Finding Title</label>
+                                <input type="text" id="alert-override-finding-title" placeholder="Override finding_info.title">
+                            </div>
+                            <div class="input-group">
+                                <label for="alert-override-severity" class="text-sm font-semibold text-[#c8b3e8]">Severity ID</label>
+                                <select id="alert-override-severity">
+                                    <option value="">Use template default</option>
+                                    <option value="1">1 - Informational</option>
+                                    <option value="2">2 - Low</option>
+                                    <option value="3">3 - Medium</option>
+                                    <option value="4">4 - High</option>
+                                    <option value="5">5 - Critical</option>
+                                </select>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details class="bg-[#241d3a] rounded-lg p-3 border border-[#3c325c]">
+                        <summary class="cursor-pointer text-sm font-semibold text-[#c8b3e8]">Custom Alert JSON (Advanced)</summary>
+                        <div class="mt-3 space-y-3 text-sm">
+                            <p class="text-xs text-[#b8a0d2]">Paste a full alert JSON to send instead of using a template. UID and timestamp will be auto-generated.</p>
+                            <textarea id="alert-custom-json" rows="10" class="w-full bg-[#3c325c] text-[#f3e8ff] border-none rounded-lg p-3 font-mono text-xs" placeholder='Paste full alert JSON here...'></textarea>
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" id="alert-custom-auto-uid" checked>
+                                <span class="text-[#f3e8ff]">Auto-generate UID and timestamp</span>
+                            </label>
+                        </div>
+                    </details>
+
+                    <div class="flex gap-3">
+                        <button type="submit" id="send-alert-btn" class="btn flex-1">
+                            Send Alert
+                        </button>
+                        <button type="button" id="send-custom-alert-btn" class="btn" style="width:auto; padding:0.6rem 1.2rem; background:#3c325c;">
+                            Send Custom JSON
+                        </button>
+                    </div>
+                </form>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 text-[#f3e8ff]">Alert Output</h3>
+                    <div id="alert-output-box" style="background-color: #1a1629; border-radius: 0.75rem; padding: 1.5rem; min-height: 200px; max-height: 500px; overflow-y: auto; border: 1px solid #3c325c; font-family: monospace; white-space: pre-wrap; word-wrap: break-word; box-shadow: inset 0 2px 5px rgba(0,0,0,0.3); font-size: 0.875rem; line-height: 1.5;">
+                        <!-- Alert output will appear here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Destination (matches other tabs) -->
+        <div class="lg:col-span-3">
+            <div class="flow-panel space-y-4">
+                <span class="flow-label">③ Destination</span>
+                <div class="input-group">
+                    <label for="alert-destination-select" class="text-sm font-semibold text-[#c8b3e8]">Select Destination</label>
+                    <select id="alert-destination-select" name="alert-destination-select" required>
+                        <option value="" disabled selected>Loading destinations...</option>
+                    </select>
+                </div>
+
+                <div id="alert-dest-info" class="p-3 bg-[#241d3a] rounded-lg border border-[#3c325c] space-y-2" style="display:none;">
+                    <div class="space-y-1 text-xs">
+                        <div><span class="font-semibold text-[#c8b3e8]">Ingest URL:</span> <span class="text-[#f3e8ff]" id="alert-dest-ingest-url"></span></div>
+                        <div><span class="font-semibold text-[#c8b3e8]">Account ID:</span> <span class="text-[#f3e8ff]" id="alert-dest-account-id"></span></div>
+                        <div><span class="font-semibold text-[#c8b3e8]">Site ID:</span> <span class="text-[#f3e8ff]" id="alert-dest-site-id"></span></div>
+                        <div><span class="font-semibold text-[#c8b3e8]">Token:</span> <span class="text-[#f3e8ff]" id="alert-dest-token-status"></span></div>
+                    </div>
+                    <div class="font-mono text-xs p-2 bg-[#1a1629] rounded border border-[#3c325c] mt-2">
+                        <span class="text-[#8b7a9f]">S1-Scope:</span> <span class="text-[#a78bfa]" id="alert-scope-preview">—</span>
+                    </div>
+                </div>
+
+                <div id="alert-dest-warning" class="p-3 bg-red-900/20 rounded-lg border border-red-700/50" style="display:none;">
+                    <p class="text-xs text-red-300" id="alert-dest-warning-text"></p>
+                </div>
+
+                <div class="p-2 bg-[#241d3a] rounded-lg border border-[#3c325c]">
+                    <p class="text-xs text-[#8b7a9f]">
+                        <span class="text-[#a78bfa]">ⓘ</span> UAM credentials are configured in <strong class="text-[#c8b3e8]">Settings → Edit Destination</strong>. The Service Account token is stored encrypted, separate from HEC.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
             <div id="settings-section" class="card space-y-4" style="display:none;">
                 <h2 class="text-2xl font-bold text-[#f3e8ff]">Settings</h2>
                 <div class="flex flex-wrap gap-2">
@@ -841,6 +988,35 @@
                                             <button type="button" class="toggle-password absolute right-2 top-1/2 -translate-y-1/2 text-[#8b7a9f] hover:text-[#f3e8ff]" data-target="dest-powerquery-read-token" style="background:none;border:none;cursor:pointer;">👁</button>
                                         </div>
                                         <p class="text-xs text-[#8b7a9f] mt-1">Required for Correlation Scenarios to query existing events via PowerQuery API</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="md:col-span-3 mt-3 p-3 bg-[#241d3a] rounded-lg border border-[#3c325c]">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <h4 class="text-sm font-semibold text-[#c8b3e8]">UAM Alert Configuration (Optional)</h4>
+                                    <span class="text-xs text-[#8b7a9f]">For sending alerts via Service Account</span>
+                                </div>
+                                <p class="text-xs text-[#b8a0d2] mb-3">Configure a Service Account token and scope for sending UAM alerts. This is separate from HEC.</p>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div class="input-group md:col-span-3">
+                                        <label for="dest-uam-ingest-url" class="text-sm font-semibold text-[#c8b3e8]">UAM Ingest URL</label>
+                                        <input type="text" id="dest-uam-ingest-url" name="dest-uam-ingest-url" placeholder="https://ingest.us1.sentinelone.net" value="https://ingest.us1.sentinelone.net">
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="dest-uam-account-id" class="text-sm font-semibold text-[#c8b3e8]">Account ID</label>
+                                        <input type="text" id="dest-uam-account-id" name="dest-uam-account-id" placeholder="e.g. 123456789012345678">
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="dest-uam-site-id" class="text-sm font-semibold text-[#c8b3e8]">Site ID (optional)</label>
+                                        <input type="text" id="dest-uam-site-id" name="dest-uam-site-id" placeholder="Leave blank for account scope">
+                                    </div>
+                                    <div class="input-group md:col-span-3">
+                                        <label for="dest-uam-service-token" class="text-sm font-semibold text-[#c8b3e8]">Service Account Token</label>
+                                        <div class="relative">
+                                            <input type="password" id="dest-uam-service-token" name="dest-uam-service-token" autocomplete="off" placeholder="Bearer token for UAM alert API" class="pr-10">
+                                            <button type="button" class="toggle-password absolute right-2 top-1/2 -translate-y-1/2 text-[#8b7a9f] hover:text-[#f3e8ff]" data-target="dest-uam-service-token" style="background:none;border:none;cursor:pointer;">👁</button>
+                                        </div>
+                                        <p class="text-xs text-[#8b7a9f] mt-1">Different from HEC token — this is a Service Account bearer token</p>
                                     </div>
                                 </div>
                             </div>
@@ -1013,6 +1189,32 @@
                     </div>
                 </div>
             </div>
+            <div class="p-3 bg-[#241d3a] rounded-lg border border-[#3c325c]" id="edit-uam-group">
+                <h4 class="text-sm font-semibold text-[#c8b3e8] mb-3">UAM Alert Configuration</h4>
+                <div class="space-y-3">
+                    <div class="input-group">
+                        <label for="edit-uam-ingest-url" class="text-sm font-semibold text-[#c8b3e8]">UAM Ingest URL</label>
+                        <input type="text" id="edit-uam-ingest-url" placeholder="https://ingest.us1.sentinelone.net" value="https://ingest.us1.sentinelone.net">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="input-group">
+                            <label for="edit-uam-account-id" class="text-sm font-semibold text-[#c8b3e8]">Account ID</label>
+                            <input type="text" id="edit-uam-account-id" placeholder="e.g. 123456789012345678">
+                        </div>
+                        <div class="input-group">
+                            <label for="edit-uam-site-id" class="text-sm font-semibold text-[#c8b3e8]">Site ID (optional)</label>
+                            <input type="text" id="edit-uam-site-id" placeholder="Leave blank for account scope">
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label for="edit-uam-service-token" class="text-sm font-semibold text-[#c8b3e8]">Service Account Token</label>
+                        <div class="relative">
+                            <input type="password" id="edit-uam-service-token" placeholder="Leave blank to keep existing" class="pr-10">
+                            <button type="button" class="toggle-password absolute right-2 top-1/2 -translate-y-1/2 text-[#8b7a9f] hover:text-[#f3e8ff]" data-target="edit-uam-service-token" style="background:none;border:none;cursor:pointer;">👁</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <div class="flex gap-3 pt-2">
                 <button type="submit" class="btn flex-1">Save Changes</button>
                 <button type="button" id="cancel-edit-modal" class="flex-1 px-4 py-2 bg-[#3c325c] hover:bg-[#4a416e] rounded-lg text-[#f3e8ff] transition-all" style="border: none; cursor: pointer;">Cancel</button>
@@ -1067,6 +1269,7 @@
             'scenarios-section': document.getElementById('scenarios-section'),
             'upload-section': document.getElementById('upload-section'),
             'correlation-section': document.getElementById('correlation-section'),
+            'alerts-section': document.getElementById('alerts-section'),
             'settings-section': document.getElementById('settings-section')
         };
         
@@ -1305,6 +1508,10 @@
                                 document.getElementById('edit-dest-token').value = '';
                                 document.getElementById('edit-config-api-url').value = d.config_api_url || 'https://xdr.us1.sentinelone.net';
                                 document.getElementById('edit-config-write-token').value = '';
+                                document.getElementById('edit-uam-ingest-url').value = d.uam_ingest_url || 'https://ingest.us1.sentinelone.net';
+                                document.getElementById('edit-uam-account-id').value = d.uam_account_id || '';
+                                document.getElementById('edit-uam-site-id').value = d.uam_site_id || '';
+                                document.getElementById('edit-uam-service-token').value = '';
                                 document.getElementById('edit-dest-modal').style.display = 'flex';
                             });
                         } else {
@@ -1445,6 +1652,16 @@
                         if (configApiUrl) payload.config_api_url = configApiUrl;
                         if (configWriteToken) payload.config_write_token = configWriteToken;
                         if (powerqueryReadToken) payload.powerquery_read_token = powerqueryReadToken;
+                        
+                        // Add UAM alert settings (optional)
+                        const uamIngestUrl = document.getElementById('dest-uam-ingest-url')?.value?.trim();
+                        const uamAccountId = document.getElementById('dest-uam-account-id')?.value?.trim();
+                        const uamSiteId = document.getElementById('dest-uam-site-id')?.value?.trim();
+                        const uamServiceToken = document.getElementById('dest-uam-service-token')?.value?.trim();
+                        if (uamIngestUrl) payload.uam_ingest_url = uamIngestUrl;
+                        if (uamAccountId) payload.uam_account_id = uamAccountId;
+                        if (uamSiteId) payload.uam_site_id = uamSiteId;
+                        if (uamServiceToken) payload.uam_service_token = uamServiceToken;
                     } else {
                         payload.ip = document.getElementById('dest-syslog-ip').value.trim();
                         payload.port = parseInt(document.getElementById('dest-syslog-port').value, 10);
@@ -1486,6 +1703,14 @@
                     if (configWriteEl) configWriteEl.value = '';
                     const powerqueryReadEl = document.getElementById('dest-powerquery-read-token');
                     if (powerqueryReadEl) powerqueryReadEl.value = '';
+                    const uamIngestUrlEl = document.getElementById('dest-uam-ingest-url');
+                    if (uamIngestUrlEl) uamIngestUrlEl.value = 'https://ingest.us1.sentinelone.net';
+                    const uamAccountIdEl = document.getElementById('dest-uam-account-id');
+                    if (uamAccountIdEl) uamAccountIdEl.value = '';
+                    const uamSiteIdEl = document.getElementById('dest-uam-site-id');
+                    if (uamSiteIdEl) uamSiteIdEl.value = '';
+                    const uamServiceTokenEl = document.getElementById('dest-uam-service-token');
+                    if (uamServiceTokenEl) uamServiceTokenEl.value = '';
                     
                     // Switch to Generate tab to use it
                     const genBtn = document.querySelector('.nav-tab[data-target="generate-section"]');
@@ -1836,6 +2061,10 @@
             const configApiUrl = document.getElementById('edit-config-api-url').value.trim();
             const configWriteToken = document.getElementById('edit-config-write-token').value.trim();
             const powerqueryReadToken = document.getElementById('edit-powerquery-read-token').value.trim();
+            const uamIngestUrl = document.getElementById('edit-uam-ingest-url').value.trim();
+            const uamAccountId = document.getElementById('edit-uam-account-id').value.trim();
+            const uamSiteId = document.getElementById('edit-uam-site-id').value.trim();
+            const uamServiceToken = document.getElementById('edit-uam-service-token').value.trim();
             
             try {
                 const payload = {};
@@ -1845,6 +2074,10 @@
                 if (configApiUrl) payload.config_api_url = configApiUrl;
                 if (configWriteToken) payload.config_write_token = configWriteToken;
                 if (powerqueryReadToken) payload.powerquery_read_token = powerqueryReadToken;
+                if (uamIngestUrl) payload.uam_ingest_url = uamIngestUrl;
+                if (uamAccountId) payload.uam_account_id = uamAccountId;
+                payload.uam_site_id = uamSiteId;  // Allow clearing with empty string
+                if (uamServiceToken) payload.uam_service_token = uamServiceToken;
                 
                 if (Object.keys(payload).length === 0) {
                     alert('No changes to save');
@@ -2882,6 +3115,341 @@
         
         // Initialize correlation scenarios
         fetchCorrelationScenarios();
+
+        // =============================================================================
+        // ALERTS (UAM Ingest API)
+        // =============================================================================
+
+        const alertTemplateSelect = document.getElementById('alert-template-select');
+        const alertTemplateDetails = document.getElementById('alert-template-details');
+        const alertForm = document.getElementById('alert-form');
+        const sendAlertBtn = document.getElementById('send-alert-btn');
+        const sendCustomAlertBtn = document.getElementById('send-custom-alert-btn');
+        const alertOutputBox = document.getElementById('alert-output-box');
+        const alertDestSelect = document.getElementById('alert-destination-select');
+        const alertDestInfo = document.getElementById('alert-dest-info');
+        const alertDestWarning = document.getElementById('alert-dest-warning');
+        const alertScopePreview = document.getElementById('alert-scope-preview');
+
+        let alertTemplatesData = [];
+        let alertDestinations = [];  // HEC destinations with UAM config
+
+        // Populate alert destination selector from existing destinations
+        async function refreshAlertDestinations() {
+            try {
+                const res = await fetch('/destinations');
+                const data = await res.json();
+                const allDests = data.destinations || [];
+                // Filter to HEC destinations only
+                alertDestinations = allDests.filter(d => d.type === 'hec');
+
+                alertDestSelect.innerHTML = '';
+                if (alertDestinations.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.value = '';
+                    opt.textContent = 'No HEC destinations configured';
+                    opt.disabled = true;
+                    opt.selected = true;
+                    alertDestSelect.appendChild(opt);
+                } else {
+                    const placeholder = document.createElement('option');
+                    placeholder.value = '';
+                    placeholder.textContent = 'Select a destination...';
+                    placeholder.disabled = true;
+                    placeholder.selected = true;
+                    alertDestSelect.appendChild(placeholder);
+
+                    alertDestinations.forEach(d => {
+                        const opt = document.createElement('option');
+                        opt.value = d.id;
+                        const uamStatus = d.has_uam_service_token ? '✓ UAM' : '⚠ No UAM';
+                        opt.textContent = `${d.name} [${uamStatus}]`;
+                        alertDestSelect.appendChild(opt);
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to fetch destinations for alerts:', err);
+                alertDestSelect.innerHTML = '<option disabled selected>Error loading destinations</option>';
+            }
+        }
+
+        // Handle alert destination selection — show UAM info
+        alertDestSelect.addEventListener('change', () => {
+            const destId = alertDestSelect.value;
+            const dest = alertDestinations.find(d => d.id === destId);
+            if (!dest) {
+                alertDestInfo.style.display = 'none';
+                alertDestWarning.style.display = 'none';
+                return;
+            }
+
+            // Show info panel
+            document.getElementById('alert-dest-ingest-url').textContent = dest.uam_ingest_url || '—';
+            document.getElementById('alert-dest-account-id').textContent = dest.uam_account_id || '—';
+            document.getElementById('alert-dest-site-id').textContent = dest.uam_site_id || '(none)';
+            document.getElementById('alert-dest-token-status').textContent = dest.has_uam_service_token ? '✓ Configured' : '✗ Not set';
+
+            // Scope preview
+            if (dest.uam_account_id) {
+                alertScopePreview.textContent = dest.uam_site_id
+                    ? `${dest.uam_account_id}:${dest.uam_site_id}`
+                    : dest.uam_account_id;
+            } else {
+                alertScopePreview.textContent = '—';
+            }
+
+            alertDestInfo.style.display = '';
+
+            // Show warning if missing required UAM fields
+            if (!dest.has_uam_service_token || !dest.uam_account_id || !dest.uam_ingest_url) {
+                const missing = [];
+                if (!dest.uam_ingest_url) missing.push('UAM Ingest URL');
+                if (!dest.uam_account_id) missing.push('Account ID');
+                if (!dest.has_uam_service_token) missing.push('Service Account Token');
+                document.getElementById('alert-dest-warning-text').textContent =
+                    `Missing: ${missing.join(', ')}. Go to Settings → Edit Destination to configure.`;
+                alertDestWarning.style.display = '';
+            } else {
+                alertDestWarning.style.display = 'none';
+            }
+        });
+
+        // Fetch alert templates
+        async function fetchAlertTemplates() {
+            try {
+                const res = await fetch('/alerts/templates');
+                const data = await res.json();
+                alertTemplatesData = data.templates || [];
+
+                alertTemplateSelect.innerHTML = '';
+                if (alertTemplatesData.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.value = '';
+                    opt.textContent = 'No templates available';
+                    opt.disabled = true;
+                    opt.selected = true;
+                    alertTemplateSelect.appendChild(opt);
+                } else {
+                    const placeholder = document.createElement('option');
+                    placeholder.value = '';
+                    placeholder.textContent = 'Select a template...';
+                    placeholder.disabled = true;
+                    placeholder.selected = true;
+                    alertTemplateSelect.appendChild(placeholder);
+
+                    alertTemplatesData.forEach(t => {
+                        const opt = document.createElement('option');
+                        opt.value = t.id;
+                        opt.textContent = `${t.title} (${t.class_name})`;
+                        alertTemplateSelect.appendChild(opt);
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to fetch alert templates:', err);
+                alertTemplateSelect.innerHTML = '<option disabled selected>Error loading templates</option>';
+            }
+        }
+
+        // Handle template selection — show details and load full JSON into custom textarea
+        alertTemplateSelect.addEventListener('change', async () => {
+            const selectedId = alertTemplateSelect.value;
+            const template = alertTemplatesData.find(t => t.id === selectedId);
+            if (template) {
+                document.getElementById('alert-template-title').textContent = template.title;
+                document.getElementById('alert-template-class').textContent = template.class_name;
+                const severityMap = {1: 'Informational', 2: 'Low', 3: 'Medium', 4: 'High', 5: 'Critical'};
+                document.getElementById('alert-template-severity').textContent = severityMap[template.severity_id] || `ID: ${template.severity_id}`;
+                document.getElementById('alert-template-finding').textContent = template.finding_title;
+                alertTemplateDetails.style.display = '';
+
+                // Fetch full template JSON and populate custom textarea as baseline
+                try {
+                    const res = await fetch(`/alerts/templates/${encodeURIComponent(selectedId)}`);
+                    const data = await res.json();
+                    if (data.template) {
+                        document.getElementById('alert-custom-json').value = JSON.stringify(data.template, null, 2);
+                    }
+                } catch (err) {
+                    console.error('Failed to load full template JSON:', err);
+                }
+            } else {
+                alertTemplateDetails.style.display = 'none';
+            }
+        });
+
+        // Helper: resolve UAM credentials from destination
+        async function resolveUamCredentials(destId) {
+            const res = await fetch(`/alerts/resolve-uam/${encodeURIComponent(destId)}`);
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || `Failed to resolve UAM credentials (${res.status})`);
+            }
+            return await res.json();
+        }
+
+        // Send alert from template
+        alertForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const templateId = alertTemplateSelect.value;
+            const destId = alertDestSelect.value;
+            const count = parseInt(document.getElementById('alert-count').value, 10) || 1;
+
+            if (!templateId) { alert('Please select an alert template'); return; }
+            if (!destId) { alert('Please select a destination'); return; }
+
+            // Build overrides
+            const overrides = {};
+            const overrideTitle = document.getElementById('alert-override-title').value.trim();
+            const overrideFindingTitle = document.getElementById('alert-override-finding-title').value.trim();
+            const overrideSeverity = document.getElementById('alert-override-severity').value;
+            if (overrideTitle) overrides.title = overrideTitle;
+            if (overrideFindingTitle) overrides.finding_title = overrideFindingTitle;
+            if (overrideSeverity) overrides.severity_id = parseInt(overrideSeverity, 10);
+
+            sendAlertBtn.disabled = true;
+            sendAlertBtn.innerText = 'Sending...';
+            const destName = alertDestinations.find(d => d.id === destId)?.name || destId;
+            const templateName = alertTemplatesData.find(t => t.id === templateId)?.title || templateId;
+            alertOutputBox.innerText = `━━━ Alert Send (Template) ━━━\n`;
+            alertOutputBox.innerText += `Template:    ${templateName} (${templateId})\n`;
+            alertOutputBox.innerText += `Destination: ${destName}\n`;
+            alertOutputBox.innerText += `Count:       ${count}\n`;
+            if (Object.keys(overrides).length > 0) alertOutputBox.innerText += `Overrides:   ${JSON.stringify(overrides)}\n`;
+            alertOutputBox.innerText += `\nResolving UAM credentials...\n`;
+
+            try {
+                // Resolve UAM token + account info from destination
+                const uamCreds = await resolveUamCredentials(destId);
+                const { token, account_id, site_id, uam_ingest_url } = uamCreds;
+
+                alertOutputBox.innerText += `Endpoint:    ${uam_ingest_url}/v1/alerts\n`;
+                alertOutputBox.innerText += `S1-Scope:    ${site_id ? account_id + ':' + site_id : account_id}\n`;
+                alertOutputBox.innerText += `Encoding:    gzip\n`;
+                alertOutputBox.innerText += `\nSending ${count} alert(s)...\n\n`;
+
+                const payload = {
+                    template_id: templateId,
+                    token: token,
+                    account_id: account_id,
+                    uam_ingest_url: uam_ingest_url,
+                    count: count
+                };
+                if (site_id) payload.site_id = site_id;
+                if (Object.keys(overrides).length > 0) payload.overrides = overrides;
+
+                const res = await fetch('/alerts/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+
+                if (data.error) {
+                    alertOutputBox.innerText += `\n❌ Error: ${data.error}\n`;
+                    if (data.detail) alertOutputBox.innerText += `Detail: ${data.detail}\n`;
+                } else {
+                    const summary = data.summary || {};
+                    alertOutputBox.innerText += `✅ Results: ${summary.successful || 0} successful, ${summary.failed || 0} failed\n\n`;
+
+                    (data.results || []).forEach((r, i) => {
+                        if (r.success) {
+                            alertOutputBox.innerText += `  [${i + 1}] ✓ Status ${r.status} - UID: ${r.alert_uid}\n`;
+                            if (r.data && Object.keys(r.data).length > 0) {
+                                alertOutputBox.innerText += `       Response: ${JSON.stringify(r.data)}\n`;
+                            }
+                        } else {
+                            alertOutputBox.innerText += `  [${i + 1}] ✗ ${r.error || 'Unknown error'}\n`;
+                            if (r.detail) alertOutputBox.innerText += `       Detail: ${r.detail}\n`;
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error('Alert send error:', err);
+                alertOutputBox.innerText += `\n❌ ${err.message}\n`;
+            } finally {
+                sendAlertBtn.disabled = false;
+                sendAlertBtn.innerText = 'Send Alert';
+            }
+        });
+
+        // Send custom alert JSON
+        sendCustomAlertBtn.addEventListener('click', async () => {
+            const customJsonText = document.getElementById('alert-custom-json').value.trim();
+            const destId = alertDestSelect.value;
+            const autoUid = document.getElementById('alert-custom-auto-uid').checked;
+
+            if (!customJsonText) { alert('Please paste alert JSON in the Custom Alert JSON section'); return; }
+            if (!destId) { alert('Please select a destination'); return; }
+
+            let alertJson;
+            try {
+                alertJson = JSON.parse(customJsonText);
+            } catch (parseErr) {
+                alert('Invalid JSON: ' + parseErr.message);
+                return;
+            }
+
+            sendCustomAlertBtn.disabled = true;
+            sendCustomAlertBtn.innerText = 'Sending...';
+            const destNameCustom = alertDestinations.find(d => d.id === destId)?.name || destId;
+            alertOutputBox.innerText = `━━━ Alert Send (Custom JSON) ━━━\n`;
+            alertOutputBox.innerText += `Destination:     ${destNameCustom}\n`;
+            alertOutputBox.innerText += `Auto-gen UID:    ${autoUid}\n`;
+            alertOutputBox.innerText += `Payload size:    ${customJsonText.length} chars\n`;
+            alertOutputBox.innerText += `\nResolving UAM credentials...\n`;
+
+            try {
+                const uamCreds = await resolveUamCredentials(destId);
+                const { token, account_id, site_id, uam_ingest_url } = uamCreds;
+
+                alertOutputBox.innerText += `Endpoint:        ${uam_ingest_url}/v1/alerts\n`;
+                alertOutputBox.innerText += `S1-Scope:        ${site_id ? account_id + ':' + site_id : account_id}\n`;
+                alertOutputBox.innerText += `Encoding:        gzip\n`;
+                alertOutputBox.innerText += `\nSending custom alert...\n\n`;
+
+                const payload = {
+                    alert_json: alertJson,
+                    token: token,
+                    account_id: account_id,
+                    uam_ingest_url: uam_ingest_url,
+                    auto_generate_uid: autoUid
+                };
+                if (site_id) payload.site_id = site_id;
+
+                const res = await fetch('/alerts/send-custom', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+
+                if (data.error) {
+                    alertOutputBox.innerText += `❌ Error: ${data.error}\n`;
+                    if (data.detail) alertOutputBox.innerText += `Detail: ${data.detail}\n`;
+                } else if (data.success) {
+                    alertOutputBox.innerText += `✅ Alert sent successfully! Status: ${data.status}\n`;
+                    if (data.data && Object.keys(data.data).length > 0) {
+                        alertOutputBox.innerText += `Response: ${JSON.stringify(data.data)}\n`;
+                    }
+                } else {
+                    alertOutputBox.innerText += `❌ Alert failed: ${data.error || 'Unknown error'}\n`;
+                    if (data.detail) alertOutputBox.innerText += `Detail: ${data.detail}\n`;
+                }
+            } catch (err) {
+                console.error('Custom alert send error:', err);
+                alertOutputBox.innerText += `\n❌ ${err.message}\n`;
+            } finally {
+                sendCustomAlertBtn.disabled = false;
+                sendCustomAlertBtn.innerText = 'Send Custom JSON';
+            }
+        });
+
+        // Initialize alert templates and destinations
+        fetchAlertTemplates();
+        refreshAlertDestinations();
 
         })();
     });
