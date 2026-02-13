@@ -1,0 +1,85 @@
+{
+    "activity_id": 1,
+    "attack_surface_ids": [1],
+    "category_uid": 2,
+    "category_name": "Findings",
+    "class_name": "S1 Security Alert",
+    "class_uid": 99602001,
+    "type_name": "S1 Security Alert: Create",
+    "type_uid": 9960200101,
+    "finding_info": {
+        "title": "Suspicious Activity",
+        "uid": "placeholder_uid",
+        "desc": "Malware Detection - Suspicious file activity detected"
+    },
+    "evidences": [
+        {
+            "process": {
+                "file": {
+                    "name": "malicious_file.exe",
+                    "path": "/usr/local/bin/malicious_file.exe",
+                    "size": 1024000,
+                    "hashes": [
+                        {
+                            "algorithm_id": 6,
+                            "value": "2c4d2c6262d46313990e31bf7b6437028a566ba8"
+                        },
+                        {
+                            "algorithm_id": 1,
+                            "value": "d41d8cd98f00b204e9800998ecf8427e"
+                        },
+                        {
+                            "algorithm_id": 2,
+                            "value": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+                        }
+                    ],
+                    "signature": {
+                        "algorithm_id": 3,
+                        "certificate": {
+                            "subject": "CN=CodeSign Cert, O=Acme Corp, C=US",
+                            "serial_number": "1234567890ABCDEF",
+                            "expiration_time": 1718400000000,
+                            "fingerprints": [
+                                {
+                                    "algorithm_id": 6,
+                                    "value": "2c4d2c6262d46313990e31bf7b6437028a566ba8"
+                                },
+                                {
+                                    "algorithm_id": 1,
+                                    "value": "d41d8cd98f00b204e9800998ecf8427e"
+                                }
+                            ],
+                            "issuer": "Acme Corp"
+                        }
+                    },
+                    "type_id": 3
+                }
+            }
+        }
+    ],
+    "resources": [
+        {
+            "name": "endpoint-workstation-01",
+            "uid": "res-001"
+        }
+    ],
+    "metadata": {
+        "version": "1.1.0",
+        "extension": {
+            "name": "s1",
+            "uid": "998",
+            "version": "0.1.0"
+        },
+        "product": {
+            "name": "HELIOS",
+            "vendor_name": "RoarinPenguin"
+        },
+        "logged_time": "DYNAMIC",
+        "modified_time": "DYNAMIC"
+    },
+    "time": "DYNAMIC",
+    "severity_id": 1,
+    "state_id": 1,
+    "s1_classification_id": 0,
+    "confidence_id": 1
+}

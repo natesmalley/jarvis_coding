@@ -1,0 +1,40 @@
+{
+    "finding_info": {
+        "uid": "placeholder_uid",
+        "title": "SharePoint Data Exfiltration Detected",
+        "desc": "User jeanluc@starfleet.com accessed and downloaded multiple sensitive documents from SharePoint sites including Personnel Records, Command Codes, and Enterprise Schematics. Pattern consistent with data exfiltration after initial compromise."
+    },
+    "resources": [
+        {
+            "uid": "jeanluc@starfleet.com",
+            "name": "jeanluc@starfleet.com"
+        }
+    ],
+    "severity": "high",
+    "category_uid": 2,
+    "class_uid": 99602001,
+    "class_name": "S1 Security Alert",
+    "type_uid": 9960200101,
+    "type_name": "S1 Security Alert: Create",
+    "category_name": "Findings",
+    "activity_id": 1,
+    "metadata": {
+        "version": "1.1.0",
+        "extension": {
+            "name": "s1",
+            "uid": "998",
+            "version": "0.1.0"
+        },
+        "product": {
+            "name": "Microsoft 365",
+            "vendor_name": "Microsoft"
+        },
+        "logged_time": "DYNAMIC",
+        "modified_time": "DYNAMIC"
+    },
+    "time": "DYNAMIC",
+    "attack_surface_ids": [1],
+    "severity_id": 4,
+    "state_id": 1,
+    "s1_classification_id": 27
+}
