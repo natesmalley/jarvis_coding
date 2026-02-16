@@ -28,6 +28,12 @@ class DestinationCreate(BaseModel):
     config_write_token: Optional[str] = Field(None, description="Config API token for reading and writing parsers")
     powerquery_read_token: Optional[str] = Field(None, description="PowerQuery Log Read Access token for querying SIEM data")
     
+    # UAM Alert Ingest (Service Account)
+    uam_ingest_url: Optional[str] = Field(None, description="UAM ingest URL (e.g., https://ingest.us1.sentinelone.net)")
+    uam_account_id: Optional[str] = Field(None, description="SentinelOne account ID for S1-Scope header")
+    uam_site_id: Optional[str] = Field(None, description="Optional SentinelOne site ID for S1-Scope header")
+    uam_service_token: Optional[str] = Field(None, description="Service Account bearer token for UAM alert API")
+    
     # Syslog fields
     ip: Optional[str] = Field(None, description="Syslog IP (required for syslog destinations)")
     port: Optional[int] = Field(None, description="Syslog port (required for syslog destinations)")
@@ -42,6 +48,10 @@ class DestinationUpdate(BaseModel):
     config_api_url: Optional[str] = None
     config_write_token: Optional[str] = None
     powerquery_read_token: Optional[str] = None
+    uam_ingest_url: Optional[str] = None
+    uam_account_id: Optional[str] = None
+    uam_site_id: Optional[str] = None
+    uam_service_token: Optional[str] = None
     ip: Optional[str] = None
     port: Optional[int] = None
     protocol: Optional[str] = None
@@ -62,6 +72,10 @@ class DestinationResponse(BaseModel):
     config_api_url: Optional[str] = None  # Config API URL for parser management
     has_config_write_token: Optional[bool] = None  # True if config API token is set
     has_powerquery_read_token: Optional[bool] = None  # True if PowerQuery read token is set
+    uam_ingest_url: Optional[str] = None  # UAM ingest URL
+    uam_account_id: Optional[str] = None  # SentinelOne account ID
+    uam_site_id: Optional[str] = None  # Optional site ID
+    has_uam_service_token: Optional[bool] = None  # True if UAM service token is set
 
 
 class DestinationWithToken(DestinationResponse):
@@ -139,6 +153,10 @@ async def create_destination(
             config_api_url=destination.config_api_url,
             config_write_token=destination.config_write_token,
             powerquery_read_token=destination.powerquery_read_token,
+            uam_ingest_url=destination.uam_ingest_url,
+            uam_account_id=destination.uam_account_id,
+            uam_site_id=destination.uam_site_id,
+            uam_service_token=destination.uam_service_token,
             ip=destination.ip,
             port=destination.port,
             protocol=destination.protocol
@@ -272,6 +290,10 @@ async def update_destination(
             config_api_url=update.config_api_url,
             config_write_token=update.config_write_token,
             powerquery_read_token=update.powerquery_read_token,
+            uam_ingest_url=update.uam_ingest_url,
+            uam_account_id=update.uam_account_id,
+            uam_site_id=update.uam_site_id,
+            uam_service_token=update.uam_service_token,
             ip=update.ip,
             port=update.port,
             protocol=update.protocol
@@ -396,4 +418,57 @@ async def get_destination_config_tokens(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to decrypt config token"
+        )
+
+
+@router.get("/{dest_id}/uam-token")
+async def get_destination_uam_token(
+    dest_id: str,
+    session: AsyncSession = Depends(get_session),
+    auth_info: tuple = Depends(get_api_key)
+):
+    """
+    Get decrypted UAM Service Account token for a destination (internal use only)
+    
+    Returns the decrypted UAM service token along with account_id, site_id, and ingest URL
+    """
+    service = DestinationService(session)
+    destination = await service.get_destination(dest_id)
+    if not destination:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Destination '{dest_id}' not found"
+        )
+    
+    if destination.type != 'hec':
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only HEC destinations have UAM tokens"
+        )
+    
+    if not destination.uam_service_token_encrypted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No UAM Service Account token found for this destination"
+        )
+    
+    if not destination.uam_account_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No UAM Account ID configured for this destination"
+        )
+    
+    try:
+        token = service.decrypt_token(destination.uam_service_token_encrypted)
+        return {
+            "token": token,
+            "account_id": destination.uam_account_id,
+            "site_id": destination.uam_site_id,
+            "uam_ingest_url": destination.uam_ingest_url or "https://ingest.us1.sentinelone.net"
+        }
+    except Exception as e:
+        logger.error(f"Failed to decrypt UAM token: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to decrypt UAM token"
         )

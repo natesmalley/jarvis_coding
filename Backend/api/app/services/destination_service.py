@@ -76,6 +76,10 @@ class DestinationService:
         config_api_url: Optional[str] = None,
         config_write_token: Optional[str] = None,
         powerquery_read_token: Optional[str] = None,
+        uam_ingest_url: Optional[str] = None,
+        uam_account_id: Optional[str] = None,
+        uam_site_id: Optional[str] = None,
+        uam_service_token: Optional[str] = None,
         ip: Optional[str] = None,
         port: Optional[int] = None,
         protocol: Optional[str] = None
@@ -133,6 +137,14 @@ class DestinationService:
                 destination.config_write_token_encrypted = self.encryption.encrypt(config_write_token)
             if powerquery_read_token:
                 destination.powerquery_read_token_encrypted = self.encryption.encrypt(powerquery_read_token)
+            if uam_ingest_url:
+                destination.uam_ingest_url = uam_ingest_url.rstrip('/')
+            if uam_account_id:
+                destination.uam_account_id = uam_account_id
+            if uam_site_id:
+                destination.uam_site_id = uam_site_id
+            if uam_service_token:
+                destination.uam_service_token_encrypted = self.encryption.encrypt(uam_service_token)
         elif dest_type == 'syslog':
             destination.ip = ip
             destination.port = port
@@ -173,6 +185,10 @@ class DestinationService:
         config_api_url: Optional[str] = None,
         config_write_token: Optional[str] = None,
         powerquery_read_token: Optional[str] = None,
+        uam_ingest_url: Optional[str] = None,
+        uam_account_id: Optional[str] = None,
+        uam_site_id: Optional[str] = None,
+        uam_service_token: Optional[str] = None,
         ip: Optional[str] = None,
         port: Optional[int] = None,
         protocol: Optional[str] = None
@@ -196,6 +212,14 @@ class DestinationService:
                 destination.config_write_token_encrypted = self.encryption.encrypt(config_write_token)
             if powerquery_read_token:
                 destination.powerquery_read_token_encrypted = self.encryption.encrypt(powerquery_read_token)
+            if uam_ingest_url:
+                destination.uam_ingest_url = uam_ingest_url.rstrip('/')
+            if uam_account_id:
+                destination.uam_account_id = uam_account_id
+            if uam_site_id is not None:  # Allow clearing site_id with empty string
+                destination.uam_site_id = uam_site_id or None
+            if uam_service_token:
+                destination.uam_service_token_encrypted = self.encryption.encrypt(uam_service_token)
         elif destination.type == 'syslog':
             if ip:
                 destination.ip = ip

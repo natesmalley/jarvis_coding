@@ -30,9 +30,13 @@ import json
 import os
 import sys
 import uuid
+import copy
+import gzip
 import threading
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
+
+import requests
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 backend_dir = os.path.dirname(script_dir)
@@ -142,6 +146,34 @@ CORRELATION_CONFIG = {
     "fallback_behavior": "offset_from_now"
 }
 
+# Alert configuration for scenario phases
+ALERT_PHASE_MAPPING = {
+    "📬 PHASE 2: Email Interaction": {
+        "template": "proofpoint_email_alert",
+        "offset_minutes": 2,  # 2 min after delivery (user clicks link)
+        "overrides": {
+            "finding_info.title": "Malicious Email Link Clicked",
+            "finding_info.desc": f"User {VICTIM_PROFILE['email']} clicked malicious link in phishing email from {ATTACKER_PROFILE['sender_email']}"
+        }
+    },
+    "📤 PHASE 4: Data Exfiltration": {
+        "template": "sharepoint_data_exfil_alert",
+        "offset_minutes": 20,  # 20 min after initial compromise
+        "overrides": {
+            "finding_info.title": "Data Exfiltration from SharePoint",
+            "finding_info.desc": f"User {VICTIM_PROFILE['email']} downloaded sensitive documents including Personnel Records and Command Codes"
+        }
+    },
+    "rdp_download": {
+        "template": "o365_rdp_sharepoint_access",
+        "offset_minutes": 25,  # 25 min after initial compromise
+        "overrides": {
+            "finding_info.title": "Apollo Ransomware - RDP Files Downloaded",
+            "finding_info.desc": f"User {VICTIM_PROFILE['email']} downloaded RDP files from SharePoint - potential lateral movement preparation"
+        }
+    }
+}
+
 
 def resolve_time_anchors(siem_context: Dict, anchors_config: List[Dict]) -> Dict[str, datetime]:
     """Resolve time anchors from SIEM query results or pre-resolved anchors"""
@@ -217,6 +249,117 @@ def get_scenario_time(base_time: datetime, minutes_offset: int, seconds_offset: 
 
 def create_event(timestamp: str, source: str, phase: str, event_data: dict) -> Dict:
     return {"timestamp": timestamp, "source": source, "phase": phase, "event": event_data}
+
+
+def load_alert_template(template_id: str) -> Optional[Dict]:
+    """Load an alert template JSON from the templates directory"""
+    templates_dir = os.path.join(backend_dir, 'api', 'app', 'alerts', 'templates')
+    template_path = os.path.join(templates_dir, f"{template_id}.json")
+    if not os.path.exists(template_path):
+        print(f"   ⚠️  Template not found: {template_path}")
+        return None
+    with open(template_path, 'r') as f:
+        return json.load(f)
+
+
+def send_phase_alert(
+    phase_name: str,
+    base_time: datetime,
+    uam_config: dict
+) -> bool:
+    """Send alert for a specific phase with correct timing.
+    
+    Standalone implementation — loads template from disk and sends
+    directly via requests + gzip. No AlertService dependency.
+    """
+    if phase_name not in ALERT_PHASE_MAPPING:
+        return False
+    
+    mapping = ALERT_PHASE_MAPPING[phase_name]
+    
+    # Load template
+    template = load_alert_template(mapping["template"])
+    if not template:
+        return False
+    
+    alert = copy.deepcopy(template)
+    
+    # Calculate alert timestamp
+    alert_time = base_time + timedelta(minutes=mapping["offset_minutes"])
+    time_ms = int(alert_time.timestamp() * 1000)
+    
+    # Inject fresh UID
+    if "finding_info" not in alert:
+        alert["finding_info"] = {}
+    alert["finding_info"]["uid"] = str(uuid.uuid4())
+    
+    # Set timestamps
+    alert["time"] = time_ms
+    if "metadata" not in alert:
+        alert["metadata"] = {}
+    alert["metadata"]["logged_time"] = time_ms
+    alert["metadata"]["modified_time"] = time_ms
+    
+    # Set user as the resource
+    alert["resources"] = [{
+        "uid": VICTIM_PROFILE["email"],
+        "name": VICTIM_PROFILE["email"]
+    }]
+    
+    # Apply overrides
+    overrides = mapping.get("overrides", {})
+    for key, value in overrides.items():
+        if "." in key:
+            keys = key.split(".")
+            current = alert
+            for k in keys[:-1]:
+                if k not in current:
+                    current[k] = {}
+                current = current[k]
+            current[keys[-1]] = value
+        else:
+            alert[key] = value
+    
+    # Send alert via UAM ingest API
+    try:
+        ingest_url = uam_config['uam_ingest_url'].rstrip('/') + '/v1/alerts'
+        scope = uam_config['uam_account_id']
+        if uam_config.get('uam_site_id'):
+            scope = f"{scope}:{uam_config['uam_site_id']}"
+        
+        headers = {
+            "Authorization": f"Bearer {uam_config['uam_service_token']}",
+            "S1-Scope": scope,
+            "Content-Encoding": "gzip",
+            "Content-Type": "application/json",
+        }
+        
+        payload = json.dumps(alert).encode("utf-8")
+        gzipped = gzip.compress(payload)
+        
+        print(f"\n      📤 Alert Details:")
+        print(f"         Template: {mapping['template']}")
+        print(f"         Title: {alert.get('finding_info', {}).get('title', 'N/A')}")
+        print(f"         User: {VICTIM_PROFILE['email']}")
+        print(f"         Time: {alert_time.isoformat()} ({time_ms}ms)")
+        print(f"         URL: {ingest_url}")
+        print(f"         Scope: {scope}")
+        print(f"         Payload: {len(payload)} bytes -> {len(gzipped)} bytes (gzip)")
+        print(f"         Full JSON: {json.dumps(alert, indent=2)}")
+        
+        resp = requests.post(ingest_url, headers=headers, data=gzipped, timeout=30)
+        
+        print(f"         Response: {resp.status_code} {resp.reason}")
+        if resp.content:
+            print(f"         Body: {resp.text[:200]}")
+        
+        return resp.status_code == 202
+        
+    except Exception as e:
+        print(f"   ✗ Alert send failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 
 def generate_proofpoint_phishing_delivery(base_time: datetime) -> List[Dict]:
@@ -423,6 +566,21 @@ def generate_m365_sharepoint_exfil(base_time: datetime) -> List[Dict]:
         m365_download['RequestedBy'] = VICTIM_PROFILE['name']
         events.append(create_event(download_time, "microsoft_365_collaboration", "sharepoint_exfil", m365_download))
     
+    # Add RDP file download event - 5 minutes after exfil starts
+    rdp_time = get_scenario_time(base_time, 25, 0)
+    m365_rdp = microsoft_365_collaboration_log()
+    m365_rdp['TimeStamp'] = rdp_time
+    m365_rdp['UserId'] = VICTIM_PROFILE['email']
+    m365_rdp['ClientIP'] = VICTIM_PROFILE['client_ip']
+    m365_rdp['Operation'] = 'FileDownloaded'
+    m365_rdp['Workload'] = 'SharePoint'
+    m365_rdp['ObjectId'] = "/sites/IT-Admin/Shared Documents/Remote/enterprise-access.rdp"
+    m365_rdp['FileName'] = "enterprise-access.rdp"
+    m365_rdp['SiteUrl'] = "https://starfleet.sharepoint.com/sites/IT-Admin"
+    m365_rdp['Details'] = f"User {VICTIM_PROFILE['email']} downloaded RDP file - potential lateral movement tool"
+    m365_rdp['RequestedBy'] = VICTIM_PROFILE['name']
+    events.append(create_event(rdp_time, "microsoft_365_collaboration", "rdp_download", m365_rdp))
+    
     return events
 
 
@@ -476,6 +634,31 @@ def generate_apollo_ransomware_scenario(siem_context: Optional[Dict] = None) -> 
     print(f"Base Time: {base_time.isoformat()}")
     print("=" * 80 + "\n")
     
+    # Initialize alert detonation from env vars
+    alerts_enabled = os.getenv('SCENARIO_ALERTS_ENABLED', 'false').lower() == 'true'
+    uam_config = None
+    
+    if alerts_enabled:
+        uam_ingest_url = os.getenv('UAM_INGEST_URL', '')
+        uam_account_id = os.getenv('UAM_ACCOUNT_ID', '')
+        uam_service_token = os.getenv('UAM_SERVICE_TOKEN', '')
+        uam_site_id = os.getenv('UAM_SITE_ID', '')
+        
+        if uam_ingest_url and uam_account_id and uam_service_token:
+            uam_config = {
+                'uam_ingest_url': uam_ingest_url,
+                'uam_account_id': uam_account_id,
+                'uam_service_token': uam_service_token,
+                'uam_site_id': uam_site_id,
+            }
+            print("\n🚨 ALERT DETONATION ENABLED")
+            print(f"   UAM Ingest: {uam_ingest_url}")
+            print(f"   Account ID: {uam_account_id}")
+            print("=" * 80)
+        else:
+            print("⚠️  SCENARIO_ALERTS_ENABLED=true but UAM credentials missing")
+            alerts_enabled = False
+    
     all_events = []
     
     # Build phases with appropriate base times
@@ -509,6 +692,18 @@ def generate_apollo_ransomware_scenario(siem_context: Optional[Dict] = None) -> 
         phase_events = generator_func(phase_base_time)
         all_events.extend(phase_events)
         print(f"   ✓ Generated {len(phase_events)} events")
+        
+        # Send corresponding alert if enabled and phase has alert mapping
+        if alerts_enabled and phase_name in ALERT_PHASE_MAPPING:
+            print(f"   📤 Sending alert for {phase_name}...", end=" ")
+            success = send_phase_alert(phase_name, phase_base_time, uam_config)
+            print(f"{'✓' if success else '✗'}")
+        
+        # Send RDP alert after data exfiltration phase
+        if alerts_enabled and phase_name == "📤 PHASE 4: Data Exfiltration":
+            print(f"   📤 Sending RDP download alert...", end=" ")
+            success = send_phase_alert("rdp_download", phase_base_time, uam_config)
+            print(f"{'✓' if success else '✗'}")
     
     all_events.sort(key=lambda x: x["timestamp"])
     

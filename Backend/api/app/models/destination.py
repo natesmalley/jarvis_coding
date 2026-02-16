@@ -24,6 +24,12 @@ class Destination(Base):
     config_write_token_encrypted = Column(Text, nullable=True)  # For putFile API
     powerquery_read_token_encrypted = Column(Text, nullable=True)  # For PowerQuery Log Read Access
     
+    # UAM Alert Ingest (Service Account - separate from HEC)
+    uam_ingest_url = Column(String, nullable=True)  # e.g., https://ingest.us1.sentinelone.net
+    uam_account_id = Column(String, nullable=True)  # SentinelOne account ID
+    uam_site_id = Column(String, nullable=True)  # Optional SentinelOne site ID
+    uam_service_token_encrypted = Column(Text, nullable=True)  # Encrypted Service Account token
+    
     # Syslog fields
     ip = Column(String, nullable=True)
     port = Column(Integer, nullable=True)
@@ -62,6 +68,12 @@ class Destination(Base):
             result['config_api_url'] = self.config_api_url
             result['has_config_write_token'] = bool(self.config_write_token_encrypted)
             result['has_powerquery_read_token'] = bool(self.powerquery_read_token_encrypted)
+            
+            # UAM Alert Ingest settings
+            result['uam_ingest_url'] = self.uam_ingest_url
+            result['uam_account_id'] = self.uam_account_id
+            result['uam_site_id'] = self.uam_site_id
+            result['has_uam_service_token'] = bool(self.uam_service_token_encrypted)
         elif self.type == 'syslog':
             result['ip'] = self.ip
             result['port'] = self.port
