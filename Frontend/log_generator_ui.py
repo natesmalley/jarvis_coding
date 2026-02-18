@@ -1686,6 +1686,7 @@ def generate_logs():
     eps = float(data.get('eps', 1.0))
     continuous = data.get('continuous', False)
     speed_mode = data.get('speed_mode', False)
+    ensure_parser = bool(data.get('ensure_parser', False))
     syslog_ip = data.get('ip')
     syslog_port = int(data.get('port')) if data.get('port') is not None else None
     syslog_protocol = data.get('protocol')
@@ -1828,6 +1829,21 @@ def generate_logs():
                     
                     hec_url = chosen.get('url')
                     dest_id = chosen.get('id')
+
+                    # Resolve config API URL + config write token (for optional parser sync)
+                    config_api_url = chosen.get('config_api_url')
+                    config_write_token = None
+                    if ensure_parser:
+                        try:
+                            token_res = requests.get(
+                                f"{API_BASE_URL}/api/v1/destinations/{dest_id}/config-tokens",
+                                headers=_get_api_headers(),
+                                timeout=10,
+                            )
+                            if token_res.status_code == 200:
+                                config_write_token = token_res.json().get('config_write_token')
+                        except Exception as e:
+                            logger.warning(f"Failed to resolve config tokens for destination {dest_id}: {e}")
                     
                     # Use local token if provided, otherwise fetch from backend
                     if local_hec_token:
@@ -1897,6 +1913,17 @@ def generate_logs():
                 env['S1_HEC_TLS_LOW'] = '1'
                 # Enable automatic insecure fallback as last resort
                 env['S1_HEC_AUTO_INSECURE'] = 'true'
+
+                if ensure_parser:
+                    env['JARVIS_ENSURE_PARSER'] = 'true'
+                    env['JARVIS_API_BASE_URL'] = API_BASE_URL
+                    if BACKEND_API_KEY:
+                        env['JARVIS_API_KEY'] = BACKEND_API_KEY
+                    if config_api_url and config_write_token:
+                        env['S1_CONFIG_API_URL'] = config_api_url
+                        env['S1_CONFIG_WRITE_TOKEN'] = config_write_token
+                    else:
+                        yield "INFO: ⚠️ Parser sync requested but destination is missing Config API URL or write token.\n"
                 
                 if continuous:
                     # Batch mode for continuous

@@ -371,6 +371,14 @@
                         </div>
                     </div>
 
+                    <div class="input-group">
+                        <label style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
+                            <input type="checkbox" id="ensure-parser" style="width: auto;">
+                            <span>Add parser if it doesn't exist</span>
+                        </label>
+                        <p class="text-xs text-[#b8a0d2] mt-1">For HEC destinations: checks & uploads the parser to the destination SIEM before sending events (requires Config API URL + write token on the destination).</p>
+                    </div>
+
                     <div class="flex gap-3">
                         <button type="submit" id="start-btn" class="btn flex-1">
                             Start Log Generation
@@ -2209,6 +2217,7 @@
             const eps = parseFloat(document.getElementById('eps').value);
             const continuousMode = continuousModeCheckbox.checked;
             const speedMode = speedModeCheckbox.checked;
+            const ensureParser = document.getElementById('ensure-parser')?.checked === true;
             const selectedOpt = destSelect.options[destSelect.selectedIndex];
             const destinationId = selectedOpt ? selectedOpt.value : '';
             const destinationType = selectedOpt ? selectedOpt.dataset.type : '';
@@ -2270,7 +2279,8 @@
                         speed_mode: speedMode,
                         destination_id: destinationId,
                         hec_token: localToken,  // Pass local token if available
-                        metadata: metadataFields  // Pass metadata fields if provided
+                        metadata: metadataFields,  // Pass metadata fields if provided
+                        ensure_parser: ensureParser
                     } : {
                         destination: 'syslog',
                         script: scriptPath,

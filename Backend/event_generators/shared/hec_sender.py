@@ -826,22 +826,19 @@ SOURCETYPE_MAP_OVERRIDES = {
     "aws_route53": "aws_route53-latest",
     "aws_vpc_dns": "aws_vpc_dns_logs-latest",
     "aws_vpcflow": "aws_vpcflow_logs-latest",
-    
     # Network security - actual directory names
     "fortinet_fortigate": "fortinet_fortigate_candidate_logs-latest",
     "fortimanager": "fortinet_fortigate_fortimanager_logs-latest",
     "checkpoint": "checkpoint_checkpoint_logs-latest",
-    "paloalto_firewall": "paloalto_logs-latest",
-    "paloalto_prismasase": "paloalto_prismasase_logs-latest",
+    "paloalto_firewall": "marketplace-paloaltonetworksfirewall-latest",
+    "paloalto_prismasase": "community-paloalto_prismasase_logs-latest",
     "cisco_firewall_threat_defense": "cisco_firewall_threat_defense-latest",
     "infoblox_ddi": "infoblox_ddi-latest",
-    
     # Zscaler products
     "zscaler": "zscaler_logs-latest",
     "zscaler_private_access": "zscaler_private_access-latest",
     "zscaler_firewall": "zscaler_firewall_logs-latest",
     "zscaler_dns_firewall": "zscaler_dns_firewall-latest",
-    
     # Netskope
     "netskope": "netskope_netskope_logs-latest",
     
@@ -958,6 +955,77 @@ SOURCETYPE_MAP = {**_LOADED_SOURCETYPE_MAP, **SOURCETYPE_MAP_OVERRIDES}
 ENV_SOURCE = os.getenv("S1_HEC_SOURCE")
 ENV_HOST = os.getenv("S1_HEC_HOST")
 ENV_INDEX = os.getenv("S1_HEC_INDEX")
+
+# Optional: ensure parsers exist in the destination SIEM before sending events
+_ENSURE_PARSER = os.getenv("JARVIS_ENSURE_PARSER", "false").lower() == "true"
+_JARVIS_API_BASE_URL = os.getenv("JARVIS_API_BASE_URL", "http://localhost:8000").rstrip("/")
+_JARVIS_API_KEY = os.getenv("JARVIS_API_KEY")
+_S1_CONFIG_API_URL = os.getenv("S1_CONFIG_API_URL")
+_S1_CONFIG_WRITE_TOKEN = os.getenv("S1_CONFIG_WRITE_TOKEN")
+
+_ENSURED_PARSERS: set[str] = set()
+
+
+def _ensure_parser_in_destination(product: str) -> None:
+    if not _ENSURE_PARSER:
+        return
+
+    sourcetype = SOURCETYPE_MAP.get(product, product)
+
+    sync_sourcetype = sourcetype
+    if sync_sourcetype.startswith("community-"):
+        sync_sourcetype = sync_sourcetype[len("community-"):]
+
+
+    if sync_sourcetype in _ENSURED_PARSERS:
+        return
+
+    # If the sourcetype isn't one that maps to a parser bundle name, nothing to do.
+    if not sourcetype:
+        return
+
+    # Require config API info to actually sync to the destination SIEM
+    if not _S1_CONFIG_API_URL or not _S1_CONFIG_WRITE_TOKEN:
+        if _VERBOSITY in ('info', 'verbose', 'debug'):
+            print(
+                f"[PARSER] Skipping ensure-parser for {product}: missing S1_CONFIG_API_URL or S1_CONFIG_WRITE_TOKEN",
+                flush=True,
+            )
+        return
+
+    headers = {}
+    if _JARVIS_API_KEY:
+        headers["X-API-Key"] = _JARVIS_API_KEY
+
+    url = f"{_JARVIS_API_BASE_URL}/api/v1/parser-sync/sync-single"
+    payload = {
+        "sourcetype": sync_sourcetype,
+        "config_api_url": _S1_CONFIG_API_URL,
+        "config_write_token": _S1_CONFIG_WRITE_TOKEN,
+    }
+
+    try:
+        resp = requests.post(url, json=payload, headers=headers, timeout=30)
+        if resp.status_code >= 400:
+            if _VERBOSITY in ('info', 'verbose', 'debug'):
+                print(
+                    f"[PARSER] Ensure-parser failed for {sync_sourcetype}: {resp.status_code} {resp.text[:200]}",
+                    flush=True,
+                )
+            return
+
+        data = resp.json() if resp.content else {}
+        if _VERBOSITY in ('info', 'verbose', 'debug'):
+            print(
+                f"[PARSER] Ensure-parser {sync_sourcetype}: {data.get('status', 'unknown')} - {data.get('message', '')}",
+                flush=True,
+            )
+
+        _ENSURED_PARSERS.add(sync_sourcetype)
+    except Exception as e:
+        if _VERBOSITY in ('info', 'verbose', 'debug'):
+            print(f"[PARSER] Ensure-parser error for {sync_sourcetype}: {e}", flush=True)
+        return
 
 def _build_qs(product: str) -> str:
     parts = [f"sourcetype={SOURCETYPE_MAP.get(product, product)}"]
@@ -1103,8 +1171,8 @@ def send_one(line, product: str, attr_fields: dict, event_time: float | None = N
     """
     Route JSON‑structured products to the /event endpoint and all
     raw / CSV / syslog products to the /raw endpoint.
-    Uses cached connection config after first successful send for performance.
     """
+    _ensure_parser_in_destination(product)
     # Build endpoint bases to try (env override → us1 → usea1 → global)
     env_event = os.getenv("S1_HEC_EVENT_URL_BASE")
     env_raw = os.getenv("S1_HEC_RAW_URL_BASE")
