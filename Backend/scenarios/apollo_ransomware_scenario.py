@@ -56,7 +56,7 @@ except (ImportError, RuntimeError):
 
 # Attack Profile - correlates with existing OCSF alert data
 ATTACKER_PROFILE = {
-    "sender_email": "hr-updates@starfleet-benefits.com",
+    "sender_email": "hr-updates@starfleat.com",
     "sender_name": "Starfleet HR Benefits",
     "sender_ip": "45.33.32.156",
     "malicious_xlsx": "TestBook.xlsm",
@@ -367,6 +367,7 @@ def generate_proofpoint_phishing_delivery(base_time: datetime) -> List[Dict]:
     events = []
     
     delivery_time = get_scenario_time(base_time, 0)
+    delivery_time_dt = base_time  # Keep datetime for calculations
     
     pf_event = {
         "GUID": str(uuid.uuid4()),
@@ -407,6 +408,19 @@ def generate_proofpoint_phishing_delivery(base_time: datetime) -> List[Dict]:
         ],
         "toAddresses": [VICTIM_PROFILE["email"]],
         "xmailer": "Microsoft Outlook 16.0",
+        # Add unmapped fields and other required fields
+        "unmapped.classification": "malware",
+        "unmapped.recipient": VICTIM_PROFILE["email"],
+        "unmapped.sender": ATTACKER_PROFILE["sender_email"],
+        "url.url_string": f"https://threatinsight.proofpoint.com/#/threat_id/{uuid.uuid4()}",
+        "device.ip": ATTACKER_PROFILE["sender_ip"],
+        # Add click-related fields for parser detection
+        "clickIP": ATTACKER_PROFILE["sender_ip"],
+        "clickTime": (datetime.fromisoformat(delivery_time.replace('Z', '+00:00')) + timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
+        "threatURL": f"https://threatinsight.proofpoint.com/#/threat_id/{uuid.uuid4()}",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "event.type": "Click",
+        "timestamp": delivery_time,
         "messageParts": [
             {
                 "disposition": "attached",

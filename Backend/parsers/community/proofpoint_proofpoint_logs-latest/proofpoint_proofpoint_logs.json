@@ -1,288 +1,85 @@
 {
-    attributes: {
-      "dataSource.category": "security",
-      "dataSource.name": "Proofpoint",
-      "dataSource.vendor": "Proofpoint"
-    },
-    formats: [
+  attributes: {
+    "dataSource.vendor": "Proofpoint",
+    "dataSource.category": "security"
+  },
+  formats: [
+    {
+      id: "format1",
+      format: "${parse=dottedjson}$"
+      rewrites: [
+        {input: "messageTime", output: "timestamp", match: ".*", replace: "$0"},
+        {input: "clickTime", output: "unmapped.clickTime", match: ".*", replace: "$0"},
+
+        {input: "threatsInfoMap", output: "unmapped.threatsInfoMap", match: ".*", replace: "$0"},
+        {input: "messageParts", output: "unmapped.messageParts", match: ".*", replace: "$0"},
+        {input: "quarantineFolder", output: "unmapped.quarantineFolder", match: ".*", replace: "$0"},
+        {input: "impostorScore", output: "unmapped.impostorScore", match: ".*", replace: "$0"},
+        {input: "phishScore", output: "unmapped.phishScore", match: ".*", replace: "$0"},
+        {input: "policyRoutes", output: "unmapped.policyRoutes", match: ".*", replace: "$0"},
+
+        {input: "threatStatus", output: "unmapped.threatStatus", match: ".*", replace: "$0"},
+        {input: "threatsInfoMap[0].threatStatus", output: "unmapped.threatStatus", match: ".*", replace: "$0"},
+
+        {input: "classification", output: "unmapped.classification", match: ".*", replace: "$0"},
+        {input: "threatsInfoMap[0].classification", output: "unmapped.classification", match: ".*", replace: "$0"},
+
+        {input: "sender", output: "unmapped.sender", match: ".*", replace: "$0"},
+        {input: "recipient", output: "unmapped.recipient", match: ".*", replace: "$0"},
+
+        {input: "sender", output: "email.from", match: ".*", replace: "$0"},
+        {input: "fromAddress[0]", output: "email.from", match: ".*", replace: "$0"},
+        {input: "fromAddress", output: "email.from", match: ".*", replace: "$0"},
+
+        {input: "recipient", output: "email.to", match: ".*", replace: "$0"},
+        {input: "toAddresses[0]", output: "email.to", match: ".*", replace: "$0"},
+        {input: "toAddresses", output: "email.to", match: ".*", replace: "$0"},
+
+        {input: "recipient", output: "actor.user.name", match: ".*", replace: "$0"},
+        {input: "toAddresses[0]", output: "actor.user.name", match: ".*", replace: "$0"},
+        {input: "toAddresses", output: "actor.user.name", match: ".*", replace: "$0"},
+
+        {input: "messageSize", output: "email.size", match: ".*", replace: "$0"},
+        {input: "headerFrom", output: "email.smtp_from", match: ".*", replace: "$0"},
+
+        {input: "oext", output: "oext", match: ".*", replace: "$0"},
+        {input: "mod", output: "mod", match: ".*", replace: "$0"}
+      ]
+    }
+  ],
+  mappings: {
+    version: 1,
+    mappings: [
       {
-        format: ".*${parse=json}{attrBlacklist=(xmailer|campaignId|threatsInfoMap|messageParts)}$"
-         rewrites: [
-           {
-             input:   "GUID",
-             output:  "message.guid",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "QID",
-             output:  "message.queueid",
-             match:   ".*",
-             replace: "$0"
-           },  
-           {
-             input:   "ccAddresses",
-             output:  "email.cc",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "cluster",
-             output:  "email_activity.cluster",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "completelyRewritten",
-             output:  "message.is_rewritten",
-             match:   ".*",
-             replace: "$0"
-           }, 
-           {
-             input:   "fromAddress",
-             output:  "email.from_address",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "headerFrom",
-             output:  "email.from",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "headerReplyTo",
-             output:  "email.reply_to",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "id",
-             output:  "email_activity.activity_id",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "impostorScore",
-             output:  "email_activity.impostor_score",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "malwareScore",
-             output:  "email_activity.malware_score",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "messageID",
-             output:  "message.id",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "messageSize",
-             output:  "message.size",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "messageTime",
-             output:  "email_activity.time_dt",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "modulesRun",
-             output:  "email_activity.modules_run",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "phishScore",
-             output:  "email_activity.severity",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "policyRoutes",
-             output:  "policy.route",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "quarantineFolder",
-             output:  "file.parent_folder",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "quarantineRule",
-             output:  "policy.rule",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "recipient",
-             output:  "email.to",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "replyToAddress",
-             output:  "email.reply_to_address",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "sender",
-             output:  "email.sender_email",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "senderIP",
-             output:  "email.sender_ip",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "spamScore",
-             output:  "device.risk_score",
-             match:   ".*",
-             replace: "$0"
-           }
-           {
-             input:   "subject",
-             output:  "email.subject",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "toAddresses",
-             output:  "email.delivered_to",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "clickIP",
-             output:  "device.ip",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "clickTime",
-             output:  "email_activity.start_time_dt",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "threatID",
-             output:  "threat.id",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "threatURL",
-             output:  "threat.url",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "threatStatus",
-             output:  "threat.status",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "userAgent",
-             output:  "http_request.user_agent",
-             match:   ".*",
-             replace: "$0"
-           }
-         ]
+        predicate: "clickTime = * OR clickIP = * OR threatURL = *",
+        transformations: [
+          { constant: { field: "dataSource.name", value: "Proofpoint" } },
+          { constant: { field: "event.type", value: "Click" } },
+          { copy: { from: "fromAddress[0]", to: "email.from" } },
+          { copy: { from: "toAddresses[0]", to: "email.to" } },
+          { copy: { from: "toAddresses[0]", to: "actor.user.name" } },
+          { copy: { from: "recipient", to: "actor.user.name" } }
+        ]
       },
       {
-        format: ".*messageParts\".\\s.$messageParts.{parse=json}{attrBlacklist=(disposition|oContentType)}$"
-        rewrites: [
-          {
-             input:   "messageParts.contentType", 
-             output:  "event.type",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "messageParts.contentType", 
-             output:  "message.type",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "messageParts.filename", 
-             output:  "file.name",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "messageParts.md5", 
-             output:  "file.md5",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "messageParts.sha256", 
-             output:  "file.sha256",
-             match:   ".*",
-             replace: "$0"
-           },
-         ]
+        predicate: "messageTime = * OR messageParts = * OR threatsInfoMap = *",
+        transformations: [
+          { constant: { field: "dataSource.name", value: "Proofpoint" } },
+          { constant: { field: "event.type", value: "Email" } },
+          { copy: { from: "fromAddress[0]", to: "email.from" } },
+          { copy: { from: "toAddresses[0]", to: "email.to" } },
+          { copy: { from: "toAddresses[0]", to: "actor.user.name" } },
+          { copy: { from: "recipient", to: "actor.user.name" } }
+        ]
       },
       {
-        format: ".*threatsInfoMap\".\\s.$threatsInfoMap.{parse=json}$"
-         rewrites: [
-          {
-             input:   "threatsInfoMap.classification", 
-             output:  "threat.classification",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "threatsInfoMap.threat", 
-             output:  "threat.name",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "threatsInfoMap.threatID", 
-             output:  "threat.id",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "threatsInfoMap.threatStatus", 
-             output:  "threat.status",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "threatsInfoMap.threatTime", 
-             output:  "threat.time",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "threatsInfoMap.threatType", 
-             output:  "threat.type",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "threatsInfoMap.threatUrl", 
-             output:  "threat.url",
-             match:   ".*",
-             replace: "$0"
-           },
-         ]
+        predicate: "true",
+        transformations: [
+          { constant: { field: "dataSource.name", value: "Proofpoint" } },
+          { constant: { field: "event.type", value: "Other" } },
+
+        ]
       }
     ]
   }
+}
