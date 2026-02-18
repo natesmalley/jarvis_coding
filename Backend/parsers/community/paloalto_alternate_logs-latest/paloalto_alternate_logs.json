@@ -1,400 +1,1169 @@
 {
-    // Specify time zone if logs are not UTC
-    //timezone: "America/Detroit"
-    
-    attributes: {
-      "dataSource.category": "security",
-      "dataSource.name": "Palo Alto Networks",
-      "dataSource.vendor": "Palo Alto Networks"
-    }
-    patterns: {
-      timestamp_pat: "\\d{4}\\/\\d{2}\\/\\d{2}.\\d{2}:\\d{2}:\\d{2}", //YYYY/MM/DD HH:MM:SS
-      value_pat: "\".*\"|[^,]*", //field value can be a comma-delimited list wrapped in quotes, a single value containing words and spaces, or empty
-    }
-    formats: [
-      // TRAFFIC
+  attributes: {
+    "dataSource.category": "security",
+    "dataSource.name": "Palo Alto Networks Firewall",
+    "dataSource.vendor": "Palo Alto Networks",
+  },
+  patterns: {
+   //maps to high_resolution_timestamp:
+   //timestamp: "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.\\d{3}(\\+|-)\\d{2}:\\d{2}",
+   //application_characteristic can be a single value, a comma delimited list in quotes, or blank. Null value is handled by format: traffic-2, not by this pattern.
+   app_characteristic: "(\".*\")|[^,]+",
+   //description field from system log is wrapped in quotes and may contain commas
+   desc: "(\".*\")",
+   userid_log_type: "USERID",
+   logout_sub_type: "logout",
+   login_sub_type: "login",
+   hipmatch_log_type: "HIPMATCH",
+   config_log_type: "CONFIG",
+   wildfire_sub_type: "wildfire",
+   data_filtering_sub_type: "file",
+   globalprotect_log_type: "GLOBALPROTECT",
+   iptag_log_type: "IPTAG",
+   gtp_log_type: "GTP",
+   tunnel_log_type: "\\b(?:START|END|start|end)\\b",
+   sctp_log_type: "SCTP",
+   system_log_type: "SYSTEM"
+  },
+  
+  formats: [
+   // {
+     // format: ".*$timestamp=timestamp$(\\,)*",
+    //}, 
+    {
+      //match all fields. application_characteristic can be a single value, or a comma delimited list in quotes. 
+      attributes: { 
+        "class_uid": "4001",
+        "category_uid": "4",
+        "severity_id": "0",
+        "class_name": "Network Activity",
+        "category_name": "Network Activity",
+        "metadata.product.name": "Palo Alto Networks Firewall",
+        "metadata.product.vendor_name": "Palo Alto Networks",
+        "metadata.version":"1.0.0-rc.3",
+        "metadata.log_name": "TRAFFIC",
+       },
+      format: ".*,$metadata.logged_time_dt$,$device.hw_info.serial_number$,TRAFFIC,$unmapped.sub_type$,.*,$metadata.original_time$,$src_endpoint.ip$,$dst_endpoint.ip$,$src_endpoint.intermediate_ips$,$dst_endpoint.intermediate_ips$,$unmapped.rule_matched$,$actor.user.name$,$unmapped.dst_user$,$app_name$,$unmapped.vsys$,$unmapped.from_zone$,$unmapped.to_zone$,$unmapped.inbound_if$,$unmapped.outbound_if$,$actor.session.issuer$,$metadata.original_time$,$actor.session.uid$,$unmapped.repeat_count$,$src_endpoint.port$,$dst_endpoint.port$,$unmapped.nat_src_port$,$unmapped.nat_dst_port$,$unmapped.flags$,$connection_info.protocol_name$,$unmapped.action_value$,$traffic.bytes$,$traffic.bytes_in$,$traffic.bytes_out$,$traffic.packets$,$actor.session.created_time_dt$,$duration$,$unmapped.url_category_value$,.*,$metadata.sequence$,$unmapped.action_flags$,$src_endpoint.location.region$,$dst_endpoint.location.region$,.*,$traffic.packets_out$,$traffic.packets_in$,$unmapped.session_end_reason_value$,$unmapped.dg_hier_level_1$,$unmapped.dg_hier_level_2$,$unmapped.dg_hier_level_3$,$unmapped.dg_hier_level_4$,$unmapped.vsys_name$,$device.hostname$,$unmapped.action_source$,$unmapped.src_uuid$,$unmapped.dst_uuid$,$device.imsi$,$device.imei$,$unmapped.parent_session_id$,$unmapped.parent_start_time$,$unmapped.tunnel_type$,$unmapped.ep_assoc_id$,$unmapped.chunks_total$,$unmapped.chunks_sent$,$unmapped.chunks_received$,$unmapped.rule_matched_uuid$,$unmapped.http2_connection$,$unmapped.link_change_count$,$unmapped.policy_id$,$unmapped.link_switches$,$unmapped.sdwan_cluster$,$unmapped.sdwan_device_type$,$unmapped.sdwan_cluster_type$,$unmapped.sdwan_site$,$actor.user.groups$,$src_endpoint.intermediate_ips$,$unmapped.src_category$,$unmapped.src_profile$,$unmapped.src_model$,$unmapped.src_vendor$,$unmapped.src_osfamily$,$unmapped.src_osversion$,$src_endpoint.hostname$,$src_endpoint.mac$,$unmapped.dst_category$,$unmapped.dst_profile$,$unmapped.dst_model$,$unmapped.dst_vendor$,$unmapped.dst_osfamily$,$unmapped.dst_osversion$,$dst_endpoint.hostname$,$dst_endpoint.mac$,$unmapped.container_id$,$unmapped.pod_namespace$,$unmapped.pod_name$,$unmapped.src_edl$,$unmapped.dst_edl$,$device.uid$,$unmapped.serial_number$,$unmapped.src_dag$,$unmapped.dst_dag$,$unmapped.session_owner$,$unmapped.high_res_timestamp$,$unmapped.nsdsai_sst$,$unmapped.nsdsai_sd$,$unmapped.subcategory_of_app$,$unmapped.category_of_app$,$unmapped.technology_of_app$,$unmapped.risk_of_app$,$unmapped.characteristic_of_app=app_characteristic$,$unmapped.container_of_app$,$unmapped.tunneled_app$,$unmapped.is_saas_of_app$,$unmapped.sanctioned_state_of_app$,$unmapped.offloaded$",
+      halt: true,
+      rewrites: [
       {
-        id: "traffic-11-0", //PAN-OS 11.0 TRAFFIC, adds Flow Type and Cluster Name
-        attributes: {
-          "event.type": "traffic",
-          "format": "traffic-v11"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,TRAFFIC,$network_activity.sub_type$,$network_activity.future_use_2$,$timestamp=timestamp_pat$,$src.ip.address$,$dst.ip.address$,$network_endpoint.nat_src_ip$,$network_endpoint.nat_dst_ip$,$rule.name$,$user.src_name$,$user.dst_name$,$network_activity.app_name$,$network_traffic.virtual_system_name$,$source_zone$,$destination_zone$,$network_interface.inbound_name$,$network_interface.outbound_name$,$network_activity.log_action$,$network_activity.future_use_3$,$session.uid$,$network_activity.repeat_count$,$network_endpoint.src_port$,$network_endpoint.dst_port$,$nenetwork_endpoint.nat_src_port$,$nenetwork_endpoint.nat_dst_port$,$network_connection_info.flag$,$network_connection_info.protocol_name$,$network_activity.action$,$network_traffic.bytes$,$network_traffic.bytes_out$,$network_traffic.bytes_in$,$network_traffic.packets$,$network_activity.start_time_dt$,$network_activity.elapsed_time$,$network_activity.category_name$,$network_activity.future_use_4$,$network_activity.sequence_number$,$network_activity.action_flags$,$location.src_country$,$location.dst_country$,$network_activity.future_use_5$,$network_traffic.packets_out$,$network_traffic.packets_in$,$session.expiration_reason$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$,$network_activity.action_source$,$virtual_machine.src_vm_uuid$,$virtual_machine.dst_vm_uuid$,$device.imsi$,$device.imei$,$session.parent_uid$,$network_activity.parent_start_time_dt$,$network_connection_info.tunnel_type$,$network_connection_info.sctp_id$,$network_connection_info.sctp_chunks$,$network_connection_info.sctp_chunks_out$,$network_connection_info.sctp_chunks_in$,$rule.uid$,$network_activity.http_connection$,$network_connection_info.app_flap_count$,$policy.uid$,$network_connection_info.link_switches$,$network_connection_info.sd_wan_cluster$,$network_connection_info.sd_wan_device_type$,$network_connection_info.sd_wan_cluster_type$,$network_connection_info.sd_wan_site$,$user.groups$,$http_request.x_forwarded_for$,$device.src_type$,$device.src_profile$,$device.src_model$,$device.src_vendor_name$,$device.src_os_edition$,$device.src_os_version$,$network_connection_info.src_hostname$,$device.src_mac$,$device.dst_type$,$device.dst_profile$,$device.dst_model$,$device.dst_vendor_name$,$device.src_os_edition$,$device.src_os_version$,$network_connection_info.dst_hostname$,$network_connection_info.dst_mac$,$container.id$,$container.pod_namespace$,$container.pod_name$,$network_endpoint.src_host_list$,$network_endpoint.dst_host_list$,$network_endpoint.host_id$,$device_hardware_info.serial_number$,$policy.src_group$,$policy.dst_group$,$session.owner$,$network_activity.time$,$network_activity.a_slice.service_type$,$network_activity.a_slice.differentiator$,$network_activity.sub_category$,$network_activity.category_name$,$network_activity.app_model$,$network_activity.severity$,$network_activity.app_characteristic=value_pat$,$network_activity.container.id$,$network_activity.app_tunnel_type$,$network_activity.is_saas$,$network_activity.is_sanctioned$,$network_activity.is_offloaded$,$network_activity.flow_type$,$network_activity.cluster.name$",
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
-      }, {
-        id: "traffic-10-2", //PAN-OS 10.2 TRAFFIC, adds numerous fields after Dynamic User Group Name
-        attributes: {
-          "event.type": "traffic",
-          "format": "traffic-v10.2"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,TRAFFIC,$network_activity.sub_type$,$network_activity.future_use_2$,$timestamp=timestamp_pat$,$src.ip.address$,$dst.ip.address$,$network_endpoint.nat_src_ip$,$network_endpoint.nat_dst_ip$,$rule.name$,$user.src_name$,$user.dst_name$,$network_activity.app_name$,$network_traffic.virtual_system_name$,$source_zone$,$destination_zone$,$network_interface.inbound_name$,$network_interface.outbound_name$,$network_activity.log_action$,$network_activity.future_use_3$,$session.uid$,$network_activity.repeat_count$,$network_endpoint.src_port$,$network_endpoint.dst_port$,$nenetwork_endpoint.nat_src_port$,$nenetwork_endpoint.nat_dst_port$,$network_connection_info.flag$,$network_connection_info.protocol_name$,$network_activity.action$,$network_traffic.bytes$,$network_traffic.bytes_out$,$network_traffic.bytes_in$,$network_traffic.packets$,$network_activity.start_time_dt$,$network_activity.elapsed_time$,$network_activity.category_name$,$network_activity.future_use_4$,$network_activity.sequence_number$,$network_activity.action_flags$,$location.src_country$,$location.dst_country$,$network_activity.future_use_5$,$network_traffic.packets_out$,$network_traffic.packets_in$,$session.expiration_reason$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$,$network_activity.action_source$,$virtual_machine.src_vm_uuid$,$virtual_machine.dst_vm_uuid$,$device.imsi$,$device.imei$,$session.parent_uid$,$network_activity.parent_start_time_dt$,$network_connection_info.tunnel_type$,$network_connection_info.sctp_id$,$network_connection_info.sctp_chunks$,$network_connection_info.sctp_chunks_out$,$network_connection_info.sctp_chunks_in$,$rule.uid$,$network_activity.http_connection$,$network_connection_info.app_flap_count$,$policy.uid$,$network_connection_info.link_switches$,$network_connection_info.sd_wan_cluster$,$network_connection_info.sd_wan_device_type$,$network_connection_info.sd_wan_cluster_type$,$network_connection_info.sd_wan_site$,$user.groups$,$http_request.x_forwarded_for$,$device.src_type$,$device.src_profile$,$device.src_model$,$device.src_vendor_name$,$device.src_os_edition$,$device.src_os_version$,$network_connection_info.src_hostname$,$device.src_mac$,$device.dst_type$,$device.dst_profile$,$device.dst_model$,$device.dst_vendor_name$,$device.src_os_edition$,$device.src_os_version$,$network_connection_info.dst_hostname$,$network_connection_info.dst_mac$,$container.id$,$container.pod_namespace$,$container.pod_name$,$network_endpoint.src_host_list$,$network_endpoint.dst_host_list$,$network_endpoint.host_id$,$device_hardware_info.serial_number$,$policy.src_group$,$policy.dst_group$,$session.owner$,$network_activity.time$,$network_activity.a_slice.service_type$,$network_activity.a_slice.differentiator$,$network_activity.sub_category$,$network_activity.category_name$,$network_activity.app_model$,$network_activity.severity$,$network_activity.app_characteristic=value_pat$,$network_activity.container.id$,$network_activity.app_tunnel_type$,$network_activity.is_saas$,$network_activity.is_sanctioned$,$network_activity.is_offloaded$",
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
-      }, {
-        id: "traffic-9-1", //PAN-OS 9.1 TRAFFIC
-        attribute: {
-          "event.type": "traffic",
-          "format": "traffic-v9.1"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,TRAFFIC,$network_activity.sub_type$,$network_activity.future_use_2$,$timestamp=timestamp_pat$,$src.ip.address$,$dst.ip.address$,$network_endpoint.nat_src_ip$,$network_endpoint.nat_dst_ip$,$rule.name$,$user.src_name$,$user.dst_name$,$network_activity.app_name$,$network_traffic.virtual_system_name$,$source_zone$,$destination_zone$,$network_interface.inbound_name$,$network_interface.outbound_name$,$network_activity.log_action$,$network_activity.future_use_3$,$session.uid$,$network_activity.repeat_count$,$network_endpoint.src_port$,$network_endpoint.dst_port$,$nenetwork_endpoint.nat_src_port$,$nenetwork_endpoint.nat_dst_port$,$network_connection_info.flag$,$network_connection_info.protocol_name$,$network_activity.action$,$network_traffic.bytes$,$network_traffic.bytes_out$,$network_traffic.bytes_in$,$network_traffic.packets$,$network_activity.start_time_dt$,$network_activity.elapsed_time$,$network_activity.category_name$,$network_activity.future_use_4$,$network_activity.sequence_number$,$network_activity.action_flags$,$location.src_country$,$location.dst_country$,$network_activity.future_use_5$,$network_traffic.packets_out$,$network_traffic.packets_in$,$session.expiration_reason$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$,$network_activity.action_source$,$virtual_machine.src_vm_uuid$,$virtual_machine.dst_vm_uuid$,$device.imsi$,$device.imei$,$session.parent_uid$,$network_activity.parent_start_time_dt$,$network_connection_info.tunnel_type$,$network_connection_info.sctp_id$,$network_connection_info.sctp_chunks$,$network_connection_info.sctp_chunks_out$,$network_connection_info.sctp_chunks_in$,$rule.uid$,$network_activity.http_connection$,$network_connection_info.app_flap_count$,$policy.uid$,$network_connection_info.link_switches$,$network_connection_info.sd_wan_cluster$,$network_connection_info.sd_wan_device_type$,$network_connection_info.sd_wan_cluster_type$,$network_connection_info.sd_wan_site$,$user.groups$",
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
+        input:   "unmapped.sub_type",
+        output:  "activity_id",
+        match:   "^start$",
+        replace: "1"
       },
-      // THREAT
       {
-        id: "threat-11-0", //PAN-OS 11.0 THREAT, adds Cluster Name and Flow Type
-        attributes: {
-          "event.type": "threat",
-          "format": "threat-v11"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,THREAT,$network_activity.sub_type$,$network_activity.future_use_2$,$timestamp=timestamp_pat$,$src.ip.address$,$dst.ip.address$,$network_endpoint.nat_src_ip$,$network_endpoint.nat_dst_ip$,$rule.name$,$user.src_name$,$user.dst_name$,$network_activity.app_name$,$network_traffic.virtual_system_name$,$source_zone$,$destination_zone$,$network_interface.inbound_name$,$network_interface.outbound_name$,$network_activity.log_action$,$network_activity.future_use_3$,$session.uid$,$network_activity.repeat_count$,$network_endpoint.src_port$,$network_endpoint.dst_port$,$nenetwork_endpoint.nat_src_port$,$nenetwork_endpoint.nat_dst_port$,$network_connection_info.flag$,$network_connection_info.protocol_name$,$network_activity.action$,$url.filename=value_pat$,$cwe.uid$,$network_activity.category_name$,$severity$,$direction$,$network_activity.sequence_number$,$network_activity.action_flags$,$location.src_location$,$location.dst_location$,$misc$,$Content_type$,$pcap.id$,$file_digest$,$cloud$,$url.index$,$user_agent$,$file_type$,$x-forwarded-for$,$referer$,$sender$,$subject$,$recipient$,$report.id$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$,$network_activity.future_use_4$,$virtual_machine.src_vm_uuid$,$virtual_machine.dst_vm_uuid$,$http_method$,$device.imsi$,$device.imei$,$session.parent_uid$,$network_activity.parent_start_time_dt$,$network_connection_info.tunnel_type$,$cwe.caption$,$content_version$,$network_activity.future_use_5$,$network_activity.sctp_association_id$,$network_connection_info.protocol_name$,$http_header$,$url.category_list=value_pat$,$rule.uid$,$network_activity.http_connection$,$user.groups$,$http_request.x_forwarded_for$,$device.src_type$,$device.src_profile$,$device.src_model$,$device.src_vendor_name$,$device.src_os_edition$,$device.src_os_version$,$network_connection_info.src_hostname$,$device.src_mac$,$device.dst_type$,$device.dst_profile$,$device.dst_model$,$device.dst_vendor_name$,$device.src_os_edition$,$device.src_os_version$,$network_connection_info.dst_hostname$,$network_connection_info.dst_mac$,$container.id$,$container.pod_namespace$,$container.pod_name$,$network_endpoint.src_host_list$,$network_endpoint.dst_host_list$,$network_endpoint.host_id$,$device_hardware_info.serial_number$,$domain_edl$,$policy.src_group$,$policy.dst_group$,$partial_hash$,$network_activity.time$,$reason$,$justification$,$network_activity.a_slice.service_type$,$network_activity.sub_category$,$network_activity.category_name$,$network_activity.app_model$,$network_activity.severity$,$network_activity.app_characteristic=value_pat$,$network_activity.container.id$,$network_activity.app_tunnel_type$,$network_activity.is_saas$,$network_activity.is_sanctioned$,$cloud_report_id$,$network_activity.cluster.name$,$network_activity.flow_type$",
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
-      }, {
-        id: "threat-10-2", //PAN-OS 10.2 THREAT, adds Cloud Report ID
-        attributes: {
-          "event.type": "threat",
-          "format": "threat-v10.2"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,THREAT,$network_activity.sub_type$,$network_activity.future_use_2$,$timestamp=timestamp_pat$,$src.ip.address$,$dst.ip.address$,$network_endpoint.nat_src_ip$,$network_endpoint.nat_dst_ip$,$rule.name$,$user.src_name$,$user.dst_name$,$network_activity.app_name$,$network_traffic.virtual_system_name$,$source_zone$,$destination_zone$,$network_interface.inbound_name$,$network_interface.outbound_name$,$network_activity.log_action$,$network_activity.future_use_3$,$session.uid$,$network_activity.repeat_count$,$network_endpoint.src_port$,$network_endpoint.dst_port$,$nenetwork_endpoint.nat_src_port$,$nenetwork_endpoint.nat_dst_port$,$network_connection_info.flag$,$network_connection_info.protocol_name$,$network_activity.action$,$url.filename=value_pat$,$cwe.uid$,$network_activity.category_name$,$severity$,$direction$,$network_activity.sequence_number$,$network_activity.action_flags$,$location.src_location$,$location.dst_location$,$misc$,$Content_type$,$pcap.id$,$file_digest$,$cloud$,$url.index$,$user_agent$,$file_type$,$x-forwarded-for$,$referer$,$sender$,$subject$,$recipient$,$report.id$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$,$network_activity.future_use_4$,$virtual_machine.src_vm_uuid$,$virtual_machine.dst_vm_uuid$,$http_method$,$device.imsi$,$device.imei$,$session.parent_uid$,$network_activity.parent_start_time_dt$,$network_connection_info.tunnel_type$,$cwe.caption$,$content_version$,$network_activity.future_use_5$,$network_activity.sctp_association_id$,$network_connection_info.protocol_name$,$http_header$,$url.category_list=value_pat$,$rule.uid$,$network_activity.http_connection$,$user.groups$,$http_request.x_forwarded_for$,$device.src_type$,$device.src_profile$,$device.src_model$,$device.src_vendor_name$,$device.src_os_edition$,$device.src_os_version$,$network_connection_info.src_hostname$,$device.src_mac$,$device.dst_type$,$device.dst_profile$,$device.dst_model$,$device.dst_vendor_name$,$device.src_os_edition$,$device.src_os_version$,$network_connection_info.dst_hostname$,$network_connection_info.dst_mac$,$container.id$,$container.pod_namespace$,$container.pod_name$,$network_endpoint.src_host_list$,$network_endpoint.dst_host_list$,$network_endpoint.host_id$,$device_hardware_info.serial_number$,$domain_edl$,$policy.src_group$,$policy.dst_group$,$partial_hash$,$network_activity.time$,$reason$,$justification$,$network_activity.a_slice.service_type$,$network_activity.sub_category$,$network_activity.category_name$,$network_activity.app_model$,$network_activity.severity$,$network_activity.app_characteristic=value_pat$,$network_activity.container.id$,$network_activity.app_tunnel_type$,$network_activity.is_saas$,$network_activity.is_sanctioned$,$cloud_report_id$",
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
-      }, {
-        id: "threat-10-1", //PAN-OS 10.1 THREAT, adds numerous fields after XFF Address
-        attributes: {
-          "event.type": "threat",
-          "format": "threat-v10.1"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,THREAT,$network_activity.sub_type$,$network_activity.future_use_2$,$timestamp=timestamp_pat$,$src.ip.address$,$dst.ip.address$,$network_endpoint.nat_src_ip$,$network_endpoint.nat_dst_ip$,$rule.name$,$user.src_name$,$user.dst_name$,$network_activity.app_name$,$network_traffic.virtual_system_name$,$source_zone$,$destination_zone$,$network_interface.inbound_name$,$network_interface.outbound_name$,$network_activity.log_action$,$network_activity.future_use_3$,$session.uid$,$network_activity.repeat_count$,$network_endpoint.src_port$,$network_endpoint.dst_port$,$nenetwork_endpoint.nat_src_port$,$nenetwork_endpoint.nat_dst_port$,$network_connection_info.flag$,$network_connection_info.protocol_name$,$network_activity.action$,$url.filename=value_pat$,$cwe.uid$,$network_activity.category_name$,$severity$,$direction$,$network_activity.sequence_number$,$network_activity.action_flags$,$location.src_location$,$location.dst_location$,$misc$,$Content_type$,$pcap.id$,$file_digest$,$cloud$,$url.index$,$user_agent$,$file_type$,$x-forwarded-for$,$referer$,$sender$,$subject$,$recipient$,$report.id$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$,$network_activity.future_use_4$,$virtual_machine.src_vm_uuid$,$virtual_machine.dst_vm_uuid$,$http_method$,$device.imsi$,$device.imei$,$session.parent_uid$,$network_activity.parent_start_time_dt$,$network_connection_info.tunnel_type$,$cwe.caption$,$content_version$,$network_activity.future_use_5$,$network_activity.sctp_association_id$,$network_connection_info.protocol_name$,$http_header$,$url.category_list=value_pat$,$rule.uid$,$network_activity.http_connection$,$user.groups$,$http_request.x_forwarded_for$,$device.src_type$,$device.src_profile$,$device.src_model$,$device.src_vendor_name$,$device.src_os_edition$,$device.src_os_version$,$network_connection_info.src_hostname$,$device.src_mac$,$device.dst_type$,$device.dst_profile$,$device.dst_model$,$device.dst_vendor_name$,$device.src_os_edition$,$device.src_os_version$,$network_connection_info.dst_hostname$,$network_connection_info.dst_mac$,$container.id$,$container.pod_namespace$,$container.pod_name$,$network_endpoint.src_host_list$,$network_endpoint.dst_host_list$,$network_endpoint.host_id$,$device_hardware_info.serial_number$,$domain_edl$,$policy.src_group$,$policy.dst_group$,$partial_hash$,$network_activity.time$,$reason$,$justification$,$network_activity.a_slice.service_type$,$network_activity.sub_category$,$network_activity.category_name$,$network_activity.app_model$,$network_activity.severity$,$network_activity.app_characteristic=value_pat$,$network_activity.container.id$,$network_activity.app_tunnel_type$,$network_activity.is_saas$,$network_activity.is_sanctioned$"
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
-      }, {
-        id: "threat-9-1-a", //PAN-OS 9.1 THREAT
-        attributes: {
-          "event.type": "threat",
-          "format": "threat-v9.1-a"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,THREAT,$network_activity.sub_type$,$network_activity.future_use_2$,$timestamp=timestamp_pat$,$src.ip.address$,$dst.ip.address$,$network_endpoint.nat_src_ip$,$network_endpoint.nat_dst_ip$,$rule.name$,$user.src_name$,$user.dst_name$,$network_activity.app_name$,$network_traffic.virtual_system_name$,$source_zone$,$destination_zone$,$network_interface.inbound_name$,$network_interface.outbound_name$,$network_activity.log_action$,$network_activity.future_use_3$,$session.uid$,$network_activity.repeat_count$,$network_endpoint.src_port$,$network_endpoint.dst_port$,$nenetwork_endpoint.nat_src_port$,$nenetwork_endpoint.nat_dst_port$,$network_connection_info.flag$,$network_connection_info.protocol_name$,$network_activity.action$,$url.filename=value_pat$,$cwe.uid$,$network_activity.category_name$,$severity$,$direction$,$network_activity.sequence_number$,$network_activity.action_flags$,$location.src_location$,$location.dst_location$,$misc$,$Content_type$,$pcap.id$,$file_digest$,$cloud$,$url.index$,$user_agent$,$file_type$,$x-forwarded-for$,$referer$,$sender$,$subject$,$recipient$,$report.id$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$,$network_activity.future_use_4$,$virtual_machine.src_vm_uuid$,$virtual_machine.dst_vm_uuid$,$http_method$,$device.imsi$,$device.imei$,$session.parent_uid$,$network_activity.parent_start_time_dt$,$network_connection_info.tunnel_type$,$cwe.caption$,$content_version$,$network_activity.future_use_5$,$network_activity.sctp_association_id$,$network_connection_info.protocol_name$,$http_header$,$url.category_list=value_pat$,$rule.uid$,$network_activity.http_connection$,$user.groups$"
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
-      }, {
-        id: "threat-9-1-b", //PAN-OS 9.1 THREAT without Dynamic User Group Name
-        attributes: {
-          "event.type": "threat",
-          "format": "threat-v9.1-b"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,THREAT,$network_activity.sub_type$,$network_activity.future_use_2$,$timestamp=timestamp_pat$,$src.ip.address$,$dst.ip.address$,$network_endpoint.nat_src_ip$,$network_endpoint.nat_dst_ip$,$rule.name$,$user.src_name$,$user.dst_name$,$network_activity.app_name$,$network_traffic.virtual_system_name$,$source_zone$,$destination_zone$,$network_interface.inbound_name$,$network_interface.outbound_name$,$network_activity.log_action$,$network_activity.future_use_3$,$session.uid$,$network_activity.repeat_count$,$network_endpoint.src_port$,$network_endpoint.dst_port$,$nenetwork_endpoint.nat_src_port$,$nenetwork_endpoint.nat_dst_port$,$network_connection_info.flag$,$network_connection_info.protocol_name$,$network_activity.action$,$url.filename=value_pat$,$cwe.uid$,$network_activity.category_name$,$severity$,$direction$,$network_activity.sequence_number$,$network_activity.action_flags$,$location.src_location$,$location.dst_location$,$misc$,$Content_type$,$pcap.id$,$file_digest$,$cloud$,$url.index$,$user_agent$,$file_type$,$x-forwarded-for$,$referer$,$sender$,$subject$,$recipient$,$report.id$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$,$network_activity.future_use_4$,$virtual_machine.src_vm_uuid$,$virtual_machine.dst_vm_uuid$,$http_method$,$device.imsi$,$device.imei$,$session.parent_uid$,$network_activity.parent_start_time_dt$,$network_connection_info.tunnel_type$,$cwe.caption$,$content_version$,$network_activity.future_use_5$,$network_activity.sctp_association_id$,$network_connection_info.protocol_name$,$http_header$,$url.category_list=value_pat$,$rule.uid$,$network_activity.http_connection$"
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
+        input:   "unmapped.sub_type",
+        output:  "activity_id",
+        match:   "^end$",
+        replace: "2"
       },
-      // CONFIG
       {
-        id: "config-10-1", //PAN-OS v10.1-v11.0 CONFIG, adds Future Use 3 and High Resolution Timestamp
-        attributes: {
-          "event.type": "config",
-          "format": "config-v10.1+"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,CONFIG,$network_activity.sub_type$,$network_activity.future_use_2$,$timestamp=timestamp_pat$,$host_name$,$network_traffic.virtual_system_name$,$command=value_pat$,$admin$,$client$,$result$,$configuration_path$,$before_change_detail$,$after_change_detail$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$,$device.group$,$audit_comment=value_pat$,$network_activity.future_use_3$,$network_activity.time$",
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
-      }, {
-        id: "config-9-1", //PAN-OS v9.1 CONFIG
-        attributes: {
-          "event.type": "config",
-          "format": "config-v9.1"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,CONFIG,$network_activity.sub_type$,$network_activity.future_use_2$,$timestamp=timestamp_pat$,$host_name$,$network_traffic.virtual_system_name$,$command=value_pat$,$admin$,$client$,$result$,$configuration_path$,$before_change_detail$,$after_change_detail$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$,$device.group$,$audit_comment=value_pat$",
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
+        input:   "unmapped.sub_type",
+        output:  "activity_id",
+        match:   "^drop$",
+        replace: "4"
       },
-      // SYSTEM
       {
-        id: "config-10-1", //PAN-OS v10.1-v11.0 SYSTEM, adds Future Use 5 & 6 and High Resolution Timestamp
-        attributes: {
-          "event.type": "system",
-          "format": "system-v11.0"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,SYSTEM,$network_activity.sub_type$,$network_activity.future_use_2$,$timestamp=timestamp_pat$,$network_traffic.virtual_system_name$,$session.parent_uid$,$object$,$network_activity.future_use_3$,$network_activity.future_use_4$,$module$,$severity$,$description$,$network_activity.sequence_number$,$network_activity.action_flags$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$,$network_activity.future_use_5$,$network_activity.future_use_6$,$network_activity.time$",
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
-      }, {
-        id: "config-10-1", //PAN-OS v9.1 SYSTEM
-        attributes: {
-          "event.type": "system",
-          "format": "system-v9.1"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,SYSTEM,$network_activity.sub_type$,$network_activity.future_use_2$,$timestamp=timestamp_pat$,$network_traffic.virtual_system_name$,$session.parent_uid$,$object$,$network_activity.future_use_3$,$network_activity.future_use_4$,$module$,$severity$,$description$,$network_activity.sequence_number$,$network_activity.action_flags$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$",
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
+        input:   "unmapped.sub_type",
+        output:  "activity_id",
+        match:   "^deny$",
+        replace: "5"
       },
-      // HIP-MATCH
       {
-        id: "hipmatch-11-0", //PAN-OS v11.0 HIPMATCH, adds Cluster Name
-        attributes: {
-          "event.type": "hipmatch",
-          "format": "hiptmatch-v11.0"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,HIP-MATCH,$network_activity.sub_type$,$network_activity.future_use_2$,$timestamp=timestamp_pat$,$user.src_name$,$network_traffic.virtual_system_name$,$machine_name$,$os$,$src.ip.address$,$hip$,$network_activity.repeat_count$,$hip_type$,$network_activity.future_use_2$,$network_activity.future_use_3$,$network_activity.sequence_number$,$network_activity.action_flags$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$,$firewall.virtual_system_id$,$ipv6_source_address$,$network_endpoint.host_id$,$user_device_serial_number$,$device_mac_address$,$network_activity.time$,$network_activity.cluster.name$",
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
-      }, {
-        id: "hipmatch-10-1", //PAN-OS v10.1-10.2 HIPMATCH, adds Device MAC Address and High Resolution Timestamp
-        attributes: {
-          "event.type": "hipmatch",
-          "format": "hiptmatch-v9.1"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,HIP-MATCH,$network_activity.sub_type$,$network_activity.future_use_2$,$timestamp=timestamp_pat$,$user.src_name$,$network_traffic.virtual_system_name$,$machine_name$,$os$,$src.ip.address$,$hip$,$network_activity.repeat_count$,$hip_type$,$network_activity.future_use_2$,$network_activity.future_use_3$,$network_activity.sequence_number$,$network_activity.action_flags$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$,$firewall.virtual_system_id$,$ipv6_source_address$,$network_endpoint.host_id$,$user_device_serial_number$,$device_mac_address$,$network_activity.time$",
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
-      }, {
-        id: "hipmatch-9-1", //PAN-OS v9.1 HIPMATCH
-        attributes: {
-          "event.type": "hipmatch",
-          "format": "hiptmatch-v9.1"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,HIP-MATCH,$network_activity.sub_type$,$network_activity.future_use_2$,$timestamp=timestamp_pat$,$user.src_name$,$network_traffic.virtual_system_name$,$machine_name$,$os$,$src.ip.address$,$hip$,$network_activity.repeat_count$,$hip_type$,$network_activity.future_use_2$,$network_activity.future_use_3$,$network_activity.sequence_number$,$network_activity.action_flags$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$,$firewall.virtual_system_id$,$ipv6_source_address$,$network_endpoint.host_id$,$user_device_serial_number$",
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
+        input:   "unmapped.sub_type",
+        output:  "activity_name",
+        match:   "^start$",
+        replace: "Open"
       },
-      // CORRELATION
       {
-        id: "correlation", //PAN-OS v9.1-11.0 CORRELATION
-        attributes: {
-          "event.type": "correlation",
-          "format": "correlation"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,CORRELATION,$network_activity.sub_type$,$network_activity.future_use_2$,$timestamp=timestamp_pat$,$src.ip.address$,$user.src_name$,$network_traffic.virtual_system_name$,$network_activity.category_name$,$severity$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$,$firewall.virtual_system_id$,$object_name$,$object_id$,$evidence$",
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
+        input:   "unmapped.sub_type",
+        output:  "activity_name",
+        match:   "^end$",
+        replace: "Close"
       },
-      // USER ID
       {
-        id: "userid-11-0", //PAN-OS v11.0 USERID, adds Origin Data Source, Future Use 3 and Cluster Name
-        attributes: {
-          "event.type": "userid",
-          "format": "userid-v11.0"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,USERID,$network_activity.sub_type$,$network_activity.future_use_2$,$timestamp=timestamp_pat$,$network_traffic.virtual_system_name$,$src.ip.address$,$user$,$data_source_name$,$session.parent_uid$,$network_activity.repeat_count$,$time_out_threshold$,$network_endpoint.src_port$,$network_endpoint.dst_port$,$data_source$,$data_source_type$,$network_activity.sequence_number$,$network_activity.action_flags$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$,$firewall.virtual_system_id$,$factor_type$,$factor_completion_time$,$factor_number$,$user.groups$,$user_by_source$,$network_activity.tag$,$network_activity.time$,$origin_data_source$,$future_use3$,$network_activity.cluster.name$",
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
-      }, {
-        id: "userid-10-1", //PAN-OS v10.1-10.2 USERID, adds Tag Name and High Resolution Timestamp
-        attributes: {
-          "event.type": "userid",
-          "format": "userid-v10.1"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,USERID,$network_activity.sub_type$,$network_activity.future_use_2$,$timestamp=timestamp_pat$,$network_traffic.virtual_system_name$,$src.ip.address$,$user$,$data_source_name$,$session.parent_uid$,$network_activity.repeat_count$,$time_out_threshold$,$network_endpoint.src_port$,$network_endpoint.dst_port$,$data_source$,$data_source_type$,$network_activity.sequence_number$,$network_activity.action_flags$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$,$firewall.virtual_system_id$,$factor_type$,$factor_completion_time$,$factor_number$,$user.groups$,$user_by_source$,$network_activity.tag$,$network_activity.time$",
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
-      }, {
-        id: "userid-10-1", //PAN-OS v9.1 USERID
-        attributes: {
-          "event.type": "userid",
-          "format": "userid-v9.1"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,USERID,$network_activity.sub_type$,$network_activity.future_use_2$,$timestamp=timestamp_pat$,$network_traffic.virtual_system_name$,$src.ip.address$,$user$,$data_source_name$,$session.parent_uid$,$network_activity.repeat_count$,$time_out_threshold$,$network_endpoint.src_port$,$network_endpoint.dst_port$,$data_source$,$data_source_type$,$network_activity.sequence_number$,$network_activity.action_flags$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$,$firewall.virtual_system_id$,$factor_type$,$factor_completion_time$,$factor_number$,$user.groups$,$user_by_source$,$network_activity.tag$,$network_activity.time$",
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
+        input:   "unmapped.sub_type",
+        output:  "activity_name",
+        match:   "^drop$",
+        replace: "Fail"
       },
-      // GLOBALPROTECT
       {
-        id: "globalprotect-9-1-3", //PAN-OS v9.1.3+ GLOBALPROTECT, different format
-        attributes: {
-          "event.type": "globalprotect",
-          "format": "globalprotect-v9.1.3"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,GLOBALPROTECT,$network_activity.sub_type$,$network_activity.future_use_2$,$timestamp=timestamp_pat$,$network_traffic.virtual_system_name$,$session.parent_uid$,$stage$,$authentication_method$,$network_connection_info.tunnel_type$,$user.src_name$,$source_region$,$machine_name$,$public_ip$,$public_ipv6$,$private_ip$,$private_ipv6$,$network_endpoint.host_id$,$device_hardware_info.serial_number$,$client_version$,$client_os$,$client_os_version$,$network_activity.repeat_count$,$reason$,$error$,$description$,$status$,$location$,$login_duration$,$connect_method$,$error_code$,$portal$,$network_activity.sequence_number$,$network_activity.action_flags$",
-        rewrites: [
+        input:   "unmapped.sub_type",
+        output:  "activity_name",
+        match:   "^deny$",
+        replace: "Refuse"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "event.type",
+        match:   "^start$",
+        replace: "Open"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "event.type",
+        match:   "^end$",
+        replace: "Close"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "event.type",
+        match:   "^drop$",
+        replace: "Fail"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "event.type",
+        match:   "^deny$",
+        replace: "Refuse"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "type_uid",
+        match:   "^start$",
+        replace: "400101"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "type_uid",
+        match:   "^end$",
+        replace: "400102"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "type_uid",
+        match:   "^drop$",
+        replace: "400104"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "type_uid",
+        match:   "^deny$",
+        replace: "400105"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "type_name",
+        match:   "^start$",
+        replace: "Network Activity: Open"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "type_name",
+        match:   "^end$",
+        replace: "Network Activity: Close"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "type_name",
+        match:   "^drop$",
+        replace: "Network Activity: Fail"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "type_name",
+        match:   "^deny$",
+        replace: "Network Activity: Refuse"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status_id",
+        match:   "^allow$",
+        replace: "1"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status_id",
+        match:   "^deny$",
+        replace: "2"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status",
+        match:   "^allow$",
+        replace: "Success"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status",
+        match:   "^deny$",
+        replace: "Failure"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status_id",
+        match:   "^(?!allow|deny$).*",
+        replace: "99"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status",
+        match:   "^(?!allow|deny$).*",
+        replace: "Other"
+      },
+        {
+        input:   "dst_endpoint.intermediate_ips",
+        output:  "dst_endpoint.intermediate_ips",
+        match:   ".*",
+        replace: "\\[\"$0\"\\]"
+      },
+      {
+        input:   "message",
+        output:  "src_endpoint.intermediate_ips",
+        match:   "(?:[^,]*,){9}([^,]*){1},(?:[^,]*,){65}([^,]*){1},(?:[^,]*,){38}.*",
+        replace: "\\[\"$1\"\\, \"$2\"\\]"
+      },
+      {
+        input:   "message",
+        output:  "observables",
+        match:   "(?:[^,]*,){7}([^,]*),([^,]*),(?:[^,]*,){3}([^,]*),(?:[^,]*,){69}([^,]*),([^,]*),(?:[^,]*,){6}([^,]*),([^,]*),.*",
+        replace: "\\[\\{\"type_id\"\\: \"1\"\\, \"type\"\\: \"Hostname\"\\, \"name\"\\: \"src_endpoint.hostname\"\\, \"value\"\\: \"$4\"\\}\\, \\{\"type_id\"\\: \"1\"\\, \"type\"\\: \"Hostname\"\\, \"name\"\\: \"dst_endpoint.hostname\"\\, \"value\"\\: \"$6\"\\}\\, \\{\"type_id\"\\: \"2\"\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"src_endpoint.ip\"\\, \"value\"\\: \"$1\"\\}\\, \\{\"type_id\"\\: \"2\"\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"dst_endpoint.ip\"\\, \"value\"\\: \"$2\"\\}\\, \\{\"type_id\"\\: \"4\"\\, \"type\"\\: \"User Name\"\\, \"name\"\\: \"actor.user.name\"\\, \"value\"\\: \"$3\"\\}\\, \\{\"type_id\"\\: \"3\"\\, \"type\"\\: \"MAC Address\"\\, \"name\"\\: \"src_endpoint.mac\"\\, \"value\"\\: \"$5\"\\}\\, \\{\"type_id\"\\: \"3\"\\, \"type\"\\: \"MAC Address\"\\, \"name\"\\: \"dst_endpoint.mac\"\\, \"value\"\\: \"$7\"\\}\\]"
+      },  
+      ]
+    },
+    {
+      //dont match on application_characteristic for cases where is it blank.
+      attributes: { 
+        "class_uid": "4001",
+        "category_uid": "4",
+        "severity_id": "0",
+        "class_name": "Network Activity",
+        "category_name": "Network Activity",
+        "metadata.product.name": "Palo Alto Networks Firewall",
+        "metadata.product.vendor_name": "Palo Alto Networks",
+        "metadata.version":"1.0.0-rc.3",
+        "metadata.log_name": "TRAFFIC",
+       },
+      format: ".*,$metadata.logged_time_dt$,$device.hw_info.serial_number$,TRAFFIC,$unmapped.sub_type$,.*,$metadata.original_time$,$src_endpoint.ip$,$dst_endpoint.ip$,$src_endpoint.intermediate_ips$,$dst_endpoint.intermediate_ips$,$unmapped.rule_matched$,$actor.user.name$,$unmapped.dst_user$,$app_name$,$unmapped.vsys$,$unmapped.from_zone$,$unmapped.to_zone$,$unmapped.inbound_if$,$unmapped.outbound_if$,$actor.session.issuer$,$metadata.original_time$,$actor.session.uid$,$unmapped.repeat_count$,$src_endpoint.port$,$dst_endpoint.port$,$unmapped.nat_src_port$,$unmapped.nat_dst_port$,$unmapped.flags$,$connection_info.protocol_name$,$unmapped.action_value$,$traffic.bytes$,$traffic.bytes_in$,$traffic.bytes_out$,$traffic.packets$,$actor.session.created_time_dt$,$duration$,$unmapped.url_category_value$,.*,$metadata.sequence$,$unmapped.action_flags$,$src_endpoint.location.region$,$dst_endpoint.location.region$,.*,$traffic.packets_out$,$traffic.packets_in$,$unmapped.session_end_reason_value$,$unmapped.dg_hier_level_1$,$unmapped.dg_hier_level_2$,$unmapped.dg_hier_level_3$,$unmapped.dg_hier_level_4$,$unmapped.vsys_name$,$device.hostname$,$unmapped.action_source$,$unmapped.src_uuid$,$unmapped.dst_uuid$,$device.imsi$,$device.imei$,$unmapped.parent_session_id$,$unmapped.parent_start_time$,$unmapped.tunnel_type$,$unmapped.ep_assoc_id$,$unmapped.chunks_total$,$unmapped.chunks_sent$,$unmapped.chunks_received$,$unmapped.rule_matched_uuid$,$unmapped.http2_connection$,$unmapped.link_change_count$,$unmapped.policy_id$,$unmapped.link_switches$,$unmapped.sdwan_cluster$,$unmapped.sdwan_device_type$,$unmapped.sdwan_cluster_type$,$unmapped.sdwan_site$,$actor.user.groups$,$src_endpoint.intermediate_ips$,$unmapped.src_category$,$unmapped.src_profile$,$unmapped.src_model$,$unmapped.src_vendor$,$unmapped.src_osfamily$,$unmapped.src_osversion$,$src_endpoint.hostname$,$src_endpoint.mac$,$unmapped.dst_category$,$unmapped.dst_profile$,$unmapped.dst_model$,$unmapped.dst_vendor$,$unmapped.dst_osfamily$,$unmapped.dst_osversion$,$dst_endpoint.hostname$,$dst_endpoint.mac$,$unmapped.container_id$,$unmapped.pod_namespace$,$unmapped.pod_name$,$unmapped.src_edl$,$unmapped.dst_edl$,$device.uid$,$unmapped.serial_number$,$unmapped.src_dag$,$unmapped.dst_dag$,$unmapped.session_owner$,$unmapped.high_res_timestamp$,$unmapped.nsdsai_sst$,$unmapped.nsdsai_sd$,$unmapped.subcategory_of_app$,$unmapped.category_of_app$,$unmapped.technology_of_app$,$unmapped.risk_of_app$,$unmapped.characteristic_of_app$,$unmapped.container_of_app$,$unmapped.tunneled_app$,$unmapped.is_saas_of_app$,$unmapped.sanctioned_state_of_app$,$unmapped.offloaded$",
+      halt: true,
+      rewrites: [
+        {
+        input:   "unmapped.sub_type",
+        output:  "event.type",
+        match:   "^start$",
+        replace: "Open"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "event.type",
+        match:   "^end$",
+        replace: "Close"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "event.type",
+        match:   "^drop$",
+        replace: "Fail"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "event.type",
+        match:   "^deny$",
+        replace: "Refuse"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "activity_id",
+        match:   "^start$",
+        replace: "1"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "activity_id",
+        match:   "^end$",
+        replace: "2"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "activity_id",
+        match:   "^drop$",
+        replace: "4"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "activity_id",
+        match:   "^deny$",
+        replace: "5"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "activity_name",
+        match:   "^start$",
+        replace: "Open"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "activity_name",
+        match:   "^end$",
+        replace: "Close"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "activity_name",
+        match:   "^drop$",
+        replace: "Fail"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "activity_name",
+        match:   "^deny$",
+        replace: "Refuse"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "type_uid",
+        match:   "^start$",
+        replace: "400101"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "type_uid",
+        match:   "^end$",
+        replace: "400102"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "type_uid",
+        match:   "^drop$",
+        replace: "400104"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "type_uid",
+        match:   "^deny$",
+        replace: "400105"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "type_name",
+        match:   "^start$",
+        replace: "Network Activity: Open"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "type_name",
+        match:   "^end$",
+        replace: "Network Activity: Close"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "type_name",
+        match:   "^drop$",
+        replace: "Network Activity: Fail"
+      },
+      {
+        input:   "unmapped.sub_type",
+        output:  "type_name",
+        match:   "^deny$",
+        replace: "Network Activity: Refuse"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status_id",
+        match:   "^allow$",
+        replace: "1"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status_id",
+        match:   "^deny$",
+        replace: "2"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status",
+        match:   "^allow$",
+        replace: "Success"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status",
+        match:   "^deny$",
+        replace: "Failure"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status_id",
+        match:   "^(?!allow|deny$).*",
+        replace: "99"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status",
+        match:   "^(?!allow|deny$).*",
+        replace: "Other"
+      },
+       {
+        input:   "dst_endpoint.intermediate_ips",
+        output:  "dst_endpoint.intermediate_ips",
+        match:   ".*",
+        replace: "\\[\"$0\"\\]"
+      }, 
+      {
+        input:   "message",
+        output:  "src_endpoint.intermediate_ips",
+        match:   "(?:[^,]*,){9}([^,]*){1},(?:[^,]*,){65}([^,]*){1},(?:[^,]*,){38}.*",
+        replace: "\\[\"$1\"\\, \"$2\"\\]"
+      },
+        {
+        input:   "message",
+        output:  "observables",
+        match:   "(?:[^,]*,){7}([^,]*),([^,]*),(?:[^,]*,){3}([^,]*),(?:[^,]*,){69}([^,]*),([^,]*),(?:[^,]*,){6}([^,]*),([^,]*),.*",
+        replace: "\\[\\{\"type_id\"\\: \"1\"\\, \"type\"\\: \"Hostname\"\\, \"name\"\\: \"src_endpoint.hostname\"\\, \"value\"\\: \"$4\"\\}\\, \\{\"type_id\"\\: \"1\"\\, \"type\"\\: \"Hostname\"\\, \"name\"\\: \"dst_endpoint.hostname\"\\, \"value\"\\: \"$6\"\\}\\, \\{\"type_id\"\\: \"2\"\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"src_endpoint.ip\"\\, \"value\"\\: \"$1\"\\}\\, \\{\"type_id\"\\: \"2\"\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"dst_endpoint.ip\"\\, \"value\"\\: \"$2\"\\}\\, \\{\"type_id\"\\: \"4\"\\, \"type\"\\: \"User Name\"\\, \"name\"\\: \"actor.user.name\"\\, \"value\"\\: \"$3\"\\}\\, \\{\"type_id\"\\: \"3\"\\, \"type\"\\: \"MAC Address\"\\, \"name\"\\: \"src_endpoint.mac\"\\, \"value\"\\: \"$5\"\\}\\, \\{\"type_id\"\\: \"3\"\\, \"type\"\\: \"MAC Address\"\\, \"name\"\\: \"dst_endpoint.mac\"\\, \"value\"\\: \"$7\"\\}\\]"
+      },
+      ]
+    },
+    {
+      attributes: {
+        "class_uid": "0",
+        "activity_id": "99",
+        "category_uid": "0",
+        "type_uid": "99",
+        "type_name": "Base Event: Other",
+        "class_name": "Base Event",
+        "category_name": "Uncategorized",
+        "metadata.product.name": "Palo Alto Networks Firewall",
+        "metadata.product.vendor_name": "Palo Alto Networks",
+        "metadata.version":"1.0.0-rc.3",
+        "metadata.log_name": "SYSTEM",
+       },
+      format: ".*,$metadata.logged_time_dt$,$unmapped.serial$,SYSTEM,$unmapped.sub_type$,.*,$metadata.original_time$,$unmapped.vsys$,$unmapped.event_id$,$unmapped.object$,.*,.*,$unmapped.module$,$unmapped.severity$,$unmapped.description=desc$,$metadata.sequence$,$unmapped.action_flags$,$unmapped.dg_hier_level_1$,$unmapped.dg_hier_level_2$,$unmapped.dg_hier_level_3$,$unmapped.dg_hier_level_4$,$unmapped.vsys_name$,$unmapped.device_name$,.*,.*,$unmapped.high_res_timestamp$",
+      halt: true,
+      rewrites: [
+      {
+        input:   "unmapped.sub_type",
+        output:  "activity_name",
+        match:   ".*",
+        replace: "$0"
+      },
+     {
+        input:   "unmapped.sub_type",
+        output:  "event.type",
+        match:   ".*",
+        replace: "$0"
+      },
+      {
+        input:   "unmapped.severity",
+        output:  "severity_id",
+        match:   "^informational$",
+        replace: "1"
+      },
+      {
+        input:   "unmapped.severity",
+        output:  "severity_id",
+        match:   "^low$",
+        replace: "2"
+      },
+      {
+        input:   "unmapped.severity",
+        output:  "severity_id",
+        match:   "^medium$",
+        replace: "3"
+      },
+      {
+        input:   "unmapped.severity",
+        output:  "severity_id",
+        match:   "^high$",
+        replace: "4"
+      },
+      {
+        input:   "unmapped.severity",
+        output:  "severity_id",
+        match:   "^critical$",
+        replace: "5"
+      },
+      {
+        input:   "message",
+        output:  "observables",
+        match:   "(?:[^,]*,){14}(\".*\"),(?:[^,]*,){7}([^,]*),.*",
+        replace: "\\[\\{\"type_id\"\\: \"1\"\\, \"type\"\\: \"Hostname\"\\, \"name\"\\: \"device.hostname\"\\, \"value\"\\: \"$2\"\\}\\]"
+      },
+      ]
+    },
+    {
+      //matches THREAT logs with comma surround lists in application_characteristic and url_category_list. 
+      attributes: { 
+        "activity_name": "THREAT",
+        "class_uid": "4001",
+        "activity_id": "99",
+        "category_uid": "4",
+        "type_uid": "400199",
+        "type_name": "Network Activity: Other",
+        "class_name": "Network Activity",
+        "category_name": "Network Activity",
+        "metadata.product.name": "Palo Alto Networks Firewall",
+        "metadata.product.vendor_name": "Palo Alto Networks",
+        "metadata.version":"1.0.0-rc.3",
+        "metadata.log_name": "THREAT",
+        "event.type": "THREAT"
+       },
+      format: ".*,$metadata.logged_time_dt$,$device.hw_info.serial_number$,THREAT,$unmapped.sub_type$,.*,$metadata.original_time$,$src_endpoint.ip$,$dst_endpoint.ip$,$src_endpoint.intermediate_ips$,$dst_endpoint.intermediate_ips$,$unmapped.rule_matched$,$actor.user.name$,$unmapped.dst_user$,$app_name$,$unmapped.vsys$,$unmapped.from_zone$,$unmapped.to_zone$,$unmapped.inbound_if$,$unmapped.outbound_if$,$actor.session.issuer$,$metadata.original_time$,$actor.session.uid$,$unmapped.repeat_count$,$src_endpoint.port$,$dst_endpoint.port$,$unmapped.nat_src_port$,$unmapped.nat_dst_port$,$unmapped.flags$,$connection_info.protocol_name$,$unmapped.action_value$,$unmapped.file$,$unmapped.threat_id$,$unmapped.url_category_value$,$unmapped.severity$,$unmapped.direction_of_attack$,$metadata.sequence$,$unmapped.action_flags$,$src_endpoint.location.region$,$dst_endpoint.location.region$,$metadata.product.version$,$unmapped.pcap_id$,$unmapped.file_digest$,.*,$cloud.account_uid$,$unmapped.url_idx$,$unmapped.user_agent$,$unmapped.file_type$,$src_endpoint.intermediate_ips$,$unmapped.referrer$,$unmapped.sender_of_email$,$unmapped.subject_of_email$,$unmapped.receipent_of_email$,$unmapped.report_id$,$unmapped.dg_hier_level_1$,$unmapped.dg_hier_level_2$,$unmapped.dg_hier_level_3$,$unmapped.dg_hier_level_4$,$unmapped.vsys_name$,$device.hostname$,.*,$unmapped.src_uuid$,$unmapped.dst_uuid$,$unmapped.http_method$,$device.imsi$,$device.imei$,$unmapped.parent_session_id$,$unmapped.parent_start_time$,$unmapped.tunnel_type$,$unmapped.threat_category$,$unmapped.content_version$,.*,$unmapped.ep_assoc_id$,$unmapped.ppid$,$unmapped.http_headers$,\"$unmapped.url_category_list$\",$unmapped.rule_matched_uuid$,$unmapped.http2_connection$,$actor.user.groups$,$src_endpoint.intermediate_ips$,$unmapped.src_category$,$unmapped.src_profile$,$unmapped.src_model$,$unmapped.src_vendor$,$unmapped.src_osfamily$,$unmapped.src_osversion$,$src_endpoint.hostname$,$src_endpoint.mac$,$unmapped.dst_category$,$unmapped.dst_profile$,$unmapped.dst_model$,$unmapped.dst_vendor$,$unmapped.dst_osfamily$,$unmapped.dst_osversion$,$dst_endpoint.hostname$,$dst_endpoint.mac$,$unmapped.container_id$,$unmapped.pod_namespace$,$unmapped.pod_name$,$unmapped.src_edl$,$unmapped.dst_edl$,$device.uid$,$unmapped.serial_number$,$unmapped.src_dag$,$unmapped.dst_dag$,$unmapped.partial_hash$,.*,$unmapped.high_res_timestamp$,$unmapped.reason$,$unmapped.justification$,$unmapped.nssai_sst$,$unmapped.subcategory_of_app$,$unmapped.category_of_app$,$unmapped.technology_of_app$,$unmapped.risk_of_app$,\"$unmapped.characteristic_of_app$\",$unmapped.container_of_app$,$unmapped.tunneled_app$,$unmapped.is_saas_of_app$,$unmapped.sanctioned_state_of_app$",
+      halt: true,
+      rewrites: [
           {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
-      }, {
-        id: "globalprotect-9-1-0", //PAN-OS v9.1.0-9.1.2 GLOBALPROTECT
-        attributes: {
-          "event.type": "globalprotect",
-          "format": "globalprotect-v9.1.3"
-        },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$device_hardware_info.serial_number$,$network_activity.sequence_number$,$network_activity.action_flags$,GLOBALPROTECT,$network_activity.future_use_2$,$network_activity.future_use_3$,$timestamp=timestamp_pat$,$network_traffic.virtual_system_name$,$session.parent_uid$,$stage$,$authentication_method$,$network_connection_info.tunnel_type$,$user.src_name$,$source_region$,$machine_name$,$public_ip$,$public_ipv6$,$private_ip$,$private_ipv6$,$network_endpoint.host_id$,$device_hardware_info.serial_number$,$client_version$,$client_os$,$client_os_version$,$network_activity.repeat_count$,$reason$,$error$,$description$,$status$,$location$,$login_duration$,$connect_method$,$error_code$,$portal$",
-        rewrites: [
+        input:   "unmapped.severity",
+        output:  "severity_id",
+        match:   "^informational$",
+        replace: "1"
+      },
+      {
+        input:   "unmapped.severity",
+        output:  "severity_id",
+        match:   "^low$",
+        replace: "2"
+      },
+      {
+        input:   "unmapped.severity",
+        output:  "severity_id",
+        match:   "^medium$",
+        replace: "3"
+      },
+      {
+        input:   "unmapped.severity",
+        output:  "severity_id",
+        match:   "^high$",
+        replace: "4"
+      },
+      {
+        input:   "unmapped.severity",
+        output:  "severity_id",
+        match:   "^critical$",
+        replace: "5"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status_id",
+        match:   "^allow$",
+        replace: "1"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status_id",
+        match:   "^deny$",
+        replace: "2"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status",
+        match:   "^allow$",
+        replace: "Success"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status",
+        match:   "^deny$",
+        replace: "Failure"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status_id",
+        match:   "^(?!allow|deny$).*",
+        replace: "99"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status",
+        match:   "^(?!allow|deny$).*",
+        replace: "Other"
+      },
+      {
+        input:   "dst_endpoint.intermediate_ips",
+        output:  "dst_endpoint.intermediate_ips",
+        match:   ".*",
+        replace: "\\[\"$0\"\\]"
+      }, 
+      {
+        input:   "message",
+        output:  "src_endpoint.intermediate_ips",
+        match:   "(?:[^,]*,){9}([^,]*),(?:[^,]*,){21}(\".*\"),(?:[^,]*,){16}([^,]*),(?:[^,]*,){26}(\".*\"),(?:[^,]*,){3}([^,]*),.*",
+        replace: "\\[\"$1\"\\, \"$3\"\\, \"$5\"\\]"
+      },
+      {
+        input:   "message",
+        output:  "observables",
+        match:   "(?:[^,]*,){7}([^,]*),([^,]*),(?:[^,]*,){3}([^,]*),(?:[^,]*,){18}(\".*\"),(?:[^,]*,){43}(\".*\"),(?:[^,]*,){10}([^,]*),([^,]*),(?:[^,]*,){6}([^,]*),([^,]*),.*",
+        replace: "\\[\\{\"type_id\"\\: \"1\"\\, \"type\"\\: \"Hostname\"\\, \"name\"\\: \"src_endpoint.hostname\"\\, \"value\"\\: \"$6\"\\}\\, \\{\"type_id\"\\: \"1\"\\, \"type\"\\: \"Hostname\"\\, \"name\"\\: \"dst_endpoint.hostname\"\\, \"value\"\\: \"$8\"\\}\\, \\{\"type_id\"\\: \"2\"\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"src_endpoint.ip\"\\, \"value\"\\: \"$1\"\\}\\, \\{\"type_id\"\\: \"2\"\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"dst_endpoint.ip\"\\, \"value\"\\: \"$2\"\\}\\, \\{\"type_id\"\\: \"4\"\\, \"type\"\\: \"User Name\"\\, \"name\"\\: \"actor.user.name\"\\, \"value\"\\: \"$3\"\\}\\, \\{\"type_id\"\\: \"3\"\\, \"type\"\\: \"MAC Address\"\\, \"name\"\\: \"src_endpoint.mac\"\\, \"value\"\\: \"$7\"\\}\\, \\{\"type_id\"\\: \"3\"\\, \"type\"\\: \"MAC Address\"\\, \"name\"\\: \"dst_endpoint.mac\"\\, \"value\"\\: \"$9\"\\}\\]"
+      },
+      ]
+    },
+    {
+      //matches THREAT logs with comma surround lists in application_characteristic and url_category_list. 
+      attributes: { 
+        "activity_name": "THREAT",
+        "class_uid": "4001",
+        "activity_id": "99",
+        "category_uid": "4",
+        "type_uid": "400199",
+        "type_name": "Network Activity: Other",
+        "class_name": "Network Activity",
+        "category_name": "Network Activity",
+        "metadata.product.name": "Palo Alto Networks Firewall",
+        "metadata.product.vendor_name": "Palo Alto Networks",
+        "metadata.version":"1.0.0-rc.3",
+        "metadata.log_name": "THREAT",
+        "event.type": "THREAT"
+       },
+      format: ".*,$metadata.logged_time_dt$,$device.hw_info.serial_number$,THREAT,$unmapped.sub_type$,.*,$metadata.original_time$,$src_endpoint.ip$,$dst_endpoint.ip$,$src_endpoint.intermediate_ips$,$dst_endpoint.intermediate_ips$,$unmapped.rule_matched$,$actor.user.name$,$unmapped.dst_user$,$app_name$,$unmapped.vsys$,$unmapped.from_zone$,$unmapped.to_zone$,$unmapped.inbound_if$,$unmapped.outbound_if$,$actor.session.issuer$,$metadata.original_time$,$actor.session.uid$,$unmapped.repeat_count$,$src_endpoint.port$,$dst_endpoint.port$,$unmapped.nat_src_port$,$unmapped.nat_dst_port$,$unmapped.flags$,$connection_info.protocol_name$,$unmapped.action_value$,$unmapped.file$,$unmapped.threat_id$,$unmapped.url_category_value$,$unmapped.severity$,$unmapped.direction_of_attack$,$metadata.sequence$,$unmapped.action_flags$,$src_endpoint.location.region$,$dst_endpoint.location.region$,$metadata.product.version$,$unmapped.pcap_id$,$unmapped.file_digest$,.*,$cloud.account_uid$,$unmapped.url_idx$,$unmapped.user_agent$,$unmapped.file_type$,$src_endpoint.intermediate_ips$,$unmapped.referrer$,$unmapped.sender_of_email$,$unmapped.subject_of_email$,$unmapped.receipent_of_email$,$unmapped.report_id$,$unmapped.dg_hier_level_1$,$unmapped.dg_hier_level_2$,$unmapped.dg_hier_level_3$,$unmapped.dg_hier_level_4$,$unmapped.vsys_name$,$device.hostname$,.*,$unmapped.src_uuid$,$unmapped.dst_uuid$,$unmapped.http_method$,$device.imsi$,$device.imei$,$unmapped.parent_session_id$,$unmapped.parent_start_time$,$unmapped.tunnel_type$,$unmapped.threat_category$,$unmapped.content_version$,.*,$unmapped.ep_assoc_id$,$unmapped.ppid$,$unmapped.http_headers$,$unmapped.url_category_list$,$unmapped.rule_matched_uuid$,$unmapped.http2_connection$,$actor.user.groups$,$src_endpoint.intermediate_ips$,$unmapped.src_category$,$unmapped.src_profile$,$unmapped.src_model$,$unmapped.src_vendor$,$unmapped.src_osfamily$,$unmapped.src_osversion$,$src_endpoint.hostname$,$src_endpoint.mac$,$unmapped.dst_category$,$unmapped.dst_profile$,$unmapped.dst_model$,$unmapped.dst_vendor$,$unmapped.dst_osfamily$,$unmapped.dst_osversion$,$dst_endpoint.hostname$,$dst_endpoint.mac$,$unmapped.container_id$,$unmapped.pod_namespace$,$unmapped.pod_name$,$unmapped.src_edl$,$unmapped.dst_edl$,$device.uid$,$unmapped.serial_number$,$unmapped.src_dag$,$unmapped.dst_dag$,$unmapped.partial_hash$,.*,$unmapped.high_res_timestamp$,$unmapped.reason$,$unmapped.justification$,$unmapped.nssai_sst$,$unmapped.subcategory_of_app$,$unmapped.category_of_app$,$unmapped.technology_of_app$,$unmapped.risk_of_app$,$unmapped.characteristic_of_app$,$unmapped.container_of_app$,$unmapped.tunneled_app$,$unmapped.is_saas_of_app$,$unmapped.sanctioned_state_of_app$",
+      halt: true,
+      rewrites: [
           {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
-      }, {
-        id: "decryption-11-0", //PAN-OS v11.0, adds Cluster Name
-        attributes: {
-          "event.type": "decryption",
-          "format": "decryption-v11.0"
+        input:   "unmapped.severity",
+        output:  "severity_id",
+        match:   "^informational$",
+        replace: "1"
+      },
+      {
+        input:   "unmapped.severity",
+        output:  "severity_id",
+        match:   "^low$",
+        replace: "2"
+      },
+      {
+        input:   "unmapped.severity",
+        output:  "severity_id",
+        match:   "^medium$",
+        replace: "3"
+      },
+      {
+        input:   "unmapped.severity",
+        output:  "severity_id",
+        match:   "^high$",
+        replace: "4"
+      },
+      {
+        input:   "unmapped.severity",
+        output:  "severity_id",
+        match:   "^critical$",
+        replace: "5"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status_id",
+        match:   "^allow$",
+        replace: "1"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status_id",
+        match:   "^deny$",
+        replace: "2"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status",
+        match:   "^allow$",
+        replace: "Success"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status",
+        match:   "^deny$",
+        replace: "Failure"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status_id",
+        match:   "^(?!allow|deny$).*",
+        replace: "99"
+      },
+      {
+        input:   "unmapped.action_value",
+        output:  "status",
+        match:   "^(?!allow|deny$).*",
+        replace: "Other"
+      },
+      {
+        input:   "dst_endpoint.intermediate_ips",
+        output:  "dst_endpoint.intermediate_ips",
+        match:   ".*",
+        replace: "\\[\"$0\"\\]"
+      }, 
+      {
+        input:   "message",
+        output:  "src_endpoint.intermediate_ips",
+        match:   "(?:[^,]*,){9}([^,]*),(?:[^,]*,){38}([^,]*),(?:[^,]*,){30}([^,]*),.*",
+        replace: "\\[\"$1\"\\, \"$2\"\\, \"$3\"\\]"
+      },
+      {
+        input:   "message",
+        output:  "observables",
+        match:   "(?:[^,]*,){7}([^,]*),([^,]*),(?:[^,]*,){3}([^,]*),(?:[^,]*,){73}([^,]*),([^,]*),(?:[^,]*,){6}([^,]*),([^,]*),.*",
+        replace: "\\[\\{\"type_id\"\\: \"1\"\\, \"type\"\\: \"Hostname\"\\, \"name\"\\: \"src_endpoint.hostname\"\\, \"value\"\\: \"$4\"\\}\\, \\{\"type_id\"\\: \"1\"\\, \"type\"\\: \"Hostname\"\\, \"name\"\\: \"dst_endpoint.hostname\"\\, \"value\"\\: \"$6\"\\}\\, \\{\"type_id\"\\: \"2\"\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"src_endpoint.ip\"\\, \"value\"\\: \"$1\"\\}\\, \\{\"type_id\"\\: \"2\"\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"dst_endpoint.ip\"\\, \"value\"\\: \"$2\"\\}\\, \\{\"type_id\"\\: \"4\"\\, \"type\"\\: \"User Name\"\\, \"name\"\\: \"actor.user.name\"\\, \"value\"\\: \"$3\"\\}\\, \\{\"type_id\"\\: \"3\"\\, \"type\"\\: \"MAC Address\"\\, \"name\"\\: \"src_endpoint.mac\"\\, \"value\"\\: \"$5\"\\}\\, \\{\"type_id\"\\: \"3\"\\, \"type\"\\: \"MAC Address\"\\, \"name\"\\: \"dst_endpoint.mac\"\\, \"value\"\\: \"$7\"\\}\\]"
+      },
+      ]
+    },
+    {
+      attributes: { 
+        "activity_name": "Logoff",
+        "activity_id": "2",
+        "category_name": "Identity & Access Management",
+        "category_uid": "3",
+        "class_name": "Authentication",
+        "class_uid": "3002",
+        "cloud.provider": "Palo Alto Networks"
+        "metadata.product.name": "Palo Alto Networks Firewall",
+        "metadata.product.vendor_name": "Palo Alto Networks",
+        "metadata.version":"1.1.0",
+        "type_uid": "300202",
+        "type_name": "Authentication: Logoff",
+        "event.type": "Logoff",
+        "severity_id": "99"
+       },
+      format: "$metadata.original_time$,$metadata.product.uid$,$unmapped.type=userid_log_type$,$unmapped.subtype=logout_sub_type$,.*,$start_time_dt$,$unmapped.vsys$,$src_endpoint.ip$,$user.name$,$user.uid$,$metadata.event_code$,$unmapped.repeatcnt$,$unmapped.timeout$,$src_endpoint.port$,$dst_endpoint.port$,$unmapped.datasource$,$unmapped.datasourcetype$,$unmapped.seqno$,$unmapped.actionflags$,$unmapped.dg_hier_level_1$,$unmapped.dg_hier_level_2$,$unmapped.dg_hier_level_3$,$unmapped.dg_hier_level_4$,$unmapped.vsys_name$,$src_endpoint.hostname$,$unmapped.vsys_id$,$unmapped.factortype$,$unmapped.factorcompletiontime$,$unmapped.factorno$,$unmapped.ugflags$,$unmapped.userbysource$,$unmapped.tag_name$,$unmapped.high_res_timestamp$",
+      halt: true,
+      rewrites: [
+        {
+          input: "message",
+          output: "observables",
+          match: "(?:[^,]*,){7}([^,]*)(?:,[^,]*){0},([^,]*)(?:,[^,]*){15},([^,]*).*",
+          replace: "\\[\\{\"type_id\"\\: 1\\, \"type\"\\: \"Hostname\"\\, \"name\"\\: \"src_endpoint.hostname\"\\, \"value\"\\: $3\\}\\, \\{\"type_id\"\\: 2\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"src_endpoint.ip\"\\, \"value\"\\: $1\\}\\, \\{\"type_id\"\\: 4\\, \"type\"\\: \"User Name\"\\, \"name\"\\: \"user.name\"\\, \"value\"\\: $2\\}\\]"
         },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,DECRYPTION,$network_activity.sub_type$,$config_version$,$timestamp=timestamp_pat$,$src.ip.address$,$dst.ip.address$,$network_endpoint.nat_src_ip$,$network_endpoint.nat_dst_ip$,$rule.name$,$user.src_name$,$user.dst_name$,$network_activity.app_name$,$network_traffic.virtual_system_name$,$source_zone$,$destination_zone$,$network_interface.inbound_name$,$network_interface.outbound_name$,$network_activity.log_action$,$time_logged$,$session.uid$,$network_activity.repeat_count$,$network_endpoint.src_port$,$network_endpoint.dst_port$,$nenetwork_endpoint.nat_src_port$,$nenetwork_endpoint.nat_dst_port$,$network_connection_info.flag$,$network_connection_info.protocol_name$,$network_activity.action$,$tunnel$,$network_activity.future_use_2$,$network_activity.future_use_3$,$virtual_machine.src_vm_uuid$,$dest_vm_uuid$,$rule.uid$,$stage_client_firewall$,$stage_firewall_server$,$tls_version$,$key_exchange_algorithm$,$encryption_algorithm$,$hash_algorithm$,$rule$,$elliptic_curve$,$error_index$,$root_status$,$chain_status$,$proxy_type$,$cert_serial_number$,$fingerprint$,$certificate.created_time$,$certificate.expiration_time$,$certificate.version$,$certificate.size$,$cn_length$,$issuer_cn_length$,$root_cn_length$,$sni_length$,$cert_flags=value_pat$,$subject_cn$,$issuer_subject_cn$,$root_subject_cn$,$server_name$,$error$,$container.id$,$container.pod_namespace$,$container.pod_name$,$src_edl$,$dest_edl$,$src_dag$,$dest_dag$,$network_activity.time$,$device.src_type$,$device.src_profile$,$device.src_model$,$device.dst_vendor_name$,$device.src_os_edition$,$device.src_os_version$,$network_connection_info.dst_hostname$,$network_connection_info.dst_mac$,$network_activity.sequence_number$,$network_activity.action_flags$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$,$firewall.virtual_system_id$,$network_activity.sub_category$,$network_activity.category_name$,$network_activity.app_model$,$network_activity.severity$,$network_activity.app_characteristic=value_pat$,$network_activity.container.id$,$network_activity.is_saas$,$network_activity.is_sanctioned$,$network_activity.cluster.name$",
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
-      }, {
-        id: "decryption-10-1", //PAN-OS v10.1-10.2
-        attributes: {
-          "event.type": "decryption",
-          "format": "decryption-v10.1"
+        {
+          input: "activity_name",
+          output: "event.type",
+          match: ".*",
+          replace: "$0"
+        }
+      ]
+    },
+    {
+      attributes: { 
+        "activity_name": "Logon",
+        "activity_id": "1",
+        "category_name": "Identity & Access Management",
+        "category_uid": "3",
+        "class_name": "Authentication",
+        "class_uid": "3002",
+        "cloud.provider": "Palo Alto Networks"
+        "metadata.product.name": "Palo Alto Networks Firewall",
+        "metadata.product.vendor_name": "Palo Alto Networks",
+        "metadata.version":"1.1.0",
+        "type_uid": "300201",
+        "type_name": "Authentication: Logon",
+        "event.type": "Logon",
+        "severity_id": "99"
+       },
+      format: "$metadata.original_time$,$metadata.product.uid$,$unmapped.type=userid_log_type$,$unmapped.subtype=login_sub_type$,.*,$start_time_dt$,$unmapped.vsys$,$src_endpoint.ip$,$user.name$,$user.uid$,$metadata.event_code$,$unmapped.repeatcnt$,$unmapped.timeout$,$src_endpoint.port$,$dst_endpoint.port$,$unmapped.datasource$,$unmapped.datasourcetype$,$unmapped.seqno$,$unmapped.actionflags$,$unmapped.dg_hier_level_1$,$unmapped.dg_hier_level_2$,$unmapped.dg_hier_level_3$,$unmapped.dg_hier_level_4$,$unmapped.vsys_name$,$src_endpoint.hostname$,$unmapped.vsys_id$,$unmapped.factortype$,$unmapped.factorcompletiontime$,$unmapped.factorno$,$unmapped.ugflags$,$unmapped.userbysource$,$unmapped.tag_name$,$unmapped.high_res_timestamp$",
+      halt: true,
+      rewrites: [
+        {
+          input: "message",
+          output: "observables",
+          match: "(?:[^,]*,){7}([^,]*)(?:,[^,]*){0},([^,]*)(?:,[^,]*){15},([^,]*).*",
+          replace: "\\[\\{\"type_id\"\\: 1\\, \"type\"\\: \"Hostname\"\\, \"name\"\\: \"src_endpoint.hostname\"\\, \"value\"\\: $3\\}\\, \\{\"type_id\"\\: 2\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"src_endpoint.ip\"\\, \"value\"\\: $1\\}\\, \\{\"type_id\"\\: 4\\, \"type\"\\: \"User Name\"\\, \"name\"\\: \"user.name\"\\, \"value\"\\: $2\\}\\]"
         },
-        format: "$network_activity.future_use_1$,$network_activity.receive_time$,$firewall.serial_number$,DECRYPTION,$network_activity.sub_type$,$config_version$,$timestamp=timestamp_pat$,$src.ip.address$,$dst.ip.address$,$network_endpoint.nat_src_ip$,$network_endpoint.nat_dst_ip$,$rule.name$,$user.src_name$,$user.dst_name$,$network_activity.app_name$,$network_traffic.virtual_system_name$,$source_zone$,$destination_zone$,$network_interface.inbound_name$,$network_interface.outbound_name$,$network_activity.log_action$,$time_logged$,$session.uid$,$network_activity.repeat_count$,$network_endpoint.src_port$,$network_endpoint.dst_port$,$nenetwork_endpoint.nat_src_port$,$nenetwork_endpoint.nat_dst_port$,$network_connection_info.flag$,$network_connection_info.protocol_name$,$network_activity.action$,$tunnel$,$network_activity.future_use_2$,$network_activity.future_use_3$,$virtual_machine.src_vm_uuid$,$dest_vm_uuid$,$rule.uid$,$stage_client_firewall$,$stage_firewall_server$,$tls_version$,$key_exchange_algorithm$,$encryption_algorithm$,$hash_algorithm$,$rule$,$elliptic_curve$,$error_index$,$root_status$,$chain_status$,$proxy_type$,$cert_serial_number$,$fingerprint$,$certificate.created_time$,$certificate.expiration_time$,$certificate.version$,$certificate.size$,$cn_length$,$issuer_cn_length$,$root_cn_length$,$sni_length$,$cert_flags=value_pat$,$subject_cn$,$issuer_subject_cn$,$root_subject_cn$,$server_name$,$error$,$container.id$,$container.pod_namespace$,$container.pod_name$,$src_edl$,$dest_edl$,$src_dag$,$dest_dag$,$network_activity.time$,$device.src_type$,$device.src_profile$,$device.src_model$,$device.dst_vendor_name$,$device.src_os_edition$,$device.src_os_version$,$network_connection_info.dst_hostname$,$network_connection_info.dst_mac$,$network_activity.sequence_number$,$network_activity.action_flags$,$device.group_hierarchy.level_1$,$device.group_hierarchy.level_2$,$device.group_hierarchy.level_3$,$device.group_hierarchy.level_4$,$firewall.virtual_system_name$,$device.name$,$firewall.virtual_system_id$,$network_activity.sub_category$,$network_activity.category_name$,$network_activity.app_model$,$network_activity.severity$,$network_activity.app_characteristic=value_pat$,$network_activity.container.id$,$network_activity.is_saas$,$network_activity.is_sanctioned$",
-        rewrites: [
-          {
-            input:   "device.name",
-            output:  "event.source",
-            match:   ".*",
-            replace: "$0"
-          }
-        ],
-        halt: true
-      }
-    ]
-  }
+        {
+          input: "activity_name",
+          output: "event.type",
+          match: ".*",
+          replace: "$0"
+        }
+      ]
+    },
+    {
+      attributes: { 
+        "action": "Other",
+        "action_id": "99",
+        "activity_name": "Other",
+        "activity_id": "99",
+        "category_name": "Findings",
+        "category_uid": "2",
+        "class_name": "Detection Finding",
+        "class_uid": "2004",
+        "cloud.provider": "Palo Alto Networks",
+        "metadata.product.name": "Palo Alto Networks Firewall",
+        "metadata.product.vendor_name": "Palo Alto Networks",
+        "metadata.version":"1.1.0",
+        "type_uid": "200499",
+        "type_name": "Detection Finding: Other",
+        "severity_id": "99"
+       },
+      format: "$metadata.original_time$,$metadata.product.uid$,$finding_info.title=hipmatch_log_type$,$unmapped.subtype$,.*,$start_time_dt$,$actor.user.name$,$unmapped.vsys$,$device.name$,$device.os.name$,$device.ip$,$unmapped.matchname$,$unmapped.repeatcnt$,$unmapped.matchtype$,.*,.*,$unmapped.seqno$,$unmapped.actionflags$,$unmapped.dg_hier_level_1$,$unmapped.dg_hier_level_2$,$unmapped.dg_hier_level_3$,$unmapped.dg_hier_level_4$,$unmapped.vsys_name$,$device.hostname$,$unmapped.vsys_id$,$unmapped.srcipv6$,$unmapped.uid_alt$,$device.uid$,$device.mac$,$unmapped.high_res_timestamp$",
+      halt: true,
+      rewrites: [
+        {
+          input: "message",
+          output: "observables",
+          match: "(?:[^,]*,){10}([^,]*)(?:,[^,]*){12},([^,]*)(?:,[^,]*){4},([^,]*).*",
+          replace: "\\[\\{\"type_id\"\\: 1\\, \"type\"\\: \"Hostname\"\\, \"name\"\\: \"device.hostname\"\\, \"value\"\\: $2\\}\\, \\{\"type_id\"\\: 2\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"device.ip\"\\, \"value\"\\: $1\\}\\, \\{\"type_id\"\\: 3\\, \"type\"\\: \"MAC Address\"\\, \"name\"\\: \"device.mac\"\\, \"value\"\\: $3\\}\\]"
+        },
+        {
+          input: "activity_name",
+          output: "event.type",
+          match: ".*",
+          replace: "$0"
+        }
+      ]
+    },
+    {
+      attributes: { 
+        "activity_name": "Log",
+        "activity_id": "1",
+        "category_name": "Discovery",
+        "category_uid": "5",
+        "class_name": "Device Config State",
+        "class_uid": "5002",
+        "cloud.provider": "Palo Alto Networks",
+        "metadata.product.name": "Palo Alto Networks Firewall",
+        "metadata.product.vendor_name": "Palo Alto Networks",
+        "metadata.version":"1.1.0",
+        "type_uid": "500201",
+        "type_name": "Device Config State: Log",
+        "severity_id": "99"
+       },
+      format: "$metadata.original_time$,$metadata.product.uid$,$unmapped.type=config_log_type$,$unmapped.subtype$,.*,$start_time_dt$,$device.hostname$,$unmapped.vsys$,$actor.process.cmd_line$,$actor.user.name$,$unmapped.client$,$unmapped.result$,$metadata.product.path$,$unmapped.before-change-detail$,$unmapped.after-change-detail$,$unmapped.seqno$,$unmapped.actionflags$,$unmapped.dg_hier_level_1$,$unmapped.dg_hier_level_2$,$unmapped.dg_hier_level_3$,$unmapped.dg_hier_level_4$,$unmapped.vsys_name$,$device.name$,$device.groups$,$unmapped.comment$",
+      halt: true,
+      rewrites: [
+        {
+          input: "message",
+          output: "observables",
+          match: "(?:[^,]*,){6}([^,]*)(?:,[^,]*){2},([^,]*).*",
+          replace: "\\[\\{\"type_id\"\\: 1\\, \"type\"\\: \"Hostname\"\\, \"name\"\\: \"device.hostname\"\\, \"value\"\\: $1\\}\\, \\{\"type_id\"\\: 4\\, \"type\"\\: \"User Name\"\\, \"name\"\\: \"actor.user.name\"\\, \"value\"\\: $2\\}\\]"
+        },
+        {
+          input: "activity_name",
+          output: "event.type",
+          match: ".*",
+          replace: "$0"
+        }
+      ]
+    },
+    {
+      attributes: {
+        "action": "Other",
+        "action_id": "99",
+        "activity_name": "Other",
+        "activity_id": "99",
+        "category_name": "Findings",
+        "category_uid": "2",
+        "class_name": "Detection Finding",
+        "class_uid": "2004",
+        "cloud.provider": "Palo Alto Networks",
+        "metadata.product.name": "Palo Alto Networks Firewall",
+        "metadata.product.vendor_name": "Palo Alto Networks",
+        "metadata.version":"1.1.0",
+        "type_uid": "200499",
+        "type_name": "Detection Finding: Other",
+        "severity_id": "99"
+       },
+      format: "$metadata.original_time$,$device.hw_info.serial_number$,$unmapped.type$,$unmapped.subtype=wildfire_sub_type$,.*,$finding_info.created_time_dt$,$source_address$,$destination_address$,$nat_source_ip$,$nat_destination_ip$,$firewall_rule.name$,$actor.user.name$,$unmapped.dstuser$,$unmapped.app$,$unmapped.vsys$,$source_zone$,$destination_zone$,$inbound_interface$,$outbound_interface$,$unmapped.logset$,.*,$actor.session.uid$,$count$,$source_port$,$destination_port$,$unmapped.natsport$,$unmapped.natdport$,$unmapped.flags$,$ip_protocol$,$action$,$filename$,$finding_info.uid$,$unmapped.category$,$unmapped.severity$,$unmapped.direction$,$metadata.sequence$,$unmapped.actionflags$,$source_location$,$destination_location$,.*,$unmapped.contenttype$,$unmapped.pcap_id$,$unmapped.filedigest$,$unmapped.cloud$,$unmapped.url_idx$,$unmapped.user_agent$,$file_type$,$unmapped.xff$,$unmapped.referer$,$unmapped.sender$,$unmapped.subject$,$unmapped.recipient$,$unmapped.reportid$,$unmapped.dg_hier_level_1$,$unmapped.dg_hier_level_2$,$unmapped.dg_hier_level_3$,$unmapped.dg_hier_level_4$,$unmapped.vsys_name$,$device.name$,.*,$source_vm_uuid$,$destination_vm_uuid$,$unmapped.http_method$,$unmapped.imsi$,$device.imei$,$parent_session_id$,$parent_start_time$,$unmapped.tunnel$,$unmapped.thr_category$,$unmapped.contentver$,.*,$unmapped.assoc_id$,$unmapped.ppid$,$unmapped.http_headers$,$unmapped.url_category_list$,$unmapped.rule_uuid$,$unmapped.http2_connection$,$unmapped.dynusergroup_name$,$unmapped.xff_ip$,$unmapped.src_category$,$unmapped.src_profile$,$unmapped.src_model$,$unmapped.src_vendor$,$unmapped.src_osfamily$,$unmapped.src_osversion$,$source_hostname$,$source_mac_address$,$unmapped.dst_category$,$unmapped.dst_profile$,$unmapped.dst_model$,$unmapped.dst_vendor$,$unmapped.dst_osfamily$,$unmapped.dst_osversion$,$destination_hostname$,$destination_mac_address$,$unmapped.container_id$,$unmapped.pod_namespace$,$unmapped.pod_name$,$unmapped.src_edl$,$unmapped.dst_edl$,$unmapped.hostid$,$unmapped.serialnumber$,$unmapped.domain_edl$,$unmapped.src_dag$,$unmapped.dst_dag$,$unmapped.partial_hash$,$unmapped.high_res_timestamp$,$unmapped.reason$,$unmapped.justification$,$unmapped.nssai_sst$,$unmapped.subcategory_of_app$,$unmapped.category_of_app$,$unmapped.technology_of_app$,$risk_level$,$unmapped.characteristic_of_app=app_characteristic$,$unmapped.container_of_app$,$unmapped.tunneled_app$,$unmapped.is_saas_of_app$,$unmapped.sanctioned_state_of_app$,$unmapped.cloud_reportid$",
+      halt: true,
+      rewrites: [
+        {
+          input: "message",
+          output: "evidences",
+          match: "^(?:[^,]*,){6}([^,]*),([^,]*),([^,]*),([^,]*),(?:[^,]*,){5}([^,]*),([^,]*),([^,]*),([^,]*),(?:[^,]*,){4}([^,]*),([^,]*),(?:[^,]*,){3}([^,]*),(?:[^,]*,){1}([^,]*),(?:[^,]*,){6}([^,]*),([^,]*),(?:[^,]*,){7}([^,]*),([^,]*),(?:[^,]*,){13}([^,]*),(?:[^,]*,){1}([^,]*),(?:[^,]*,){18}([^,]*),([^,]*),(?:[^,]*,){6}([^,]*),([^,]*),(?:[^,]*,){7}([^,]*),([^,]*),(?:[^,]*,){6}([^,]*),([^,]*),(?:[^,]*,){6}([^,]*),([^,]*),(?:[^,]*,){1}([^,]*),([^,]*).*",
+          replace: "\\[\"src_endpoint\"\\:\\{\"ip\"\\: $1\\, \"intermediate_ips\"\\:\\[$3\\]\\, \"zone\"\\: $5\\, \"interface_name\"\\: $7\\, \"port\"\\: $9\\, \"location\"\\: \\{\"country\"\\: $13\\}\\, \"uid\"\\: $16\\, \"hostname\"\\: $20\\, \"mac\"\\: $21\\}\\, \"dst_endpoint\"\\:\\{\"ip\"\\: $2\\, \"intermediate_ips\"\\:\\[$4\\]\\, \"zone\"\\: $6\\, \"interface_name\"\\: $8\\, \"port\"\\: $10\\, \"location\"\\: \\{\"country\"\\: $14\\}\\, \"uid\"\\: $17\\, \"hostname\"\\: $22\\, \"mac\"\\: $23\\}\\, \"connection_info\"\\: \\{ \"protocol_name\"\\: $11\\}\\, \"process\"\\: \\{\"file\"\\: \\{\"name\"\\: $12\\, \"type\"\\: $15\\}\\, \"parent_process\"\\: \\{\"session\": \\{\"uid\": $18\\}\\, \"created_time\"\\: $19\\}\\} \\]"
+        },
+        {
+          input: "message",
+          output: "observables",
+          match: "^(?:[^,]*,){6}([^,]*),(?:[^,]*,){0}([^,]*),(?:[^,]*,){3}([^,]*),(?:[^,]*,){73}([^,]*),(?:[^,]*,){7}([^,]*).*",
+          replace: "\\[\\{\"type_id\"\\: 1\\, \"type\"\\: \"Hostname\"\\, \"name\"\\: \"evidences.src_endpoint.hostname\"\\, \"value\"\\: $4\\}\\, \\{\"type_id\"\\: 1\\, \"type\"\\: \"Hostname\"\\, \"name\"\\: \"evidences.dst_endpoint.hostname\"\\, \"value\"\\: $5\\}\\, \\{\"type_id\"\\: 2\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"evidences.src_endpoint.ip\"\\, \"value\"\\: $1\\}\\, \\{\"type_id\"\\: 2\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"evidences.dst_endpoint.ip\"\\, \"value\"\\: $2\\}\\, \\{\"type_id\"\\: 4\\, \"type\"\\: \"User Name\"\\, \"name\"\\: \"actor.user.name\"\\, \"value\"\\: $3\\}\\]"
+        },
+        {
+          input: "activity_name",
+          output: "event.type",
+          match: ".*",
+          replace: "$0"
+        },
+        {
+          action: "removeFields",
+          fields: [
+            "source_address",
+            "destination_address",
+            "nat_source_ip",
+            "nat_destination_ip",
+            "source_zone",
+            "destination_zone",
+            "inbound_interface",
+            "outbound_interface",
+            "source_port",
+            "destination_port",
+            "ip_protocol",
+            "filename",
+            "source_location",
+            "destination_location",
+            "file_type",
+            "source_vm_uuid",
+            "destination_vm_uuid",
+            "parent_session_id",
+            "parent_start_time",
+            "source_hostname",
+            "source_mac_address",
+            "destination_hostname",
+            "destination_mac_address"
+          ]
+        }
+      ]
+    },
+    {
+      attributes: {
+        "action": "Other",
+        "action_id": "99",
+        "activity_name": "Other",
+        "activity_id": "99",
+        "category_name": "Findings",
+        "category_uid": "2",
+        "class_name": "Detection Finding",
+        "class_uid": "2004",
+        "cloud.provider": "Palo Alto Networks",
+        "metadata.product.name": "Palo Alto Networks Firewall",
+        "metadata.product.vendor_name": "Palo Alto Networks",
+        "metadata.version":"1.1.0",
+        "type_uid": "200499",
+        "type_name": "Detection Finding: Other",
+        "severity_id": "99"
+       },
+      format: "$metadata.original_time$,$device.hw_info.serial_number$,$unmapped.type$,$unmapped.subtype=data_filtering_sub_type$,.*,$finding_info.created_time_dt$,$source_address$,$destination_address$,$nat_source_ip$,$nat_destination_ip$,$firewall_rule.name$,$actor.user.name$,$unmapped.dstuser$,$unmapped.app$,$unmapped.vsys$,$source_zone$,$destination_zone$,$inbound_interface$,$outbound_interface$,$unmapped.logset$,.*,$actor.session.uid$,$count$,$source_port$,$destination_port$,$unmapped.natsport$,$unmapped.natdport$,$unmapped.flags$,$ip_protocol$,$action$,$filename$,$finding_info.uid$,$unmapped.category$,$unmapped.severity$,$unmapped.direction$,$metadata.sequence$,$unmapped.actionflags$,$source_location$,$destination_location$,.*,$unmapped.contenttype$,$unmapped.pcap_id$,$unmapped.filedigest$,$unmapped.cloud$,$unmapped.url_idx$,$unmapped.user_agent$,$file_type$,$unmapped.xff$,$unmapped.referer$,$unmapped.sender$,$unmapped.subject$,$unmapped.recipient$,$unmapped.reportid$,$unmapped.dg_hier_level_1$,$unmapped.dg_hier_level_2$,$unmapped.dg_hier_level_3$,$unmapped.dg_hier_level_4$,$unmapped.vsys_name$,$device.name$,.*,$source_vm_uuid$,$destination_vm_uuid$,$unmapped.http_method$,$unmapped.imsi$,$device.imei$,$parent_session_id$,$parent_start_time$,$unmapped.tunnel$,$unmapped.thr_category$,$unmapped.contentver$,.*,$unmapped.assoc_id$,$unmapped.ppid$,$unmapped.http_headers$,$unmapped.url_category_list$,$unmapped.rule_uuid$,$unmapped.http2_connection$,$unmapped.dynusergroup_name$,$unmapped.xff_ip$,$unmapped.src_category$,$unmapped.src_profile$,$unmapped.src_model$,$unmapped.src_vendor$,$unmapped.src_osfamily$,$unmapped.src_osversion$,$source_hostname$,$source_mac_address$,$unmapped.dst_category$,$unmapped.dst_profile$,$unmapped.dst_model$,$unmapped.dst_vendor$,$unmapped.dst_osfamily$,$unmapped.dst_osversion$,$destination_hostname$,$destination_mac_address$,$unmapped.container_id$,$unmapped.pod_namespace$,$unmapped.pod_name$,$unmapped.src_edl$,$unmapped.dst_edl$,$unmapped.hostid$,$unmapped.serialnumber$,$unmapped.domain_edl$,$unmapped.src_dag$,$unmapped.dst_dag$,$unmapped.partial_hash$,$unmapped.high_res_timestamp$,$unmapped.reason$,$unmapped.justification$,$unmapped.nssai_sst$,$unmapped.subcategory_of_app$,$unmapped.category_of_app$,$unmapped.technology_of_app$,$risk_level$,$unmapped.characteristic_of_app=app_characteristic$,$unmapped.container_of_app$,$unmapped.tunneled_app$,$unmapped.is_saas_of_app$,$unmapped.sanctioned_state_of_app$,$unmapped.cloud_reportid$",
+      halt: true,
+      rewrites: [
+        {
+          input: "message",
+          output: "evidences",
+          match: "^(?:[^,]*,){6}([^,]*),([^,]*),([^,]*),([^,]*),(?:[^,]*,){5}([^,]*),([^,]*),([^,]*),([^,]*),(?:[^,]*,){4}([^,]*),([^,]*),(?:[^,]*,){3}([^,]*),(?:[^,]*,){1}([^,]*),(?:[^,]*,){6}([^,]*),([^,]*),(?:[^,]*,){7}([^,]*),([^,]*),(?:[^,]*,){13}([^,]*),(?:[^,]*,){1}([^,]*),(?:[^,]*,){18}([^,]*),([^,]*),(?:[^,]*,){6}([^,]*),([^,]*),(?:[^,]*,){7}([^,]*),([^,]*),(?:[^,]*,){6}([^,]*),([^,]*),(?:[^,]*,){6}([^,]*),([^,]*),(?:[^,]*,){1}([^,]*),([^,]*).*",
+          replace: "\\[\"src_endpoint\"\\:\\{\"ip\"\\: $1\\, \"intermediate_ips\"\\:\\[$3\\]\\, \"zone\"\\: $5\\, \"interface_name\"\\: $7\\, \"port\"\\: $9\\, \"location\"\\: \\{\"country\"\\: $13\\}\\, \"uid\"\\: $16\\, \"hostname\"\\: $20\\, \"mac\"\\: $21\\}\\, \"dst_endpoint\"\\:\\{\"ip\"\\: $2\\, \"intermediate_ips\"\\:\\[$4\\]\\, \"zone\"\\: $6\\, \"interface_name\"\\: $8\\, \"port\"\\: $10\\, \"location\"\\: \\{\"country\"\\: $14\\}\\, \"uid\"\\: $17\\, \"hostname\"\\: $22\\, \"mac\"\\: $23\\}\\, \"connection_info\"\\: \\{ \"protocol_name\"\\: $11\\}\\, \"process\"\\: \\{\"file\"\\: \\{\"name\"\\: $12\\, \"type\"\\: $15\\}\\, \"parent_process\"\\: \\{\"session\": \\{\"uid\": $18\\}\\, \"created_time\"\\: $19\\}\\} \\]"
+        },
+        {
+          input: "message",
+          output: "observables",
+          match: "^(?:[^,]*,){6}([^,]*),(?:[^,]*,){0}([^,]*),(?:[^,]*,){3}([^,]*),(?:[^,]*,){73}([^,]*),(?:[^,]*,){7}([^,]*).*",
+          replace: "\\[\\{\"type_id\"\\: 1\\, \"type\"\\: \"Hostname\"\\, \"name\"\\: \"evidences.src_endpoint.hostname\"\\, \"value\"\\: $4\\}\\, \\{\"type_id\"\\: 1\\, \"type\"\\: \"Hostname\"\\, \"name\"\\: \"evidences.dst_endpoint.hostname\"\\, \"value\"\\: $5\\}\\, \\{\"type_id\"\\: 2\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"evidences.src_endpoint.ip\"\\, \"value\"\\: $1\\}\\, \\{\"type_id\"\\: 2\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"evidences.dst_endpoint.ip\"\\, \"value\"\\: $2\\}\\, \\{\"type_id\"\\: 4\\, \"type\"\\: \"User Name\"\\, \"name\"\\: \"actor.user.name\"\\, \"value\"\\: $3\\}\\]"
+        },
+        {
+          input: "activity_name",
+          output: "event.type",
+          match: ".*",
+          replace: "$0"
+        },
+        {
+          action: "removeFields",
+          fields: [
+            "source_address",
+            "destination_address",
+            "nat_source_ip",
+            "nat_destination_ip",
+            "source_zone",
+            "destination_zone",
+            "inbound_interface",
+            "outbound_interface",
+            "source_port",
+            "destination_port",
+            "ip_protocol",
+            "filename",
+            "source_location",
+            "destination_location",
+            "file_type",
+            "source_vm_uuid",
+            "destination_vm_uuid",
+            "parent_session_id",
+            "parent_start_time",
+            "source_hostname",
+            "source_mac_address",
+            "destination_hostname",
+            "destination_mac_address"
+          ]
+        }
+      ]
+    },
+    {
+      attributes: {
+        "activity_name": "Other",
+        "activity_id": "99",
+        "category_name": "Identity & Access Management",
+        "category_uid": "3",
+        "class_name": "Authentication",
+        "class_uid": "3002",
+        "cloud.provider": "Palo Alto Networks",
+        "metadata.product.name": "Palo Alto Networks Firewall",
+        "metadata.product.vendor_name": "Palo Alto Networks",
+        "metadata.version":"1.1.0",
+        "type_uid": "300299",
+        "type_name": "Authentication: Other",
+        "severity_id": "99"
+       },
+      format: "$metadata.original_time$,$metadata.product.uid$,$unmapped.type=globalprotect_log_type$,$unmapped.subtype$,.*,$start_time_dt$,$unmapped.vsys$,$metadata.event_code$,$unmapped.stage$,$auth_protocol$,$unmapped.tunnel_type$,$actor.user.name$,$src_endpoint.location.region$,$device.name$,$device.ip$,$unmapped.public_ipv6$,$unmapped.private_ip$,$unmapped.private_ipv6$,$unmapped.hostid$,$src_endpoint.hw_info.serial_number$,$metadata.product.version$,$src_endpoint.os.name$,$src_endpoint.os.version$,$unmapped.repeatcnt$,$unmapped.reason$,$unmapped.error$,$unmapped.description$,$status$,$unmapped.location$,$unmapped.login_duration$,$unmapped.connect_method$,$unmapped.error_code$,$unmapped.portal$,$unmapped.seqno$,$unmapped.actionflags$,$unmapped.high_res_timestamp$,$unmapped.selection_type$,$unmapped.response_time$,$unmapped.priority$,$unmapped.attempted_gateways$,$unmapped.gateway$,$unmapped.dg_hier_level_1$,$unmapped.dg_hier_level_2$,$unmapped.dg_hier_level_3$,$unmapped.dg_hier_level_4$,$unmapped.vsys_name$,$src_endpoint.hostname$,$unmapped.vsys_id$",
+      halt: true,
+      rewrites: [
+        {
+          input: "message",
+          output: "observables",
+          match: "(?:[^,]*,){11}([^,]*)(?:,[^,]*){2},([^,]*).*",
+          replace: "\\[\\{\"type_id\"\\: 2\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"device.ip\"\\, \"value\"\\: $2\\}\\, \\{\"type_id\"\\: 4\\, \"type\"\\: \"User Name\"\\, \"name\"\\: \"actor.user.name\"\\, \"value\"\\: $1\\}\\]"
+        },
+        {
+          input: "activity_name",
+          output: "event.type",
+          match: ".*",
+          replace: "$0"
+        }
+      ]
+    },
+    {
+      attributes: {
+        "activity_name": "Update",
+        "activity_id": "3",
+        "category_name": "Identity & Access Management",
+        "category_uid": "3",
+        "class_name": "Entity Management",
+        "class_uid": "3004",
+        "cloud.provider": "Palo Alto Networks",
+        "metadata.product.name": "Palo Alto Networks Firewall",
+        "metadata.product.vendor_name": "Palo Alto Networks",
+        "metadata.version":"1.1.0",
+        "type_uid": "300403",
+        "type_name": "Entity Management: Update",
+        "severity_id": "99"
+       },
+      format: "$metadata.original_time$,$metadata.product.uid$,$unmapped.type=iptag_log_type$,$unmapped.subtype$,.*,$start_time_dt$,$unmapped.vsys$,$device.ip$,$unmapped.tag_name$,$metadata.event_code$,$unmapped.repeatcnt$,$unmapped.timeout$,$unmapped.datasource$,$unmapped.datasourcetype$,$unmapped.datasource_subtype$,$unmapped.seqno$,$unmapped.actionflags$,$unmapped.dg_hier_level_1$,$unmapped.dg_hier_level_2$,$unmapped.dg_hier_level_3$,$unmapped.dg_hier_level_4$,$unmapped.vsys_name$,$device.name$,$unmapped.vsys_id$",
+      halt: true,
+      rewrites: [
+        {
+          input: "message",
+          output: "observables",
+          match: "(?:[^,]*,){7}([^,]*)(?:,[^,]*){14},([^,]*).*",
+          replace: "\\[\\{\"type_id\"\\: 1\\, \"type\"\\: \"Hostname\"\\, \"name\"\\: \"device.name\"\\, \"value\"\\: $2\\}\\, \\{\"type_id\"\\: 2\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"device.ip\"\\, \"value\"\\: $1\\}\\]"
+        },
+        {
+          input: "activity_name",
+          output: "event.type",
+          match: ".*",
+          replace: "$0"
+        }
+      ]
+    },
+    {
+      attributes: {
+        "activity_name": "Open",
+        "activity_id": "1",
+        "category_name": "Network Activity",
+        "category_uid": "4",
+        "class_name": "Network Activity",
+        "class_uid": "4001",
+        "cloud.provider": "Palo Alto Networks",
+        "metadata.product.name": "Palo Alto Networks Firewall",
+        "metadata.product.vendor_name": "Palo Alto Networks",
+        "metadata.version":"1.1.0",
+        "type_uid": "400101",
+        "type_name": "Network Activity: Open",
+        "severity_id": "99"
+       },
+      format: "$metadata.original_time$,$metadata.product.uid$,$unmapped.type=gtp_log_type$,$unmapped.subtype$,.*,$start_time_dt$,$src_endpoint.ip$,$dst_endpoint.ip$,.*,.*,$firewall_rule.name$,.*,.*,$unmapped.app$,$unmapped.vsys$,$src_endpoint.zone$,$dst_endpoint.zone$,$src_endpoint.interface_name$,$dst_endpoint.interface_name$,$unmapped.logset$,.*,$actor.session.uid$,.*,$src_endpoint.port$,$dst_endpoint.port$,.*,.*,.*,$connection_info.protocol_name$,$action$,$unmapped.event_type$,$unmapped.msisdn$,$unmapped.apn$,$unmapped.rat$,$unmapped.msg_type$,$device.ip$,$unmapped.teid1$,$unmapped.teid2$,$unmapped.gtp_interface$,$unmapped.cause_code$,$unmapped.severity$,$unmapped.mcc$,$unmapped.mnc$,$unmapped.area_code$,$unmapped.cell_id$,$unmapped.event_code$,.*,.*,$src_endpoint.location.country$,$dst_endpoint.location.country$,.*,.*,.*,.*,.*,.*,.*,$unmapped.imsi$,$device.imei$,.*,.*,.*,.*,.*,.*,.*,.*,.*,.*,.*,.*,.*,.*,.*,.*,$start_time$,$unmapped.elapsed$,$unmapped.tunnel_insp_rule$,$unmapped.tunnel_insp_rule$,$unmapped.tunnel_insp_rule$,$unmapped.rule_uuid$,$unmapped.pcap_id$",
+      halt: true,
+      rewrites: [
+        {
+          input: "message",
+          output: "observables",
+          match: "(?:[^,]*,){6}([^,]*)(?:,[^,]*){0},([^,]*)(?:,[^,]*){27},([^,]*).*",
+          replace: "\\[\\{\"type_id\"\\: 2\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"src_endpoint.ip\"\\, \"value\"\\: $1\\}\\, \\{\"type_id\"\\: 2\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"dst_endpoint.ip\"\\, \"value\"\\: $2\\}, \\{\"type_id\"\\: 2\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"device.ip\"\\, \"value\"\\: $3\\}\\]"
+        },
+        {
+          input: "activity_name",
+          output: "event.type",
+          match: ".*",
+          replace: "$0"
+        }
+      ]
+    },
+    {
+      attributes: {
+        "activity_name": "Open",
+        "activity_id": "1",
+        "category_name": "Network Activity",
+        "category_uid": "4",
+        "class_name": "Network Activity",
+        "class_uid": "4001",
+        "cloud.provider": "Palo Alto Networks",
+        "metadata.product.name": "Palo Alto Networks Firewall",
+        "metadata.product.vendor_name": "Palo Alto Networks",
+        "metadata.version":"1.1.0",
+        "type_uid": "400101",
+        "type_name": "Network Activity: Open",
+        "severity_id": "99"
+       },
+      format: "$metadata.original_time$,$metadata.product.uid$,$unmapped.type=tunnel_log_type$,$unmapped.subtype$,.*,$start_time_dt$,$src_endpoint.ip$,$dst_endpoint.ip$,$src_endpoint.proxy_endpoint.ip$,$dst_endpoint.proxy_endpoint.ip$,$firewall_rule.name$,$actor.user.name$,$user.name$,$unmapped.app$,$unmapped.vsys$,$src_endpoint.zone$,$dst_endpoint.zone$,$src_endpoint.interface_name$,$dst_endpoint.interface_name$,$unmapped.logset$,.*,$actor.session.uid$,$unmapped.repeatcnt$,$src_endpoint.port$,$dst_endpoint.port$,$src_endpoint.proxy_endpoint.port$,$dst_endpoint.proxy_endpoint.port$,$unmapped.flags$,$connection_info.protocol_name$,$action$,$unmapped.severity$,$unmapped.seqno$,$unmapped.actionflags$,$src_endpoint.location.country$,$dst_endpoint.location.country$,$unmapped.dg_hier_level_1$,$unmapped.dg_hier_level_2$,$unmapped.dg_hier_level_3$,$unmapped.dg_hier_level_4$,$unmapped.vsys_name$,$device.name$,$unmapped.imsi$,$device.imei$,$session.uid$,$start_time$,$tunnel_type$,$traffic.bytes$,$traffic.bytes_out$,$traffic.bytes_in$,$traffic.packets$,$traffic.packets_out$,$traffic.packets_in$,$unmapped.max_encap$,$unmapped.unknown_proto$,$unmapped.strict_check$,$unmapped.tunnel_fragment$,$session.count$,$unmapped.sessions_closed$,$session.expiration_reason$,$unmapped.action_source$,$session.created_time$,$session.expiration_time$,$unmapped.tunnel_insp_rule$,$device.ip$,$user.uid$,$unmapped.rule_uuid$,$unmapped.pcap_id$,$unmapped.dynusergroup_name$,$unmapped.src_edl$,$unmapped.dst_edl$,$unmapped.high_res_timestamp$,$unmapped.nssai_sd$,$unmapped.nssai_sd$,$unmapped.pdu_session_id$,$unmapped.subcategory_of_app$,$unmapped.category_of_app$,$unmapped.technology_of_app$,$unmapped.risk_of_app$,$unmapped.characteristic_of_app$,$unmapped.container_of_app$,$unmapped.is_saas_of_app$,$unmapped.sanctioned_state_of_app$,$unmapped.cluster_name$",
+      halt: true,
+      rewrites: [
+        {
+          input: "message",
+          output: "observables",
+          match: "(?:[^,]*,){6}([^,]*)(?:,[^,]*){0},([^,]*)(?:,[^,]*){57},([^,]*).*",
+          replace: "\\[\\{\"type_id\"\\: 2\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"src_endpoint.ip\"\\, \"value\"\\: $1\\}\\, \\{\"type_id\"\\: 2\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"dst_endpoint.ip\"\\, \"value\"\\: $2\\}, \\{\"type_id\"\\: 2\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"device.ip\"\\, \"value\"\\: $3\\}\\]"
+        },
+        {
+          input: "activity_name",
+          output: "event.type",
+          match: ".*",
+          replace: "$0"
+        }
+      ]
+    },
+    {
+      attributes: {
+        "activity_name": "Open",
+        "activity_id": "1",
+        "category_name": "Network Activity",
+        "category_uid": "4",
+        "class_name": "Network Activity",
+        "class_uid": "4001",
+        "cloud.provider": "Palo Alto Networks",
+        "metadata.product.name": "Palo Alto Networks Firewall",
+        "metadata.product.vendor_name": "Palo Alto Networks",
+        "metadata.version":"1.1.0",
+        "type_uid": "400101",
+        "type_name": "Network Activity: Open",
+        "severity_id": "99"
+       },
+      format: "$metadata.original_time$,$metadata.product.uid$,$unmapped.type=sctp_log_type$,.*,.*,$start_time_dt$,$src_endpoint.ip$,$dst_endpoint.ip$,.*,.*,$firewall_rule.name$,.*,.*,.*,$unmapped.vsys$,$src_endpoint.zone$,$dst_endpoint.zone$,$src_endpoint.interface_name$,$dst_endpoint.interface_name$,$unmapped.logset$,.*,$actor.session.uid$,$unmapped.repeatcnt$,$src_endpoint.port$,$dst_endpoint.port$,.*,.*,.*,.*,$connection_info.protocol_name$,$action$,$unmapped.dg_hier_level_1$,$unmapped.dg_hier_level_2$,$unmapped.dg_hier_level_3$,$unmapped.dg_hier_level_4$,$unmapped.vsys_name$,$device.name$,$unmapped.seqno$,.*,$unmapped.assoc_id$,$unmapped.ppid$,$unmapped.severity$,$unmappedsctp_chunk_type$,.*,$unmapped.verif_tag_1$,$unmapped.verif_tag_2$,$unmapped.sctp_cause_code$,$unmapped.diam_app_id$,$unmapped.diam_cmd_code$,$unmapped.diam_avp_code$,$unmapped.stream_id$,$unmapped.assoc_end_reason$,$unmapped.op_code$,$unmapped.sccp_calling_ssn$,$unmapped.sccp_calling_gt$,$unmapped.sctp_filter$,$unmapped.chunks$,$unmapped.chunks_sent$,$unmapped.chunks_received$,$traffic.packets$,$traffic.packets_out$,$traffic.packets_in$,$unmapped.rule_uuid$",
+      halt: true,
+      rewrites: [
+        {
+          input: "message",
+          output: "observables",
+          match: "(?:[^,]*,){6}([^,]*)(?:,[^,]*){0},([^,]*).*",
+          replace: "\\[\\{\"type_id\"\\: 2\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"src_endpoint.ip\"\\, \"value\"\\: $1\\}\\, \\{\"type_id\"\\: 2\\, \"type\"\\: \"IP Address\"\\, \"name\"\\: \"dst_endpoint.ip\"\\, \"value\"\\: $2\\}\\]"
+        },
+        {
+          input: "activity_name",
+          output: "event.type",
+          match: ".*",
+          replace: "$0"
+        }
+      ]
+    },
+    {
+      attributes: {
+        "activity_name": "Create",
+        "activity_id": "1",
+        "category_name": "Findings",
+        "category_uid": "2",
+        "class_name": "Detection Finding",
+        "class_uid": "2004",
+        "cloud.provider": "Palo Alto Networks",
+        "metadata.product.name": "Palo Alto Networks Firewall",
+        "metadata.product.vendor_name": "Palo Alto Networks",
+        "metadata.version":"1.1.0",
+        "type_uid": "200401",
+        "type_name": "Detection Finding: Create",
+        "severity_id": "99"
+       },
+      format: "$metadata.original_time$,$metadata.product.uid$,$unmapped.type=system_log_type$,$unmapped.subtype$,.*,$start_time_dt$,$unmapped.vsys$,$metadata.event_code$,$unmapped.object$,.*,.*,$unmapped.module$,$unmapped.severity$,$unmapped.description$,$unmapped.seqno$,$unmapped.actionflags$,$unmapped.dg_hier_level_1$,$unmapped.dg_hier_level_2$,$unmapped.dg_hier_level_3$,$unmapped.dg_hier_level_4$,$unmapped.vsys_name$,$device.hostname$",
+      halt: true,
+      rewrites: [
+        {
+          input: "message",
+          output: "observables",
+          match: "(?:[^,]*,){21}([^,]*).*",
+          replace: "\\[\\{\"type_id\"\\: 1\\, \"type\"\\: \"Hostname\"\\, \"name\"\\: \"device.hostname\"\\, \"value\"\\: $1\\}\\}\\]"
+        },
+        {
+          input: "activity_name",
+          output: "event.type",
+          match: ".*",
+          replace: "$0"
+        }
+      ]
+    },
+  ]
+}

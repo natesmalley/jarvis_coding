@@ -18,6 +18,15 @@ from app.services.github_parser_service import get_github_parser_service
 
 logger = logging.getLogger(__name__)
 
+
+# Some generator sourcetypes correspond to marketplace parser names that don't exist
+# as local parser directories in this repo. Provide aliases so we can still upload
+# a reasonable local parser when asked to sync those names.
+LOCAL_PARSER_ALIASES: Dict[str, str] = {
+    # Palo Alto Networks Firewall marketplace parser name -> local parser folder name
+    "marketplace-paloaltonetworksfirewall-latest": "paloalto_firewall-latest",
+}
+
 # Mapping from generator/source names to parser sourcetypes
 # This maps scenario sources to their corresponding parser directory names
 SCENARIO_SOURCE_TO_PARSER = {
@@ -49,7 +58,7 @@ SCENARIO_SOURCE_TO_PARSER = {
     
     # Network Security
     "darktrace": "darktrace_darktrace_logs-latest",
-    "paloalto_firewall": "paloalto_logs-latest",
+    "paloalto_firewall": "paloalto_firewall-latest",
     "f5_networks": "f5_networks_logs-latest",
     "fortinet_fortigate": "fortinet_fortigate_candidate_logs-latest",
     "zscaler": "zscaler_logs-latest",
@@ -125,9 +134,36 @@ class ParserSyncService:
             sourcetype: The parser sourcetype (e.g., 'okta_authentication-latest')
             
         Returns:
-            The parser path in SIEM (e.g., '/parsers/okta_authentication-latest')
+            The parser path in SIEM (e.g., '/logParsers/okta_authentication-latest')
         """
-        return f"/parsers/{sourcetype}"
+        # In the Scalyr/SentinelOne config tree, log parsers are stored as JSON files
+        # under /logParsers.
+        leaf = sourcetype
+        if not leaf.endswith(".json"):
+            leaf = f"{leaf}.json"
+        return f"/logParsers/{leaf}"
+
+    def _local_parser_directories_for_sourcetype(self, sourcetype: str) -> List[Path]:
+        local_name = LOCAL_PARSER_ALIASES.get(sourcetype, sourcetype)
+
+        # Handle prefixed sourcetypes produced by generator tooling (e.g., community-foo-latest)
+        if local_name.startswith("community-"):
+            leaf = local_name[len("community-"):]
+            return [
+                self.parsers_dir / "community" / leaf,
+                self.parsers_dir / "community_new" / leaf,
+            ]
+        if local_name.startswith("marketplace-"):
+            leaf = local_name[len("marketplace-"):]
+            return [
+                self.parsers_dir / "marketplace" / leaf,
+            ]
+
+        return [
+            self.parsers_dir / "community" / local_name,
+            self.parsers_dir / "community_new" / local_name,
+            self.parsers_dir / "sentinelone" / local_name,
+        ]
     
     def load_local_parser(self, sourcetype: str) -> Optional[str]:
         """
@@ -139,12 +175,7 @@ class ParserSyncService:
         Returns:
             The parser JSON content as string, or None if not found
         """
-        # Try community directory first
-        parser_dirs = [
-            self.parsers_dir / "community" / sourcetype,
-            self.parsers_dir / "community_new" / sourcetype,
-            self.parsers_dir / "sentinelone" / sourcetype,
-        ]
+        parser_dirs = self._local_parser_directories_for_sourcetype(sourcetype)
         
         for parser_dir in parser_dirs:
             if parser_dir.exists():
@@ -168,6 +199,54 @@ class ParserSyncService:
         
         logger.warning(f"Parser not found locally: {sourcetype}")
         return None
+
+    def ensure_parser_for_sourcetype(
+        self,
+        sourcetype: str,
+        config_write_token: str,
+        github_repo_urls: Optional[List[str]] = None,
+        github_token: Optional[str] = None,
+        selected_parser: Optional[Dict] = None,
+    ) -> Dict[str, str]:
+        parser_path = self.get_parser_path_in_siem(sourcetype)
+
+        exists, _ = self.check_parser_exists(config_write_token, parser_path)
+        if exists:
+            return {
+                "status": "exists",
+                "message": f"Parser already exists: {parser_path}",
+            }
+
+        parser_content = self.load_local_parser(sourcetype)
+        from_github = False
+
+        if not parser_content and github_repo_urls:
+            parser_content = self.load_parser_from_github(
+                sourcetype=sourcetype,
+                repo_urls=github_repo_urls,
+                selected_parser=selected_parser,
+                github_token=github_token,
+            )
+            from_github = parser_content is not None
+
+        if not parser_content:
+            return {
+                "status": "no_parser",
+                "message": f"Parser not found locally or in GitHub repos: {sourcetype}",
+            }
+
+        success = self.upload_parser(config_write_token, parser_path, parser_content)
+        ok, detail = success
+        if not ok:
+            return {
+                "status": "failed",
+                "message": f"Failed to upload parser: {parser_path} ({detail})",
+            }
+
+        return {
+            "status": "uploaded_from_github" if from_github else "uploaded",
+            "message": f"Parser uploaded successfully: {parser_path}",
+        }
     
     def load_parser_from_github(
         self,
@@ -298,7 +377,7 @@ class ParserSyncService:
         parser_path: str,
         content: str,
         timeout: int = 30
-    ) -> bool:
+    ) -> Tuple[bool, str]:
         """
         Upload a parser to the destination SIEM using putFile API
         
@@ -309,7 +388,7 @@ class ParserSyncService:
             timeout: Request timeout in seconds
             
         Returns:
-            True if upload succeeded, False otherwise
+            Tuple of (success, message)
         """
         try:
             url = f"{self.api_base_url}/putFile"
@@ -332,25 +411,22 @@ class ParserSyncService:
                 result = response.json()
                 if result.get("status") == "success":
                     logger.info(f"Parser uploaded successfully: {parser_path}")
-                    return True
+                    return True, "success"
                 else:
-                    logger.error(
-                        f"Failed to upload parser {parser_path}: {result.get('message', 'Unknown error')}"
-                    )
-                    return False
+                    msg = result.get('message', 'Unknown error')
+                    logger.error(f"Failed to upload parser {parser_path}: {msg}")
+                    return False, msg
             else:
-                logger.error(
-                    f"Failed to upload parser {parser_path}: "
-                    f"{response.status_code} - {response.text}"
-                )
-                return False
+                msg = f"{response.status_code} - {response.text}"
+                logger.error(f"Failed to upload parser {parser_path}: {msg}")
+                return False, msg
                 
         except requests.exceptions.Timeout:
             logger.error(f"Timeout uploading parser: {parser_path}")
-            return False
+            return False, "timeout"
         except Exception as e:
             logger.error(f"Error uploading parser {parser_path}: {e}")
-            return False
+            return False, str(e)
     
     def ensure_parsers_for_sources(
         self,
@@ -457,9 +533,9 @@ class ParserSyncService:
                 continue
             
             # Upload the parser
-            success = self.upload_parser(config_write_token, parser_path, parser_content)
+            ok, detail = self.upload_parser(config_write_token, parser_path, parser_content)
             
-            if success:
+            if ok:
                 status = "uploaded_from_github" if from_github else "uploaded"
                 source_label = "GitHub" if from_github else "local"
                 results[source] = {
@@ -471,7 +547,7 @@ class ParserSyncService:
                 results[source] = {
                     "status": "failed",
                     "sourcetype": actual_sourcetype,
-                    "message": f"Failed to upload parser: {parser_path}"
+                    "message": f"Failed to upload parser: {parser_path} ({detail})"
                 }
         
         return results

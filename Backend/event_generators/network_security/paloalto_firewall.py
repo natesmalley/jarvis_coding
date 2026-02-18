@@ -5,6 +5,12 @@ import random
 from datetime import datetime, timezone, timedelta
 import time
 
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'shared'))
+from randomization import Randomizer
+
 # Palo Alto log types
 LOG_TYPES = ["TRAFFIC", "THREAT", "SYSTEM", "CONFIG", "HIP-MATCH", "GLOBALPROTECT", "USERID", "URL"]
 
@@ -19,14 +25,18 @@ SEVERITIES = ["critical", "high", "medium", "low", "informational"]
 
 def get_random_ip(internal_probability=0.5):
     """Generate a random IP address."""
-    if random.random() < internal_probability:
-        return random.choice([
-            f"10.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(1, 254)}",
-            f"172.{random.randint(16, 31)}.{random.randint(0, 255)}.{random.randint(1, 254)}",
-            f"192.168.{random.randint(0, 255)}.{random.randint(1, 254)}"
-        ])
-    else:
-        return f"{random.randint(1, 223)}.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(1, 254)}"
+    internal = random.random() < internal_probability
+    return _R.ip(internal=internal)
+
+
+def get_random_username(domain_probability: float = 0.7, empty_probability: float = 0.2) -> str:
+    if random.random() < empty_probability:
+        return ""
+
+    username = _R.person(domain="corp.local").username
+    if random.random() < domain_probability:
+        return f"corp\\{username}"
+    return username
 
 def generate_serial_number():
     """Generate a firewall serial number."""
@@ -35,6 +45,9 @@ def generate_serial_number():
 def generate_session_id():
     """Generate a session ID."""
     return str(random.randint(10000, 999999))
+
+
+_R = Randomizer()
 
 def generate_traffic_log():
     """Generate a TRAFFIC log entry."""
@@ -89,7 +102,7 @@ def generate_traffic_log():
         src_ip,  # natsrc
         dst_ip,  # natdst
         f"allow-{app}" if action == "allow" else f"block-{random.choice(['threats', 'malware', 'default'])}",  # rule
-        random.choice([f"domain\\user{random.randint(1, 100)}", ""]),  # srcuser
+        get_random_username(),  # srcuser
         "",  # dstuser
         app,  # app
         "vsys1",  # vsys
@@ -125,7 +138,14 @@ def generate_traffic_log():
         str(int(packets * 0.4)),  # pkts_received
         random.choice(["aged-out", "tcp-fin", "tcp-rst", "policy-deny", ""]) if action != "allow" else "aged-out",  # session_end_reason
     ]
-    
+
+    # The marketplace Palo Alto firewall parser expects a fixed number of CSV columns.
+    # If we stop emitting fields early, the line will not match even if the earlier
+    # fields are correct (because required delimiters/columns are missing).
+    expected_fields = 115
+    if len(fields) < expected_fields:
+        fields.extend([""] * (expected_fields - len(fields)))
+
     return ",".join(fields)
 
 def generate_threat_log():
@@ -155,7 +175,7 @@ def generate_threat_log():
         src_ip,  # natsrc
         dst_ip,  # natdst
         "block-threats",  # rule
-        "",  # srcuser
+        get_random_username(),  # srcuser
         "",  # dstuser
         random.choice(["web-browsing", "ssl", "ftp", "smtp"]),  # app
         "vsys1",  # vsys
@@ -197,7 +217,11 @@ def generate_threat_log():
         "",  # recipient
         "",  # reportid
     ]
-    
+
+    expected_fields = 120
+    if len(fields) < expected_fields:
+        fields.extend([""] * (expected_fields - len(fields)))
+
     return ",".join(fields)
 
 def paloalto_firewall_log(overrides: dict | None = None) -> str:

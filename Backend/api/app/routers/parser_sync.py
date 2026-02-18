@@ -135,19 +135,15 @@ async def sync_single_parser(
     service = ParserSyncService(config_api_url=request.config_api_url)
     
     logger.info(f"Syncing single parser for sourcetype: {request.sourcetype}")
-    
-    # Use the sourcetype as the source name for lookup
-    results = service.ensure_parsers_for_sources(
-        sources=[request.sourcetype],
+
+    result = service.ensure_parser_for_sourcetype(
+        sourcetype=request.sourcetype,
         config_write_token=request.config_write_token,
         github_repo_urls=request.github_repo_urls,
-        github_token=request.github_token
+        github_token=request.github_token,
     )
-    
-    # Get result for the sourcetype
-    result = results.get(request.sourcetype, {})
-    status = result.get('status', 'no_parser')
-    message = result.get('message', 'Unknown status')
+    status = result.get("status", "no_parser")
+    message = result.get("message", "Unknown status")
     
     logger.info(f"Single parser sync for {request.sourcetype}: {status} - {message}")
     
