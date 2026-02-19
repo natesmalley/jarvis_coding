@@ -260,6 +260,70 @@ class ScenarioService:
         
         return execution_id
     
+    async def start_correlation_scenario(
+        self, 
+        scenario_id: str, 
+        siem_context: Dict[str, Any],
+        speed: str = "fast", 
+        dry_run: bool = False,
+        background_tasks=None
+    ) -> str:
+        """Start correlation scenario execution with SIEM context"""
+        execution_id = str(uuid.uuid4())
+        
+        self.running_scenarios[execution_id] = {
+            "scenario_id": scenario_id,
+            "execution_id": execution_id,
+            "status": "running",
+            "started_at": datetime.utcnow().isoformat(),
+            "speed": speed,
+            "dry_run": dry_run,
+            "siem_context": siem_context,
+            "progress": 0
+        }
+        
+        if background_tasks:
+            background_tasks.add_task(self._execute_correlation_scenario, execution_id, scenario_id, siem_context)
+        
+        return execution_id
+    
+    async def _execute_correlation_scenario(self, execution_id: str, scenario_id: str, siem_context: Dict[str, Any]):
+        """Execute correlation scenario with SIEM context"""
+        import sys
+        import os
+        from pathlib import Path
+        
+        # Add scenarios directory to path
+        scenarios_dir = Path(__file__).parent.parent.parent / "scenarios"
+        if str(scenarios_dir) not in sys.path:
+            sys.path.insert(0, str(scenarios_dir))
+        
+        try:
+            # Set SIEM context environment variable for the scenario
+            siem_context_json = json.dumps(siem_context)
+            os.environ['SIEM_CONTEXT'] = siem_context_json
+            
+            # Import and run the scenario
+            module = __import__(scenario_id)
+            scenario_result = module.generate_apollo_ransomware_scenario(siem_context=siem_context)
+            
+            # Update execution status
+            if execution_id in self.running_scenarios:
+                self.running_scenarios[execution_id]["status"] = "completed"
+                self.running_scenarios[execution_id]["progress"] = 100
+                self.running_scenarios[execution_id]["completed_at"] = datetime.utcnow().isoformat()
+                self.running_scenarios[execution_id]["result"] = scenario_result
+            
+        except Exception as e:
+            logger.error(f"Correlation scenario execution failed: {e}")
+            if execution_id in self.running_scenarios:
+                self.running_scenarios[execution_id]["status"] = "failed"
+                self.running_scenarios[execution_id]["error"] = str(e)
+                self.running_scenarios[execution_id]["completed_at"] = datetime.utcnow().isoformat()
+        finally:
+            # Clean up environment variable
+            os.environ.pop('SIEM_CONTEXT', None)
+    
     async def _execute_scenario(self, execution_id: str, scenario: Dict[str, Any]):
         """Execute scenario in background"""
         try:

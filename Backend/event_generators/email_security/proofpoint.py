@@ -192,8 +192,18 @@ def proofpoint_log(overrides: dict | None = None) -> Dict:
     Pass `overrides` to force any field to a specific value:
         proofpoint_log({"phishScore": 95})
     """
-    # Determine threat type
-    threat_type = random.choice(THREAT_TYPES)
+    # Apply overrides first to determine threat type
+    if overrides:
+        # If phishScore is high, make it malicious
+        if overrides.get("phishScore", 0) > 50:
+            threat_type = random.choice(["phish", "malware", "spam"])
+        elif overrides.get("phishScore", 0) == 0:
+            threat_type = "none"
+        else:
+            threat_type = random.choice(THREAT_TYPES)
+    else:
+        threat_type = random.choice(THREAT_TYPES)
+    
     is_malicious = threat_type != "none"
     
     # Generate sender and recipient
@@ -274,6 +284,26 @@ def proofpoint_log(overrides: dict | None = None) -> Dict:
     
     # Add message parts
     event["messageParts"] = _generate_message_parts(threat_type)
+    
+    # Add click-related fields for parser detection
+    if is_malicious:
+        event["clickIP"] = _generate_ip()
+        event["clickTime"] = (message_time + timedelta(minutes=random.randint(1, 30))).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+        event["threatURL"] = f"https://threatinsight.proofpoint.com/#/threat_id/{uuid.uuid4()}"
+        event["userAgent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        event["event.type"] = "Click"
+    else:
+        event["event.type"] = "Email"
+    
+    # Add unmapped fields and other required fields
+    event["unmapped.classification"] = threat_type
+    event["unmapped.recipient"] = recipient_email
+    event["unmapped.sender"] = sender_email
+    event["url.url_string"] = f"https://threatinsight.proofpoint.com/#/threat_id/{uuid.uuid4()}"
+    event["device.ip"] = _generate_ip()
+    
+    # Add timestamp field directly
+    event["timestamp"] = message_time.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
     
     # Add SPF, DKIM, DMARC results
     event["spf"] = random.choice(["pass", "fail", "softfail", "neutral", "none"])
