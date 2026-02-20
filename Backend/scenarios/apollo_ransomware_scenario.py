@@ -466,6 +466,7 @@ def generate_m365_email_interaction(base_time: datetime) -> List[Dict]:
     m365_email_access['SiteUrl'] = f"https://outlook.office365.com/mail/inbox"
     # Parser-mapped fields for OCSF synthetic columns
     m365_email_access['RequestedBy'] = VICTIM_PROFILE['name']  # -> actor.user.name
+    m365_email_access['user.email_addr'] = VICTIM_PROFILE['email']  # -> actor.user.email_addr
     events.append(create_event(email_access_time, "microsoft_365_collaboration", "email_interaction", m365_email_access))
     
     # Attachment preview/download - 30 seconds after MailItemsAccessed (1 min after delivery)
@@ -482,6 +483,7 @@ def generate_m365_email_interaction(base_time: datetime) -> List[Dict]:
     m365_attachment['SiteUrl'] = f"https://outlook.office365.com/mail/inbox"
     # Parser-mapped fields for OCSF synthetic columns
     m365_attachment['RequestedBy'] = VICTIM_PROFILE['name']  # -> actor.user.name
+    m365_attachment['user.email_addr'] = VICTIM_PROFILE['email']  # -> actor.user.email_addr
     events.append(create_event(attachment_time, "microsoft_365_collaboration", "email_interaction", m365_attachment))
     
     # File opened in Excel Online / locally - 30 seconds after FileDownloaded (1 min 30 sec after delivery)
@@ -498,6 +500,7 @@ def generate_m365_email_interaction(base_time: datetime) -> List[Dict]:
     m365_file_open['SiteUrl'] = f"https://starfleet-my.sharepoint.com/personal/{VICTIM_PROFILE['username']}"
     # Parser-mapped fields for OCSF synthetic columns
     m365_file_open['RequestedBy'] = VICTIM_PROFILE['name']  # -> actor.user.name
+    m365_file_open['user.email_addr'] = VICTIM_PROFILE['email']  # -> actor.user.email_addr
     events.append(create_event(file_open_time, "microsoft_365_collaboration", "file_access", m365_file_open))
     
     return events
