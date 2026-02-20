@@ -1,6 +1,6 @@
 {
     "attributes": {
-        "dataSource.name": "Microsoft 365 Collaboration",
+        "dataSource.name": "Microsoft O365",
         "dataSource.vendor": "Microsoft",
         "dataSource.category": "security",
         "metadata.product.name": "Microsoft 365 SharePoint/OneDrive",
