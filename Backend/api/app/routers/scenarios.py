@@ -6,6 +6,7 @@ from typing import List, Optional, Dict, Any
 import asyncio
 import time
 import json
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path as PathLib
 
@@ -28,6 +29,17 @@ class SIEMQueryRequest(BaseModel):
     start_time_hours: int = 24  # How far back to start (default 24h)
     end_time_hours: int = 0  # How far back to end (default now)
     anchor_configs: Optional[List[Dict[str, Any]]] = None
+
+
+class CorrelationRunRequest(BaseModel):
+    """Request model for correlation scenario execution"""
+    scenario_id: str
+    destination_id: str
+    siem_context: Optional[Dict[str, Any]] = None
+    trace_id: Optional[str] = None
+    tag_phase: bool = True
+    tag_trace: bool = True
+    workers: int = 10
 
 # Initialize scenario service
 scenario_service = ScenarioService()
@@ -274,6 +286,56 @@ async def execute_siem_query(
                 "metadata": result.get("metadata", {})
             }
         )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/correlation/run", response_model=BaseResponse)
+async def run_correlation_scenario(
+    request: CorrelationRunRequest,
+    background_tasks: BackgroundTasks,
+    _: str = Depends(require_write_access)
+):
+    """
+    Execute a correlation scenario with SIEM context and trace ID support
+    """
+    try:
+        # Validate scenario exists and supports correlation
+        scenarios_dir = PathLib(__file__).parent.parent.parent / "scenarios"
+        if str(scenarios_dir) not in sys.path:
+            sys.path.insert(0, str(scenarios_dir))
+        
+        scenario_modules = {
+            "apollo_ransomware_scenario": "apollo_ransomware_scenario"
+        }
+        
+        if request.scenario_id not in scenario_modules:
+            raise HTTPException(status_code=404, detail=f"Correlation scenario '{request.scenario_id}' not found")
+        
+        # Start correlation scenario execution with trace ID
+        execution_id = await scenario_service.start_correlation_scenario(
+            scenario_id=request.scenario_id,
+            siem_context=request.siem_context or {},
+            trace_id=request.trace_id,
+            tag_phase=request.tag_phase,
+            tag_trace=request.tag_trace,
+            background_tasks=background_tasks
+        )
+        
+        return BaseResponse(
+            success=True,
+            data={
+                "execution_id": execution_id,
+                "scenario_id": request.scenario_id,
+                "status": "started",
+                "trace_id": request.trace_id,
+                "tag_phase": request.tag_phase,
+                "tag_trace": request.tag_trace,
+                "started_at": datetime.utcnow().isoformat()
+            }
+        )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
