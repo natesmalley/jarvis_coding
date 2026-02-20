@@ -301,9 +301,9 @@ def send_phase_alert(
     alert["metadata"]["logged_time"] = time_ms
     alert["metadata"]["modified_time"] = time_ms
     
-    # Set user as the resource
+    # Set user as the resource (uid must be a UUID for site-scoped alerts)
     alert["resources"] = [{
-        "uid": VICTIM_PROFILE["email"],
+        "uid": str(uuid.uuid4()),
         "name": VICTIM_PROFILE["email"]
     }]
     
@@ -333,6 +333,7 @@ def send_phase_alert(
             "S1-Scope": scope,
             "Content-Encoding": "gzip",
             "Content-Type": "application/json",
+            "S1-Trace-Id": "helios-ingest-uam:alwayslog",
         }
         
         payload = json.dumps(alert).encode("utf-8")

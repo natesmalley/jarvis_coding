@@ -109,9 +109,9 @@ class AlertService:
         alert["metadata"]["logged_time"] = time_ms
         alert["metadata"]["modified_time"] = time_ms
         
-        # Set user as the resource
+        # Set user as the resource (uid must be a UUID for site-scoped alerts)
         alert["resources"] = [{
-            "uid": user_email,
+            "uid": str(uuid.uuid4()),
             "name": user_email
         }]
         
@@ -163,6 +163,11 @@ class AlertService:
         if "related_events" in alert.get("finding_info", {}):
             for event in alert["finding_info"]["related_events"]:
                 event["uid"] = str(uuid.uuid4())
+
+        # Generate UIDs for resources with placeholder
+        for resource in alert.get("resources", []):
+            if resource.get("uid") == "DYNAMIC_RESOURCE_UID":
+                resource["uid"] = str(uuid.uuid4())
 
         # Apply overrides
         if overrides:
@@ -219,6 +224,7 @@ class AlertService:
             "S1-Scope": scope,
             "Content-Encoding": "gzip",
             "Content-Type": "application/json",
+            "S1-Trace-Id": "helios-ingest-uam:alwayslog",
         }
 
         # UAM ingest API expects a single alert object (batch not supported for alerts)
@@ -227,6 +233,13 @@ class AlertService:
         logger.info(f"Compressed alert payload: {len(payload)} bytes -> {len(gzipped_alert)} bytes (gzip)")
 
         url = uam_ingest_url.rstrip("/") + "/v1/alerts"
+
+        logger.info(
+            "UAM alert egress: url=%s scope=%s token_len=%d token_prefix=%s token_suffix=%s headers=%s payload_size=%d gzip_size=%d",
+            url, scope, len(token), token[:20] + "...", "..." + token[-20:],
+            {k: v for k, v in headers.items() if k != "Authorization"},
+            len(payload), len(gzipped_alert)
+        )
 
         try:
             logger.info(f"Sending POST request to {url}")

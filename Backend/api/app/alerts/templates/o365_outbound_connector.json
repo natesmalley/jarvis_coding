@@ -6,7 +6,7 @@
     },
     "resources": [
         {
-            "uid": "jeanluc@starfleet.com",
+            "uid": "DYNAMIC_RESOURCE_UID",
             "name": "jeanluc@starfleet.com"
         }
     ],

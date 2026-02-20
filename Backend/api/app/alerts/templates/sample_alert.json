@@ -6,8 +6,8 @@
     },
     "resources": [
         {
-            "uid": "helios-asset-001",
-            "name": "helios-endpoint-01"
+            "uid": "DYNAMIC_RESOURCE_UID",
+            "name": "helios-endpoint"
         }
     ],
     "severity": "high",
