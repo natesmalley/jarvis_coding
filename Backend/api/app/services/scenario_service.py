@@ -1,16 +1,15 @@
 """
 Scenario service for managing attack scenarios
 """
-from typing import Dict, Any, List, Optional
-import uuid
-import time
-import asyncio
-from datetime import datetime
 import logging
 import os
 import sys
-import importlib
 import json
+import uuid
+import asyncio
+import importlib
+from datetime import datetime
+from typing import Dict, Any, Optional, List
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -129,6 +128,17 @@ class ScenarioService:
                 ]
             }
             ,
+            "apollo_ransomware_scenario": {
+                "id": "apollo_ransomware_scenario",
+                "name": "Apollo Ransomware Scenario",
+                "description": "Proofpoint phishing, M365 email interaction, SharePoint recon & exfiltration",
+                "phases": [
+                    {"name": "Phishing Delivery", "generators": ["proofpoint"], "duration": 5},
+                    {"name": "Email Interaction", "generators": ["microsoft_365_collaboration"], "duration": 5},
+                    {"name": "SharePoint Recon", "generators": ["microsoft_365_collaboration"], "duration": 15},
+                    {"name": "Data Exfiltration", "generators": ["microsoft_365_collaboration"], "duration": 10}
+                ]
+            },
             "hr_phishing_pdf_c2": {
                 "id": "hr_phishing_pdf_c2",
                 "name": "HR Phishing PDF -> PowerShell -> Scheduled Task -> C2",
@@ -236,6 +246,7 @@ class ScenarioService:
         scenario_id: str, 
         speed: str = "fast", 
         dry_run: bool = False,
+        overwrite_parser: bool = False,
         background_tasks=None
     ) -> str:
         """Start scenario execution"""
@@ -252,6 +263,7 @@ class ScenarioService:
             "started_at": datetime.utcnow().isoformat(),
             "speed": speed,
             "dry_run": dry_run,
+            "overwrite_parser": overwrite_parser,
             "progress": 0
         }
         
@@ -264,11 +276,15 @@ class ScenarioService:
         self, 
         scenario_id: str, 
         siem_context: Dict[str, Any],
+        trace_id: Optional[str] = None,
+        tag_phase: bool = True,
+        tag_trace: bool = True,
         speed: str = "fast", 
         dry_run: bool = False,
+        overwrite_parser: bool = False,
         background_tasks=None
     ) -> str:
-        """Start correlation scenario execution with SIEM context"""
+        """Start correlation scenario execution with SIEM context and trace ID support"""
         execution_id = str(uuid.uuid4())
         
         self.running_scenarios[execution_id] = {
@@ -279,16 +295,36 @@ class ScenarioService:
             "speed": speed,
             "dry_run": dry_run,
             "siem_context": siem_context,
+            "trace_id": trace_id,
+            "tag_phase": tag_phase,
+            "tag_trace": tag_trace,
+            "overwrite_parser": overwrite_parser,
             "progress": 0
         }
         
         if background_tasks:
-            background_tasks.add_task(self._execute_correlation_scenario, execution_id, scenario_id, siem_context)
+            background_tasks.add_task(
+                self._execute_correlation_scenario, 
+                execution_id, 
+                scenario_id, 
+                siem_context,
+                trace_id,
+                tag_phase,
+                tag_trace
+            )
         
         return execution_id
     
-    async def _execute_correlation_scenario(self, execution_id: str, scenario_id: str, siem_context: Dict[str, Any]):
-        """Execute correlation scenario with SIEM context"""
+    async def _execute_correlation_scenario(
+        self, 
+        execution_id: str, 
+        scenario_id: str, 
+        siem_context: Dict[str, Any],
+        trace_id: Optional[str] = None,
+        tag_phase: bool = True,
+        tag_trace: bool = True
+    ):
+        """Execute correlation scenario with SIEM context and trace ID support"""
         import sys
         import os
         from pathlib import Path
@@ -302,6 +338,12 @@ class ScenarioService:
             # Set SIEM context environment variable for the scenario
             siem_context_json = json.dumps(siem_context)
             os.environ['SIEM_CONTEXT'] = siem_context_json
+            
+            # Set trace ID and tagging environment variables
+            if trace_id:
+                os.environ['S1_TRACE_ID'] = trace_id
+            os.environ['S1_TAG_PHASE'] = '1' if tag_phase else '0'
+            os.environ['S1_TAG_TRACE'] = '1' if tag_trace else '0'
             
             # Import and run the scenario
             module = __import__(scenario_id)
@@ -321,8 +363,12 @@ class ScenarioService:
                 self.running_scenarios[execution_id]["error"] = str(e)
                 self.running_scenarios[execution_id]["completed_at"] = datetime.utcnow().isoformat()
         finally:
-            # Clean up environment variable
+            # Clean up environment variables
             os.environ.pop('SIEM_CONTEXT', None)
+            if trace_id:
+                os.environ.pop('S1_TRACE_ID', None)
+            os.environ.pop('S1_TAG_PHASE', None)
+            os.environ.pop('S1_TAG_TRACE', None)
     
     async def _execute_scenario(self, execution_id: str, scenario: Dict[str, Any]):
         """Execute scenario in background"""

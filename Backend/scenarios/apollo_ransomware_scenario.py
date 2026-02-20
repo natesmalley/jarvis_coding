@@ -88,7 +88,8 @@ CORRELATION_CONFIG = {
     "name": "Apollo Ransomware - STARFLEET Attack",
     "description": "Correlates Proofpoint and M365 events with existing EDR/WEL data for the Apollo ransomware attack chain targeting STARFLEET.",
     
-    "default_query": """dataSource.name in ('SentinelOne','Windows Event Logs') endpoint.name contains ("Enterprise", "bridge")
+    "default_query": """dataSource.name in ('SentinelOne','Windows Event Logs') endpoint.name contains ("Enterprise", "bridge")  AND  (winEventLog.id = 4698 or * contains "apollo") 
+
 | group newest_timestamp = newest(timestamp), oldest_timestamp = oldest(timestamp) by event.type, src.process.user, endpoint.name, src.endpoint.ip.address, dst.ip.address
 | sort newest_timestamp
 | columns event.type, src.process.user, endpoint.name, oldest_timestamp, newest_timestamp, src.endpoint.ip.address, dst.ip.address""",
@@ -450,8 +451,8 @@ def generate_m365_email_interaction(base_time: datetime) -> List[Dict]:
     """Generate M365 events for email access and attachment download"""
     events = []
     
-    # Email accessed - 5 minutes after delivery (user checks email)
-    email_access_time = get_scenario_time(base_time, 5)
+    # Email accessed - 30 seconds after Proofpoint delivery
+    email_access_time = get_scenario_time(base_time, 0, 30)
     m365_email_access = microsoft_365_collaboration_log()
     m365_email_access['TimeStamp'] = email_access_time
     m365_email_access['UserId'] = VICTIM_PROFILE['email']
@@ -465,10 +466,12 @@ def generate_m365_email_interaction(base_time: datetime) -> List[Dict]:
     m365_email_access['SiteUrl'] = f"https://outlook.office365.com/mail/inbox"
     # Parser-mapped fields for OCSF synthetic columns
     m365_email_access['RequestedBy'] = VICTIM_PROFILE['name']  # -> actor.user.name
+    m365_email_access['user.email_addr'] = VICTIM_PROFILE['email']  # -> actor.user.email_addr
+    m365_email_access['object_id'] = f"/Inbox/{ATTACKER_PROFILE['malicious_xlsx']}"  # -> object_id for mail items analysis
     events.append(create_event(email_access_time, "microsoft_365_collaboration", "email_interaction", m365_email_access))
     
-    # Attachment preview/download - 6 minutes after delivery
-    attachment_time = get_scenario_time(base_time, 6)
+    # Attachment preview/download - 30 seconds after MailItemsAccessed (1 min after delivery)
+    attachment_time = get_scenario_time(base_time, 1)
     m365_attachment = microsoft_365_collaboration_log()
     m365_attachment['TimeStamp'] = attachment_time
     m365_attachment['UserId'] = VICTIM_PROFILE['email']
@@ -481,10 +484,12 @@ def generate_m365_email_interaction(base_time: datetime) -> List[Dict]:
     m365_attachment['SiteUrl'] = f"https://outlook.office365.com/mail/inbox"
     # Parser-mapped fields for OCSF synthetic columns
     m365_attachment['RequestedBy'] = VICTIM_PROFILE['name']  # -> actor.user.name
+    m365_attachment['user.email_addr'] = VICTIM_PROFILE['email']  # -> actor.user.email_addr
+    m365_attachment['object_id'] = f"/Attachments/{ATTACKER_PROFILE['malicious_xlsx']}"  # -> object_id for mail items analysis
     events.append(create_event(attachment_time, "microsoft_365_collaboration", "email_interaction", m365_attachment))
     
-    # File opened in Excel Online / locally - 7 minutes after delivery
-    file_open_time = get_scenario_time(base_time, 7)
+    # File opened in Excel Online / locally - 30 seconds after FileDownloaded (1 min 30 sec after delivery)
+    file_open_time = get_scenario_time(base_time, 1, 30)
     m365_file_open = microsoft_365_collaboration_log()
     m365_file_open['TimeStamp'] = file_open_time
     m365_file_open['UserId'] = VICTIM_PROFILE['email']
@@ -497,6 +502,8 @@ def generate_m365_email_interaction(base_time: datetime) -> List[Dict]:
     m365_file_open['SiteUrl'] = f"https://starfleet-my.sharepoint.com/personal/{VICTIM_PROFILE['username']}"
     # Parser-mapped fields for OCSF synthetic columns
     m365_file_open['RequestedBy'] = VICTIM_PROFILE['name']  # -> actor.user.name
+    m365_file_open['user.email_addr'] = VICTIM_PROFILE['email']  # -> actor.user.email_addr
+    m365_file_open['object_id'] = f"/Documents/{ATTACKER_PROFILE['malicious_xlsx']}"  # -> object_id for mail items analysis
     events.append(create_event(file_open_time, "microsoft_365_collaboration", "file_access", m365_file_open))
     
     return events
@@ -785,9 +792,15 @@ def send_to_hec(event_data: dict, event_type: str, trace_id: str = None, phase: 
     
     product = type_to_product.get(event_type, event_type)
     
+    # Special handling for dataSource.name to match expected values
+    if event_type == "microsoft_365_collaboration":
+        data_source_name = "Microsoft O365"
+    else:
+        data_source_name = event_type.replace('_', ' ').title()
+    
     attr_fields = {
         "dataSource.vendor": event_type.split('_')[0].title() if '_' in event_type else event_type.title(),
-        "dataSource.name": event_type.replace('_', ' ').title(),
+        "dataSource.name": data_source_name,
         "dataSource.category": "security"
     }
     

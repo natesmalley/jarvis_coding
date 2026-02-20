@@ -379,6 +379,14 @@
                         <p class="text-xs text-[#b8a0d2] mt-1">For HEC destinations: checks & uploads the parser to the destination SIEM before sending events (requires Config API URL + write token on the destination).</p>
                     </div>
 
+                    <div class="input-group">
+                        <label style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
+                            <input type="checkbox" id="overwrite-parser" style="width: auto;">
+                            <span>Overwrite existing parsers</span>
+                        </label>
+                        <p class="text-xs text-[#b8a0d2] mt-1">If checked, will overwrite existing parsers in the destination SIEM instead of skipping them. Use with caution.</p>
+                    </div>
+
                     <div class="flex gap-3">
                         <button type="submit" id="start-btn" class="btn flex-1">
                             Start Log Generation
@@ -514,6 +522,17 @@
                                 <input type="number" id="noise-events-count" value="1200" min="100" max="1000000" step="100">
                                 <p class="text-xs text-[#b8a0d2] mt-1">Recommended: 1200 events (400 per source: Okta, Azure AD, M365). Max: 1M events.</p>
                             </div>
+                        </div>
+                    </details>
+
+                    <details class="bg-[#241d3a] rounded-lg p-3 border border-[#3c325c]">
+                        <summary class="cursor-pointer text-sm font-semibold text-[#c8b3e8]">Parser Options</summary>
+                        <div class="mt-3 space-y-2 text-sm">
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" id="scenario-overwrite-parser">
+                                <span class="text-[#f3e8ff]">Overwrite existing parsers</span>
+                            </label>
+                            <p class="text-xs text-[#b8a0d2]">If checked, will overwrite existing parsers in the destination SIEM instead of skipping them. Use with caution.</p>
                         </div>
                     </details>
 
@@ -751,6 +770,11 @@
                                 <button type="button" id="gen-correlation-trace-id" class="btn" style="width:auto; padding:0.6rem 1rem;">Generate</button>
                             </div>
                         </div>
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" id="correlation-overwrite-parser">
+                            <span class="text-[#f3e8ff]">Overwrite existing parsers</span>
+                        </label>
+                        <p class="text-xs text-[#b8a0d2]">If checked, will overwrite existing parsers in the destination SIEM instead of skipping them. Use with caution.</p>
                     </div>
                 </details>
 
@@ -2217,7 +2241,8 @@
             const eps = parseFloat(document.getElementById('eps').value);
             const continuousMode = continuousModeCheckbox.checked;
             const speedMode = speedModeCheckbox.checked;
-            const ensureParser = document.getElementById('ensure-parser')?.checked === true;
+            const overwriteParser = document.getElementById('overwrite-parser')?.checked === true;
+            const ensureParser = overwriteParser || (document.getElementById('ensure-parser')?.checked === true);
             const selectedOpt = destSelect.options[destSelect.selectedIndex];
             const destinationId = selectedOpt ? selectedOpt.value : '';
             const destinationType = selectedOpt ? selectedOpt.dataset.type : '';
@@ -2280,7 +2305,8 @@
                         destination_id: destinationId,
                         hec_token: localToken,  // Pass local token if available
                         metadata: metadataFields,  // Pass metadata fields if provided
-                        ensure_parser: ensureParser
+                        ensure_parser: ensureParser,
+                        overwrite_parser: overwriteParser
                     } : {
                         destination: 'syslog',
                         script: scriptPath,
@@ -2502,6 +2528,9 @@
                 const generateNoise = document.getElementById('generate-noise')?.checked || false;
                 const noiseEventsCount = parseInt(document.getElementById('noise-events-count')?.value || '1200', 10);
                 
+                // Parser options
+                const overwriteParser = document.getElementById('scenario-overwrite-parser')?.checked || false;
+                
                 // Get local token if available
                 let localToken = null;
                 if (window.tokenVault && window.tokenVault.hasToken(destinationId)) {
@@ -2522,6 +2551,7 @@
                         trace_id: traceId,
                         generate_noise: generateNoise,
                         noise_events_count: noiseEventsCount,
+                        overwrite_parser: overwriteParser,
                         hec_token: localToken,  // Pass local token if available
                         debug_mode: debugMode   // Pass debug mode for server-side filtering
                     }),
@@ -3060,6 +3090,7 @@
             const workerCount = parseInt(document.getElementById('correlation-worker-count').value, 10) || 10;
             const tagPhase = document.getElementById('correlation-tag-phase').checked;
             const tagTrace = document.getElementById('correlation-tag-trace').checked;
+            const overwriteParser = document.getElementById('correlation-overwrite-parser').checked;
             let traceId = correlationTraceIdInput.value.trim();
             
             if (tagTrace && !traceId) {
@@ -3091,6 +3122,7 @@
                         tag_phase: tagPhase,
                         tag_trace: tagTrace,
                         trace_id: traceId,
+                        overwrite_parser: overwriteParser,
                         hec_token: localToken
                     })
                 });

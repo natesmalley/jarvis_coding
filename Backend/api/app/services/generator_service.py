@@ -172,7 +172,8 @@ class GeneratorService:
         count: int = 1,
         format: str = "json",
         star_trek_theme: bool = True,
-        options: Dict[str, Any] = None
+        options: Dict[str, Any] = None,
+        overwrite_parser: bool = False
     ) -> List[Dict[str, Any]]:
         """Execute a generator and return events"""
         if generator_id not in self.generator_metadata:

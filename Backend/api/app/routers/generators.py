@@ -190,7 +190,8 @@ async def execute_generator(
             count=request.count,
             format=request.format,
             star_trek_theme=request.star_trek_theme,
-            options=request.options
+            options=request.options,
+            overwrite_parser=request.overwrite_parser
         )
         execution_time = (time.time() - start_time) * 1000  # Convert to ms
         

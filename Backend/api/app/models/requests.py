@@ -14,6 +14,7 @@ class GeneratorExecuteRequest(BaseModel):
     continuous: bool = Field(default=False, description="Run indefinitely (ignores count)")
     eps: Optional[float] = Field(None, ge=0.1, le=10000, description="Events per second rate")
     speed_mode: bool = Field(False, description="Pre-generate 1K events and loop for max throughput (auto-enabled for EPS > 1000)")
+    overwrite_parser: bool = Field(False, description="Overwrite existing parsers during execution")
     options: Dict[str, Any] = Field(default_factory=dict, description="Generator-specific options")
     
     @validator('count')
@@ -52,6 +53,7 @@ class ScenarioExecuteRequest(BaseModel):
     """Scenario execution request"""
     speed: str = Field("fast", pattern="^(realtime|fast|instant)$")
     dry_run: bool = Field(False)
+    overwrite_parser: bool = Field(False, description="Overwrite existing parsers during execution")
     
     class Config:
         extra = "forbid"
