@@ -544,6 +544,7 @@ def run_correlation_scenario():
     tag_trace = data.get('tag_trace', True)
     trace_id = (data.get('trace_id') or '').strip()
     local_token = data.get('hec_token')
+    overwrite_parser = data.get('overwrite_parser', False)
     
     if not scenario_id:
         return jsonify({'error': 'scenario_id is required'}), 400
@@ -551,6 +552,10 @@ def run_correlation_scenario():
         return jsonify({'error': 'destination_id is required'}), 400
     
     # Resolve destination
+    config_write_token = None
+    config_api_url = None
+    github_repo_urls = []
+    github_token = None
     try:
         dest_resp = requests.get(
             f"{API_BASE_URL}/api/v1/destinations/{destination_id}",
@@ -580,6 +585,35 @@ def run_correlation_scenario():
         
         if not hec_url or not hec_token:
             return jsonify({'error': 'HEC destination incomplete'}), 400
+        
+        # Fetch config token and URL for parser sync if available
+        config_api_url = chosen.get('config_api_url')
+        if chosen.get('has_config_write_token') and config_api_url:
+            try:
+                config_resp = requests.get(
+                    f"{API_BASE_URL}/api/v1/destinations/{destination_id}/config-tokens",
+                    headers=_get_api_headers(),
+                    timeout=10
+                )
+                if config_resp.status_code == 200:
+                    config_tokens = config_resp.json()
+                    config_write_token = config_tokens.get('config_write_token')
+            except Exception as ce:
+                logger.warning(f"Failed to retrieve config token for correlation: {ce}")
+            
+            # Fetch GitHub parser repositories from settings
+            try:
+                repos_resp = requests.get(
+                    f"{API_BASE_URL}/api/v1/settings/parser-repositories",
+                    headers=_get_api_headers(),
+                    timeout=10
+                )
+                if repos_resp.status_code == 200:
+                    repos_data = repos_resp.json()
+                    github_repo_urls = [url for url in repos_data.get('repositories', []) if url]
+                    github_token = repos_data.get('github_token')
+            except Exception as ge:
+                logger.warning(f"Failed to retrieve GitHub parser repositories: {ge}")
             
     except Exception as e:
         return jsonify({'error': f'Failed to resolve destination: {str(e)}'}), 500
@@ -607,6 +641,50 @@ def run_correlation_scenario():
     def generate_and_stream():
         try:
             yield "INFO: Starting correlation scenario execution...\n"
+            
+            # Parser sync: Check and upload required parsers before running scenario
+            if config_write_token and config_api_url:
+                if overwrite_parser:
+                    yield "INFO: Checking required parsers in destination SIEM (overwrite mode ON)...\n"
+                else:
+                    yield "INFO: Checking required parsers in destination SIEM...\n"
+                try:
+                    sync_payload = {
+                        "scenario_id": scenario_id,
+                        "config_api_url": config_api_url,
+                        "config_write_token": config_write_token,
+                        "overwrite_parser": overwrite_parser
+                    }
+                    if github_repo_urls:
+                        sync_payload["github_repo_urls"] = github_repo_urls
+                    if github_token:
+                        sync_payload["github_token"] = github_token
+                    
+                    sync_resp = requests.post(
+                        f"{API_BASE_URL}/api/v1/parser-sync/sync",
+                        headers=_get_api_headers(),
+                        json=sync_payload,
+                        timeout=120
+                    )
+                    if sync_resp.status_code == 200:
+                        sync_result = sync_resp.json()
+                        for source, info in sync_result.get('results', {}).items():
+                            status = info.get('status', 'unknown')
+                            message = info.get('message', '')
+                            sourcetype = info.get('sourcetype', 'unknown')
+                            if status == 'exists':
+                                yield f"INFO: Parser exists: {source} -> {sourcetype}\n"
+                            elif status in ('uploaded', 'uploaded_from_github'):
+                                yield f"INFO: Parser uploaded: {source} -> {sourcetype}\n"
+                            elif status == 'failed':
+                                yield f"WARN: Parser sync failed: {source} -> {sourcetype} - {message}\n"
+                            elif status == 'no_parser':
+                                yield f"WARN: No parser mapping: {source}\n"
+                        yield "INFO: Parser sync complete\n"
+                    else:
+                        yield f"WARN: Parser sync API returned {sync_resp.status_code}, continuing without sync\n"
+                except Exception as pe:
+                    yield f"WARN: Parser sync failed: {pe}, continuing without sync\n"
             
             if siem_context and siem_context.get('results'):
                 yield f"INFO: Using SIEM context with {len(siem_context.get('results', []))} results\n"
@@ -843,6 +921,7 @@ def run_scenario():
     local_token = data.get('hec_token')  # Token from browser localStorage
     sync_parsers = data.get('sync_parsers', True)  # Enable parser sync by default
     debug_mode = data.get('debug_mode', False)  # Verbose logging mode
+    overwrite_parser = data.get('overwrite_parser', False)  # Overwrite existing parsers
     
     if not scenario_id:
         return jsonify({'error': 'scenario_id is required'}), 400
@@ -952,13 +1031,17 @@ def run_scenario():
             
             # Parser sync: Check and upload required parsers before running scenario
             if sync_parsers and config_write_token and config_api_url:
-                yield "INFO: Checking required parsers in destination SIEM...\n"
+                if overwrite_parser:
+                    yield "INFO: Checking required parsers in destination SIEM (overwrite mode ON)...\n"
+                else:
+                    yield "INFO: Checking required parsers in destination SIEM...\n"
                 try:
                     # Call the parser sync API with GitHub repos
                     sync_payload = {
                         "scenario_id": scenario_id,
                         "config_api_url": config_api_url,
-                        "config_write_token": config_write_token
+                        "config_write_token": config_write_token,
+                        "overwrite_parser": overwrite_parser
                     }
                     if github_repo_urls:
                         sync_payload["github_repo_urls"] = github_repo_urls
@@ -1686,7 +1769,8 @@ def generate_logs():
     eps = float(data.get('eps', 1.0))
     continuous = data.get('continuous', False)
     speed_mode = data.get('speed_mode', False)
-    ensure_parser = bool(data.get('ensure_parser', False))
+    overwrite_parser = bool(data.get('overwrite_parser', False))
+    ensure_parser = bool(data.get('ensure_parser', False)) or overwrite_parser
     syslog_ip = data.get('ip')
     syslog_port = int(data.get('port')) if data.get('port') is not None else None
     syslog_protocol = data.get('protocol')
@@ -1916,6 +2000,8 @@ def generate_logs():
 
                 if ensure_parser:
                     env['JARVIS_ENSURE_PARSER'] = 'true'
+                    if overwrite_parser:
+                        env['JARVIS_OVERWRITE_PARSER'] = 'true'
                     env['JARVIS_API_BASE_URL'] = API_BASE_URL
                     if BACKEND_API_KEY:
                         env['JARVIS_API_KEY'] = BACKEND_API_KEY

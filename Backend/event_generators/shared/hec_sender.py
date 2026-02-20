@@ -958,6 +958,7 @@ ENV_INDEX = os.getenv("S1_HEC_INDEX")
 
 # Optional: ensure parsers exist in the destination SIEM before sending events
 _ENSURE_PARSER = os.getenv("JARVIS_ENSURE_PARSER", "false").lower() == "true"
+_OVERWRITE_PARSER = os.getenv("JARVIS_OVERWRITE_PARSER", "false").lower() == "true"
 _JARVIS_API_BASE_URL = os.getenv("JARVIS_API_BASE_URL", "http://localhost:8000").rstrip("/")
 _JARVIS_API_KEY = os.getenv("JARVIS_API_KEY")
 _S1_CONFIG_API_URL = os.getenv("S1_CONFIG_API_URL")
@@ -1002,6 +1003,7 @@ def _ensure_parser_in_destination(product: str) -> None:
         "sourcetype": sync_sourcetype,
         "config_api_url": _S1_CONFIG_API_URL,
         "config_write_token": _S1_CONFIG_WRITE_TOKEN,
+        "overwrite_parser": _OVERWRITE_PARSER,
     }
 
     try:

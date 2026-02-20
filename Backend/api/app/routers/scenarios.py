@@ -40,6 +40,7 @@ class CorrelationRunRequest(BaseModel):
     tag_phase: bool = True
     tag_trace: bool = True
     workers: int = 10
+    overwrite_parser: bool = False
 
 # Initialize scenario service
 scenario_service = ScenarioService()
@@ -319,6 +320,7 @@ async def run_correlation_scenario(
             trace_id=request.trace_id,
             tag_phase=request.tag_phase,
             tag_trace=request.tag_trace,
+            overwrite_parser=request.overwrite_parser,
             background_tasks=background_tasks
         )
         
@@ -371,6 +373,7 @@ async def execute_scenario(
     scenario_id: str = Path(..., description="Scenario identifier"),
     speed: str = Query("fast", description="Execution speed: realtime, fast, instant"),
     dry_run: bool = Query(False, description="Simulate without generating events"),
+    overwrite_parser: bool = Query(False, description="Overwrite existing parsers during execution"),
     _: str = Depends(require_write_access)
 ):
     """Execute an attack scenario"""
@@ -385,6 +388,7 @@ async def execute_scenario(
             scenario_id=scenario_id,
             speed=speed,
             dry_run=dry_run,
+            overwrite_parser=overwrite_parser,
             background_tasks=background_tasks
         )
         

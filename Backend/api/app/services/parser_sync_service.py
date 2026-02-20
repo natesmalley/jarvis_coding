@@ -136,12 +136,9 @@ class ParserSyncService:
         Returns:
             The parser path in SIEM (e.g., '/logParsers/okta_authentication-latest')
         """
-        # In the Scalyr/SentinelOne config tree, log parsers are stored as JSON files
-        # under /logParsers.
-        leaf = sourcetype
-        if not leaf.endswith(".json"):
-            leaf = f"{leaf}.json"
-        return f"/logParsers/{leaf}"
+        # In the Scalyr/SentinelOne config tree, log parsers are stored
+        # under /logParsers without a file extension.
+        return f"/logParsers/{sourcetype}"
 
     def _local_parser_directories_for_sourcetype(self, sourcetype: str) -> List[Path]:
         local_name = LOCAL_PARSER_ALIASES.get(sourcetype, sourcetype)
@@ -207,15 +204,19 @@ class ParserSyncService:
         github_repo_urls: Optional[List[str]] = None,
         github_token: Optional[str] = None,
         selected_parser: Optional[Dict] = None,
+        overwrite: bool = False,
     ) -> Dict[str, str]:
         parser_path = self.get_parser_path_in_siem(sourcetype)
 
         exists, _ = self.check_parser_exists(config_write_token, parser_path)
-        if exists:
+        if exists and not overwrite:
             return {
                 "status": "exists",
                 "message": f"Parser already exists: {parser_path}",
             }
+        
+        if exists and overwrite:
+            logger.info(f"Overwriting existing parser: {parser_path}")
 
         parser_content = self.load_local_parser(sourcetype)
         from_github = False
@@ -434,7 +435,8 @@ class ParserSyncService:
         config_write_token: str,
         github_repo_urls: Optional[List[str]] = None,
         github_token: Optional[str] = None,
-        selected_parsers: Optional[Dict[str, Dict]] = None
+        selected_parsers: Optional[Dict[str, Dict]] = None,
+        overwrite: bool = False
     ) -> Dict[str, dict]:
         """
         Ensure all required parsers exist in the destination SIEM
@@ -445,6 +447,7 @@ class ParserSyncService:
             github_repo_urls: Optional list of GitHub repository URLs to fetch parsers from
             github_token: Optional GitHub personal access token for private repos
             selected_parsers: Optional dict mapping sourcetype to user-selected parser info
+            overwrite: If True, overwrite existing parsers instead of skipping them
             
         Returns:
             Dict with status for each source:
@@ -492,13 +495,20 @@ class ParserSyncService:
             # Check if parser exists (write token can also read)
             exists, _ = self.check_parser_exists(config_write_token, parser_path)
             
-            if exists:
+            if exists and not overwrite:
                 results[source] = {
                     "status": "exists",
                     "sourcetype": sourcetype,
                     "message": f"Parser already exists: {parser_path}"
                 }
                 continue
+            
+            if exists and overwrite:
+                # Parser exists but we need to overwrite it
+                logger.info(f"Overwriting existing parser: {parser_path}")
+            else:
+                # Parser doesn't exist, we need to create it
+                logger.info(f"Creating new parser: {parser_path}")
             
             # Parser doesn't exist, try to find it
             parser_content = None
