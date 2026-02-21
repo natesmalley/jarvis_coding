@@ -159,7 +159,7 @@ ALERT_PHASE_MAPPING = {
     },
     "📤 PHASE 4: Data Exfiltration": {
         "template": "sharepoint_data_exfil_alert",
-        "offset_minutes": 20,  # 20 min after initial compromise
+        "offset_minutes": 25,  # After last document download (base+24:30)
         "overrides": {
             "finding_info.title": "Data Exfiltration from SharePoint",
             "finding_info.desc": f"User {VICTIM_PROFILE['email']} downloaded sensitive documents including Personnel Records and Command Codes"
@@ -167,9 +167,9 @@ ALERT_PHASE_MAPPING = {
     },
     "rdp_download": {
         "template": "o365_rdp_sharepoint_access",
-        "offset_minutes": 25,  # 25 min after initial compromise
+        "offset_minutes": 35,  # After RDP file download event (base+25)
         "overrides": {
-            "finding_info.title": "Apollo Ransomware - RDP Files Downloaded",
+            "finding_info.title": "OneDrive RDP Files Downloaded",
             "finding_info.desc": f"User {VICTIM_PROFILE['email']} downloaded RDP files from SharePoint - potential lateral movement preparation"
         }
     }
