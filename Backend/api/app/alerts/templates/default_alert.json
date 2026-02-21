@@ -60,7 +60,7 @@
     "resources": [
         {
             "name": "endpoint-workstation-01",
-            "uid": "res-001"
+            "uid": "DYNAMIC_RESOURCE_UID"
         }
     ],
     "metadata": {

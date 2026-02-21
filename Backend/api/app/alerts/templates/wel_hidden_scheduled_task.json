@@ -1,13 +1,13 @@
 {
     "finding_info": {
         "uid": "placeholder_uid",
-        "title": "Office 365 Access or Download of .RDP Files in SharePoint",
-        "desc": "Access or download of RDP files from SharePoint detected. Potential remote desktop access or lateral movement preparation."
+        "title": "HELIOS - WEL Hidden Scheduled Task Creation",
+        "desc": "Detects the creation of a hidden scheduled task, a tactic often used by attackers to maintain persistence on a compromised system. Hidden tasks can evade detection by administrators and standard monitoring tools, allowing adversaries to execute malicious activities stealthily. This technique is commonly employed to run malicious scripts, download payloads, or maintain remote access without raising suspicion. Extended Windows Event Log collection must be enabled for this rule to work properly."
     },
     "resources": [
         {
             "uid": "DYNAMIC_RESOURCE_UID",
-            "name": "jeanluc@starfleet.com"
+            "name": "endpoint"
         }
     ],
     "severity": "high",
@@ -26,16 +26,14 @@
             "version": "0.1.0"
         },
         "product": {
-            "name": "Microsoft 365",
+            "name": "Windows Event Logs",
             "vendor_name": "Microsoft"
         },
         "logged_time": "DYNAMIC",
         "modified_time": "DYNAMIC"
     },
     "time": "DYNAMIC",
-    "attack_surface_ids": [
-        1
-    ],
+    "attack_surface_ids": [1],
     "severity_id": 4,
     "state_id": 1,
     "s1_classification_id": 28

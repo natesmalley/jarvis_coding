@@ -22,6 +22,7 @@ class ParserSyncRequest(BaseModel):
     github_repo_urls: Optional[List[str]] = Field(None, description="Optional GitHub repository URLs to fetch parsers from")
     github_token: Optional[str] = Field(None, description="Optional GitHub token for private repositories")
     selected_parsers: Optional[Dict[str, Dict]] = Field(None, description="Optional user-selected parsers for similar name resolution")
+    overwrite_parser: bool = Field(False, description="If true, overwrite existing parsers instead of skipping them")
 
 
 class ParserSyncResponse(BaseModel):
@@ -77,7 +78,8 @@ async def sync_parsers(
         config_write_token=request.config_write_token,
         github_repo_urls=request.github_repo_urls,
         github_token=request.github_token,
-        selected_parsers=request.selected_parsers
+        selected_parsers=request.selected_parsers,
+        overwrite=request.overwrite_parser
     )
     
     # Count results (include uploaded_from_github in uploaded count)
@@ -107,6 +109,7 @@ class SingleParserSyncRequest(BaseModel):
     config_write_token: str = Field(..., description="Config API token for reading and writing parsers")
     github_repo_urls: Optional[List[str]] = Field(None, description="Optional GitHub repository URLs to fetch parsers from")
     github_token: Optional[str] = Field(None, description="Optional GitHub token for private repositories")
+    overwrite_parser: bool = Field(False, description="If true, overwrite existing parser instead of skipping")
 
 
 class SingleParserSyncResponse(BaseModel):
@@ -141,6 +144,7 @@ async def sync_single_parser(
         config_write_token=request.config_write_token,
         github_repo_urls=request.github_repo_urls,
         github_token=request.github_token,
+        overwrite=request.overwrite_parser,
     )
     status = result.get("status", "no_parser")
     message = result.get("message", "Unknown status")

@@ -1,16 +1,16 @@
 {
     "finding_info": {
         "uid": "placeholder_uid",
-        "title": "Office 365 Login by Non Compliant Device",
-        "desc": "Login from non-compliant device detected. Potential policy violation or compromised device."
+        "title": "HELIOS - WEL Successful Brute Force Attack",
+        "desc": "Detects a successful brute force attack against a Windows endpoint. Multiple failed authentication attempts followed by a successful logon indicate credential compromise. This technique is commonly used by attackers to gain initial access or escalate privileges within a network. Extended Windows Event Log collection must be enabled for this rule to work properly."
     },
     "resources": [
         {
             "uid": "DYNAMIC_RESOURCE_UID",
-            "name": "jeanluc@starfleet.com"
+            "name": "endpoint"
         }
     ],
-    "severity": "medium",
+    "severity": "critical",
     "category_uid": 2,
     "class_uid": 99602001,
     "class_name": "S1 Security Alert",
@@ -26,17 +26,15 @@
             "version": "0.1.0"
         },
         "product": {
-            "name": "Microsoft 365",
+            "name": "Windows Event Logs",
             "vendor_name": "Microsoft"
         },
         "logged_time": "DYNAMIC",
         "modified_time": "DYNAMIC"
     },
     "time": "DYNAMIC",
-    "attack_surface_ids": [
-        1
-    ],
-    "severity_id": 3,
+    "attack_surface_ids": [1],
+    "severity_id": 5,
     "state_id": 1,
-    "s1_classification_id": 1
+    "s1_classification_id": 28
 }

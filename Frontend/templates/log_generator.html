@@ -379,6 +379,14 @@
                         <p class="text-xs text-[#b8a0d2] mt-1">For HEC destinations: checks & uploads the parser to the destination SIEM before sending events (requires Config API URL + write token on the destination).</p>
                     </div>
 
+                    <div class="input-group">
+                        <label style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
+                            <input type="checkbox" id="overwrite-parser" style="width: auto;">
+                            <span>Overwrite existing parsers</span>
+                        </label>
+                        <p class="text-xs text-[#b8a0d2] mt-1">If checked, will overwrite existing parsers in the destination SIEM instead of skipping them. Use with caution.</p>
+                    </div>
+
                     <div class="flex gap-3">
                         <button type="submit" id="start-btn" class="btn flex-1">
                             Start Log Generation
@@ -514,6 +522,17 @@
                                 <input type="number" id="noise-events-count" value="1200" min="100" max="1000000" step="100">
                                 <p class="text-xs text-[#b8a0d2] mt-1">Recommended: 1200 events (400 per source: Okta, Azure AD, M365). Max: 1M events.</p>
                             </div>
+                        </div>
+                    </details>
+
+                    <details class="bg-[#241d3a] rounded-lg p-3 border border-[#3c325c]">
+                        <summary class="cursor-pointer text-sm font-semibold text-[#c8b3e8]">Parser Options</summary>
+                        <div class="mt-3 space-y-2 text-sm">
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" id="scenario-overwrite-parser">
+                                <span class="text-[#f3e8ff]">Overwrite existing parsers</span>
+                            </label>
+                            <p class="text-xs text-[#b8a0d2]">If checked, will overwrite existing parsers in the destination SIEM instead of skipping them. Use with caution.</p>
                         </div>
                     </details>
 
@@ -714,9 +733,23 @@
                         <button type="button" id="run-correlation-query-btn" class="btn flex-1" disabled>
                             🔍 Run Query
                         </button>
+                        <button type="button" id="get-xdr-assets-btn" class="btn" style="width:auto; padding:0.6rem 1rem; background:#2d2650;" disabled>
+                            🖥️ Get Assets
+                        </button>
                         <button type="button" id="reset-correlation-query-btn" class="btn" style="width:auto; padding:0.6rem 1rem; background:#3c325c;">
                             ↩️ Reset
                         </button>
+                    </div>
+                </div>
+
+                <!-- XDR Assets Display -->
+                <div id="xdr-assets-panel" class="p-4 bg-[#241d3a] rounded-lg border border-[#3c325c]" style="display:none;">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="text-sm font-semibold text-[#c8b3e8]">XDR Assets</h4>
+                        <span id="xdr-assets-count" class="text-xs text-[#8b7a9f]"></span>
+                    </div>
+                    <div id="xdr-assets-list" class="space-y-2 text-xs max-h-48 overflow-y-auto">
+                        <!-- Assets will be populated here -->
                     </div>
                 </div>
 
@@ -751,6 +784,11 @@
                                 <button type="button" id="gen-correlation-trace-id" class="btn" style="width:auto; padding:0.6rem 1rem;">Generate</button>
                             </div>
                         </div>
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" id="correlation-overwrite-parser">
+                            <span class="text-[#f3e8ff]">Overwrite existing parsers</span>
+                        </label>
+                        <p class="text-xs text-[#b8a0d2]">If checked, will overwrite existing parsers in the destination SIEM instead of skipping them. Use with caution.</p>
                     </div>
                 </details>
 
@@ -1007,6 +1045,19 @@
                                 <p class="text-xs text-[#b8a0d2] mb-3">Configure a Service Account token and scope for sending UAM alerts. This is separate from HEC.</p>
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div class="input-group md:col-span-3">
+                                        <label for="dest-s1-management-url" class="text-sm font-semibold text-[#c8b3e8]">S1 Management URL</label>
+                                        <input type="text" id="dest-s1-management-url" name="dest-s1-management-url" placeholder="https://demo.sentinelone.net">
+                                        <p class="text-xs text-[#8b7a9f] mt-1">Management console URL — used for asset lookups to link alerts to endpoints</p>
+                                    </div>
+                                    <div class="input-group md:col-span-3">
+                                        <label for="dest-s1-api-token" class="text-sm font-semibold text-[#c8b3e8]">S1 API Token</label>
+                                        <div class="relative">
+                                            <input type="password" id="dest-s1-api-token" name="dest-s1-api-token" autocomplete="off" placeholder="S1 API Token (Settings → Users → API Token)" class="pr-10">
+                                            <button type="button" class="toggle-password absolute right-2 top-1/2 -translate-y-1/2 text-[#8b7a9f] hover:text-[#f3e8ff]" data-target="dest-s1-api-token" style="background:none;border:none;cursor:pointer;">👁</button>
+                                        </div>
+                                        <p class="text-xs text-[#8b7a9f] mt-1">For agent/asset lookups — generate from S1 Console → Settings → Users → API Token</p>
+                                    </div>
+                                    <div class="input-group md:col-span-3">
                                         <label for="dest-uam-ingest-url" class="text-sm font-semibold text-[#c8b3e8]">UAM Ingest URL</label>
                                         <input type="text" id="dest-uam-ingest-url" name="dest-uam-ingest-url" placeholder="https://ingest.us1.sentinelone.net" value="https://ingest.us1.sentinelone.net">
                                     </div>
@@ -1200,6 +1251,19 @@
             <div class="p-3 bg-[#241d3a] rounded-lg border border-[#3c325c]" id="edit-uam-group">
                 <h4 class="text-sm font-semibold text-[#c8b3e8] mb-3">UAM Alert Configuration</h4>
                 <div class="space-y-3">
+                    <div class="input-group">
+                        <label for="edit-s1-management-url" class="text-sm font-semibold text-[#c8b3e8]">S1 Management URL</label>
+                        <input type="text" id="edit-s1-management-url" placeholder="https://demo.sentinelone.net">
+                        <p class="text-xs text-[#8b7a9f] mt-1">Management console URL — used for asset lookups to link alerts to endpoints</p>
+                    </div>
+                    <div class="input-group">
+                        <label for="edit-s1-api-token" class="text-sm font-semibold text-[#c8b3e8]">S1 API Token</label>
+                        <div class="relative">
+                            <input type="password" id="edit-s1-api-token" placeholder="Leave blank to keep existing" class="pr-10">
+                            <button type="button" class="toggle-password absolute right-2 top-1/2 -translate-y-1/2 text-[#8b7a9f] hover:text-[#f3e8ff]" data-target="edit-s1-api-token" style="background:none;border:none;cursor:pointer;">👁</button>
+                        </div>
+                        <p class="text-xs text-[#8b7a9f] mt-1">For agent/asset lookups — generate from S1 Console → Settings → Users → API Token</p>
+                    </div>
                     <div class="input-group">
                         <label for="edit-uam-ingest-url" class="text-sm font-semibold text-[#c8b3e8]">UAM Ingest URL</label>
                         <input type="text" id="edit-uam-ingest-url" placeholder="https://ingest.us1.sentinelone.net" value="https://ingest.us1.sentinelone.net">
@@ -1516,6 +1580,7 @@
                                 document.getElementById('edit-dest-token').value = '';
                                 document.getElementById('edit-config-api-url').value = d.config_api_url || 'https://xdr.us1.sentinelone.net';
                                 document.getElementById('edit-config-write-token').value = '';
+                                document.getElementById('edit-s1-management-url').value = d.s1_management_url || '';
                                 document.getElementById('edit-uam-ingest-url').value = d.uam_ingest_url || 'https://ingest.us1.sentinelone.net';
                                 document.getElementById('edit-uam-account-id').value = d.uam_account_id || '';
                                 document.getElementById('edit-uam-site-id').value = d.uam_site_id || '';
@@ -1661,7 +1726,11 @@
                         if (configWriteToken) payload.config_write_token = configWriteToken;
                         if (powerqueryReadToken) payload.powerquery_read_token = powerqueryReadToken;
                         
-                        // Add UAM alert settings (optional)
+                        // Add S1 Management URL, API Token, and UAM alert settings (optional)
+                        const s1ManagementUrl = document.getElementById('dest-s1-management-url')?.value?.trim();
+                        if (s1ManagementUrl) payload.s1_management_url = s1ManagementUrl;
+                        const s1ApiToken = document.getElementById('dest-s1-api-token')?.value?.trim();
+                        if (s1ApiToken) payload.s1_api_token = s1ApiToken;
                         const uamIngestUrl = document.getElementById('dest-uam-ingest-url')?.value?.trim();
                         const uamAccountId = document.getElementById('dest-uam-account-id')?.value?.trim();
                         const uamSiteId = document.getElementById('dest-uam-site-id')?.value?.trim();
@@ -2069,6 +2138,8 @@
             const configApiUrl = document.getElementById('edit-config-api-url').value.trim();
             const configWriteToken = document.getElementById('edit-config-write-token').value.trim();
             const powerqueryReadToken = document.getElementById('edit-powerquery-read-token').value.trim();
+            const s1ManagementUrl = document.getElementById('edit-s1-management-url').value.trim();
+            const s1ApiToken = document.getElementById('edit-s1-api-token').value.trim();
             const uamIngestUrl = document.getElementById('edit-uam-ingest-url').value.trim();
             const uamAccountId = document.getElementById('edit-uam-account-id').value.trim();
             const uamSiteId = document.getElementById('edit-uam-site-id').value.trim();
@@ -2082,6 +2153,8 @@
                 if (configApiUrl) payload.config_api_url = configApiUrl;
                 if (configWriteToken) payload.config_write_token = configWriteToken;
                 if (powerqueryReadToken) payload.powerquery_read_token = powerqueryReadToken;
+                payload.s1_management_url = s1ManagementUrl;  // Allow clearing with empty string
+                if (s1ApiToken) payload.s1_api_token = s1ApiToken;
                 if (uamIngestUrl) payload.uam_ingest_url = uamIngestUrl;
                 if (uamAccountId) payload.uam_account_id = uamAccountId;
                 payload.uam_site_id = uamSiteId;  // Allow clearing with empty string
@@ -2217,7 +2290,8 @@
             const eps = parseFloat(document.getElementById('eps').value);
             const continuousMode = continuousModeCheckbox.checked;
             const speedMode = speedModeCheckbox.checked;
-            const ensureParser = document.getElementById('ensure-parser')?.checked === true;
+            const overwriteParser = document.getElementById('overwrite-parser')?.checked === true;
+            const ensureParser = overwriteParser || (document.getElementById('ensure-parser')?.checked === true);
             const selectedOpt = destSelect.options[destSelect.selectedIndex];
             const destinationId = selectedOpt ? selectedOpt.value : '';
             const destinationType = selectedOpt ? selectedOpt.dataset.type : '';
@@ -2280,7 +2354,8 @@
                         destination_id: destinationId,
                         hec_token: localToken,  // Pass local token if available
                         metadata: metadataFields,  // Pass metadata fields if provided
-                        ensure_parser: ensureParser
+                        ensure_parser: ensureParser,
+                        overwrite_parser: overwriteParser
                     } : {
                         destination: 'syslog',
                         script: scriptPath,
@@ -2502,6 +2577,9 @@
                 const generateNoise = document.getElementById('generate-noise')?.checked || false;
                 const noiseEventsCount = parseInt(document.getElementById('noise-events-count')?.value || '1200', 10);
                 
+                // Parser options
+                const overwriteParser = document.getElementById('scenario-overwrite-parser')?.checked || false;
+                
                 // Get local token if available
                 let localToken = null;
                 if (window.tokenVault && window.tokenVault.hasToken(destinationId)) {
@@ -2522,6 +2600,7 @@
                         trace_id: traceId,
                         generate_noise: generateNoise,
                         noise_events_count: noiseEventsCount,
+                        overwrite_parser: overwriteParser,
                         hec_token: localToken,  // Pass local token if available
                         debug_mode: debugMode   // Pass debug mode for server-side filtering
                     }),
@@ -2855,6 +2934,10 @@
         // Config API URL and PowerQuery token are now resolved from the selected destination
         const genCorrelationTraceIdBtn = document.getElementById('gen-correlation-trace-id');
         const correlationTraceIdInput = document.getElementById('correlation-trace-id');
+        const getXdrAssetsBtn = document.getElementById('get-xdr-assets-btn');
+        const xdrAssetsPanel = document.getElementById('xdr-assets-panel');
+        const xdrAssetsList = document.getElementById('xdr-assets-list');
+        const xdrAssetsCount = document.getElementById('xdr-assets-count');
         
         let correlationScenarios = [];
         let currentCorrelationScenario = null;
@@ -2911,15 +2994,19 @@
                 runCorrelationQueryBtn.disabled = false;
                 runCorrelationFallbackBtn.disabled = false;
                 runCorrelationScenarioBtn.disabled = true;  // Enabled after query
+                if (getXdrAssetsBtn) getXdrAssetsBtn.disabled = false;
                 
                 correlationAnchorsPanel.style.display = 'none';
                 correlationAnchorsList.innerHTML = '';
+                if (xdrAssetsPanel) xdrAssetsPanel.style.display = 'none';
             } else {
                 correlationScenarioDetails.style.display = 'none';
                 correlationQuery.value = '';
                 runCorrelationQueryBtn.disabled = true;
                 runCorrelationFallbackBtn.disabled = true;
                 runCorrelationScenarioBtn.disabled = true;
+                if (getXdrAssetsBtn) getXdrAssetsBtn.disabled = true;
+                if (xdrAssetsPanel) xdrAssetsPanel.style.display = 'none';
             }
         });
         
@@ -2929,6 +3016,91 @@
                 correlationQuery.value = currentCorrelationScenario.default_query || '';
             }
         });
+        
+        // Get XDR Assets
+        if (getXdrAssetsBtn) {
+            getXdrAssetsBtn.addEventListener('click', async () => {
+                const destinationId = destSelect.value;
+                if (!destinationId) {
+                    alert('Please select a destination');
+                    return;
+                }
+                
+                getXdrAssetsBtn.disabled = true;
+                getXdrAssetsBtn.textContent = '🔄 Loading...';
+                correlationOutputBox.innerText = 'Fetching XDR assets from S1 management API...\n';
+                
+                try {
+                    const res = await fetch('/xdr/assets', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ destination_id: destinationId })
+                    });
+                    
+                    const data = await res.json();
+                    
+                    if (data.error) {
+                        correlationOutputBox.innerText += `\n❌ ${data.error}\n`;
+                        if (xdrAssetsPanel) xdrAssetsPanel.style.display = 'none';
+                        return;
+                    }
+                    
+                    const assets = data.data || [];
+                    correlationOutputBox.innerText += `✓ Found ${assets.length} assets\n`;
+                    
+                    if (xdrAssetsPanel && xdrAssetsList && xdrAssetsCount) {
+                        xdrAssetsPanel.style.display = '';
+                        xdrAssetsCount.textContent = `${assets.length} assets`;
+                        xdrAssetsList.innerHTML = '';
+                        
+                        // Separate agent assets from device-only assets
+                        const agentAssets = assets.filter(a => a.agent);
+                        const deviceAssets = assets.filter(a => !a.agent);
+                        
+                        agentAssets.forEach(asset => {
+                            const div = document.createElement('div');
+                            div.className = 'flex items-center gap-2 p-2 bg-[#1a1629] rounded border border-[#3c325c]';
+                            const ip = asset.agent?.lastReportedIp || '';
+                            const version = asset.agent?.agentVersion || '';
+                            const status = asset.agent?.networkStatus === 'connected' ? '🟢' : '🔴';
+                            div.innerHTML = `
+                                <span>${status}</span>
+                                <span class="font-semibold text-[#a78bfa]">${asset.name || '?'}</span>
+                                <span class="text-[#8b7a9f]">|</span>
+                                <span class="text-[#c8b3e8]">${asset.category || ''}</span>
+                                <span class="text-[#8b7a9f]">|</span>
+                                <span class="text-[#b8a0d2] font-mono">${asset.id}</span>
+                                ${ip ? `<span class="text-[#8b7a9f]">| ${ip}</span>` : ''}
+                                ${version ? `<span class="text-[#8b7a9f]">v${version}</span>` : ''}
+                            `;
+                            xdrAssetsList.appendChild(div);
+                        });
+                        
+                        deviceAssets.forEach(asset => {
+                            const div = document.createElement('div');
+                            div.className = 'flex items-center gap-2 p-2 bg-[#1a1629] rounded border border-[#2a2040] opacity-60';
+                            div.innerHTML = `
+                                <span>📱</span>
+                                <span class="text-[#8b7a9f]">${asset.name || '?'}</span>
+                                <span class="text-[#8b7a9f]">|</span>
+                                <span class="text-[#8b7a9f]">${asset.resourceType || asset.category || 'Device'}</span>
+                                <span class="text-[#8b7a9f]">|</span>
+                                <span class="text-[#8b7a9f] font-mono">${asset.id}</span>
+                            `;
+                            xdrAssetsList.appendChild(div);
+                        });
+                        
+                        correlationOutputBox.innerText += `   ${agentAssets.length} agent assets (real endpoints)\n`;
+                        correlationOutputBox.innerText += `   ${deviceAssets.length} device assets (created by alerts)\n`;
+                    }
+                } catch (err) {
+                    correlationOutputBox.innerText += `\n❌ Error: ${err.message}\n`;
+                } finally {
+                    getXdrAssetsBtn.disabled = false;
+                    getXdrAssetsBtn.textContent = '🖥️ Get Assets';
+                }
+            });
+        }
         
         // Generate trace ID
         if (genCorrelationTraceIdBtn && correlationTraceIdInput) {
@@ -3060,6 +3232,7 @@
             const workerCount = parseInt(document.getElementById('correlation-worker-count').value, 10) || 10;
             const tagPhase = document.getElementById('correlation-tag-phase').checked;
             const tagTrace = document.getElementById('correlation-tag-trace').checked;
+            const overwriteParser = document.getElementById('correlation-overwrite-parser').checked;
             let traceId = correlationTraceIdInput.value.trim();
             
             if (tagTrace && !traceId) {
@@ -3091,6 +3264,7 @@
                         tag_phase: tagPhase,
                         tag_trace: tagTrace,
                         trace_id: traceId,
+                        overwrite_parser: overwriteParser,
                         hec_token: localToken
                     })
                 });

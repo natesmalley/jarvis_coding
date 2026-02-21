@@ -1,6 +1,15 @@
 """
 Scenario service for managing attack scenarios
 """
+import logging
+import os
+import sys
+import json
+import uuid
+import asyncio
+import importlib
+from datetime import datetime
+from typing import Dict, Any, Optional, List
 from typing import Dict, Any, List, Optional
 import uuid
 import time
@@ -129,6 +138,17 @@ class ScenarioService:
                 ]
             }
             ,
+            "apollo_ransomware_scenario": {
+                "id": "apollo_ransomware_scenario",
+                "name": "Apollo Ransomware Scenario",
+                "description": "Proofpoint phishing, M365 email interaction, SharePoint recon & exfiltration",
+                "phases": [
+                    {"name": "Phishing Delivery", "generators": ["proofpoint"], "duration": 5},
+                    {"name": "Email Interaction", "generators": ["microsoft_365_collaboration"], "duration": 5},
+                    {"name": "SharePoint Recon", "generators": ["microsoft_365_collaboration"], "duration": 15},
+                    {"name": "Data Exfiltration", "generators": ["microsoft_365_collaboration"], "duration": 10}
+                ]
+            },
             "hr_phishing_pdf_c2": {
                 "id": "hr_phishing_pdf_c2",
                 "name": "HR Phishing PDF -> PowerShell -> Scheduled Task -> C2",
@@ -236,6 +256,7 @@ class ScenarioService:
         scenario_id: str, 
         speed: str = "fast", 
         dry_run: bool = False,
+        overwrite_parser: bool = False,
         background_tasks=None
     ) -> str:
         """Start scenario execution"""
@@ -252,6 +273,7 @@ class ScenarioService:
             "started_at": datetime.utcnow().isoformat(),
             "speed": speed,
             "dry_run": dry_run,
+            "overwrite_parser": overwrite_parser,
             "progress": 0
         }
         
@@ -269,6 +291,7 @@ class ScenarioService:
         tag_trace: bool = True,
         speed: str = "fast", 
         dry_run: bool = False,
+        overwrite_parser: bool = False,
         background_tasks=None
     ) -> str:
         """Start correlation scenario execution with SIEM context and trace ID support"""
@@ -285,6 +308,7 @@ class ScenarioService:
             "trace_id": trace_id,
             "tag_phase": tag_phase,
             "tag_trace": tag_trace,
+            "overwrite_parser": overwrite_parser,
             "progress": 0
         }
         
