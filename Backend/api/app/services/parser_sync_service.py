@@ -32,6 +32,7 @@ LOCAL_PARSER_ALIASES: Dict[str, str] = {
 SCENARIO_SOURCE_TO_PARSER = {
     # Identity & Access
     "okta_authentication": "okta_authentication-latest",
+    "okta_ocsf_logs": "okta_ocsf_logs-latest",
     "microsoft_azuread": "microsoft_azuread-latest",
     "microsoft_azure_ad_signin": "microsoft_azure_ad_signin-latest",
     

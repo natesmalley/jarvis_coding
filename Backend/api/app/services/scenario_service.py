@@ -120,10 +120,10 @@ class ScenarioService:
                 "name": "Finance Employee MFA Fatigue Attack",
                 "description": "8-day scenario with baseline behavior, MFA fatigue attack from Russia, OneDrive exfiltration, and SOAR response",
                 "phases": [
-                    {"name": "Normal Behavior (Days 1-7)", "generators": ["okta_authentication", "microsoft_azuread", "microsoft_365_collaboration"], "duration": 7},
-                    {"name": "MFA Fatigue Attack", "generators": ["okta_authentication"], "duration": 1},
+                    {"name": "Normal Behavior (Days 1-7)", "generators": ["okta_ocsf_logs", "microsoft_azuread", "microsoft_365_collaboration"], "duration": 7},
+                    {"name": "MFA Fatigue Attack", "generators": ["okta_ocsf_logs"], "duration": 1},
                     {"name": "Data Exfiltration", "generators": ["microsoft_365_collaboration"], "duration": 1},
-                    {"name": "Detection & Response", "generators": ["okta_authentication"], "duration": 1}
+                    {"name": "Detection & Response", "generators": ["okta_ocsf_logs"], "duration": 1}
                 ]
             },
             "insider_cloud_download_exfiltration": {

@@ -1,191 +1,179 @@
 {
-    attributes: {
-      source: "okta"
-      "dataSource.category": "security",
-      "dataSource.name": "Okta",
-      "dataSource.vendor": "Okta",
+  "attributes": {
+    "dataSource.category": "security",
+    "dataSource.name": "Okta",
+    "dataSource.vendor": "Okta"
+  },
+  "formats": [
+    {
+      "format": ".*published",
+      "attributes": {
+        "category_uid": "3",
+        "category_name": "Audit Activity",
+        "class_uid": "3006",
+        "class_name": "Access Activity",
+        "severity_id": "99",
+        "activity_id": "99",
+        "type_uid": "300699",
+        "metadata.product.vendor_name": "Okta",
+        "metadata.product.name": "Okta",
+        "metadata.version": "1.0.0-rc.2"
+      }
     },
-    formats: [
-      {
-        format: ".*${parse=dottedJson}{attrBlacklist=target}$"
-         rewrites: [ 
-           {
-             input:   "actor.id", 
-             output:  "user.account_uid",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "actor.type",
-             output:  "user.account_type",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "actor.alternateId",
-             output:  "user.email_addr",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "actor.displayName",
-             output:  "user.name",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "authenticationContext.authenticationStep",
-             output:  "authenticationStep",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "authenticationContext.externalSessionId",
-             output:  "externalSessionId",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "client.ipAddress",
-             output:  "client.ip",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "client.userAgent.browser",
-             output:  "client.browser",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "client.userAgent.os",
-             output:  "clinet.os",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "client.userAgent.rawUserAgent",
-             output:  "client.userAgent",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "client.zone",
-             output:  "client.location.zone",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "client.geographicalContext.city",
-             output:  "client.location.city",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "client.geographicalContext.country",
-             output:  "client.location.country",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "client.geographicalContext.geolocation.lat",
-             output:  "client.location.lat",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "client.geographicalContext.geolocation.lon",
-             output:  "client.location.lon",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "client.geographicalContext.postalCode",
-             output:  "client.location.postal_code",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "client.geographicalContext.state",
-             output:  "client.location.state",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "debugContext.debugData.requestUri",
-             output:  "observables",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "debugContext.debugData.state",
-             output:  "status",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "displayMessage",
-             output:  "msg",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "eventType",
-             output:  "category_name",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "legacyEventType",
-             output:  "legacy_category_name",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "outcome.result",
-             output:  "result",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "published",
-             output:  "time",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "transaction.id",
-             output:  "type_uid",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "transaction.type",
-             output:  "type_name",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "version",
-             output:  "metadata.version",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "uuid",
-             output:  "activity_id",
-             match:   ".*",
-             replace: "$0"
-           },
-           {
-             input:   "time",
-             output:  "timestamp",
-             match:   ".*",
-             replace: "$0"
-           }
-         ]
-      },
-        {format: ".*target\": \\[$target.=json{parse=dottedJson}$"}
-       
-    ]
-  }
+    {
+      "format": ".*${parse=dottedJson}{attrBlacklist=(detailEntry|type|authenticationStep|target|request|userId|timeUnit|timeSpan|threshold|requestId|rateLimitSecondsToReset|rateLimitScopeType|rateLimitBucketUuid|dtHash|securityContext|requestApiTokenId)}$",
+      "rewrites": [
+        {
+          "input": "actor.alternateId",
+          "output": "actor.user.email_addr",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "actor.displayName",
+          "output": "actor.user.name",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "actor.id",
+          "output": "actor.user.uid",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "actor.type",
+          "output": "actor.user.type",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "client.ipAddress",
+          "output": "src_endpoint.ip",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "client.device",
+          "output": "unmapped.client.device",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "client.id",
+          "output": "src_endpoint.uid",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "client.zone",
+          "output": "src_endpoint.domain",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "client.geographicalContext.city",
+          "output": "src_endpoint.location.city",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "client.geographicalContext.country",
+          "output": "src_endpoint.location.country",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "client.geographicalContext.postalCode",
+          "output": "src_endpoint.location.postal_code",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "client.geographicalContext.state",
+          "output": "src_endpoint.location.region",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "securityContext.isp",
+          "output": "src_endpoint.location.isp",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "client.userAgent.rawUserAgent",
+          "output": "http_request.user_agent",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "eventType",
+          "output": "unmapped.eventType",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "eventType",
+          "output": "event.type",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "eventType",
+          "output": "activity_name",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "legacyEventType",
+          "output": "unmapped.legacyEventType",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "outcome.result",
+          "output": "status",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "outcome.reason",
+          "output": "status_detail",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "_time",
+          "output": "timestamp",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "published",
+          "output": "time",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "displayMessage",
+          "output": "message",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "uuid",
+          "output": "metadata.uid",
+          "match": ".*",
+          "replace": "$0"
+        },
+        {
+          "input": "severity",
+          "output": "severity",
+          "match": ".*",
+          "replace": "$0"
+        }
+      ]
+    }
+  ]
+}
