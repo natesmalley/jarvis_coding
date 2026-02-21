@@ -248,6 +248,10 @@ def update_destination(dest_id):
             payload['config_write_token'] = data['config_write_token']
         if data.get('powerquery_read_token'):
             payload['powerquery_read_token'] = data['powerquery_read_token']
+        if 's1_management_url' in data:
+            payload['s1_management_url'] = data['s1_management_url']
+        if data.get('s1_api_token'):
+            payload['s1_api_token'] = data['s1_api_token']
         if data.get('uam_ingest_url'):
             payload['uam_ingest_url'] = data['uam_ingest_url']
         if data.get('uam_account_id'):
@@ -532,6 +536,69 @@ def execute_correlation_query():
         return jsonify({'error': str(e), 'results': []}), 500
 
 
+@app.route('/xdr/assets', methods=['POST'])
+def get_xdr_assets():
+    """Fetch XDR assets from S1 management API via destination credentials"""
+    try:
+        data = request.get_json(silent=True) or {}
+        destination_id = data.get('destination_id')
+        if not destination_id:
+            return jsonify({'error': 'No destination_id provided'}), 400
+
+        # Resolve S1 API token from destination
+        s1_resp = requests.get(
+            f"{API_BASE_URL}/api/v1/destinations/{destination_id}/s1-api-token",
+            headers=_get_api_headers(),
+            timeout=10
+        )
+        if s1_resp.status_code != 200:
+            return jsonify({'error': 'No S1 API Token configured for this destination. Go to Settings → Edit Destination.'}), 400
+        s1_data = s1_resp.json()
+        s1_token = s1_data.get('token', '')
+        s1_mgmt_url = s1_data.get('s1_management_url', '')
+
+        if not s1_token or not s1_mgmt_url:
+            return jsonify({'error': 'S1 Management URL or API Token missing'}), 400
+
+        # Get UAM account/site IDs from destination for scoping
+        dest_resp = requests.get(
+            f"{API_BASE_URL}/api/v1/destinations/{destination_id}",
+            headers=_get_api_headers(),
+            timeout=10
+        )
+        if dest_resp.status_code != 200:
+            return jsonify({'error': 'Failed to fetch destination details'}), 400
+        dest = dest_resp.json()
+
+        params = {}
+        if dest.get('uam_account_id'):
+            params['accountIds'] = dest['uam_account_id']
+        if dest.get('uam_site_id'):
+            params['siteIds'] = dest['uam_site_id']
+
+        # Call XDR assets API
+        xdr_url = f"{s1_mgmt_url.rstrip('/')}/web/api/v2.1/xdr/assets"
+        xdr_resp = requests.get(
+            xdr_url,
+            headers={
+                "Authorization": f"ApiToken {s1_token}",
+                "Content-Type": "application/json",
+            },
+            params=params,
+            timeout=20
+        )
+        xdr_resp.raise_for_status()
+        assets_data = xdr_resp.json()
+
+        return jsonify(assets_data)
+    except requests.exceptions.RequestException as e:
+        logger.error(f"XDR assets API call failed: {e}")
+        return jsonify({'error': f'XDR assets API call failed: {str(e)}'}), 500
+    except Exception as e:
+        logger.error(f"Failed to fetch XDR assets: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/correlation-scenarios/run', methods=['POST'])
 def run_correlation_scenario():
     """Execute a correlation scenario with SIEM context"""
@@ -732,6 +799,22 @@ def run_correlation_scenario():
                 env['UAM_SERVICE_TOKEN'] = uam_service_token
                 if uam_site_id:
                     env['UAM_SITE_ID'] = uam_site_id
+                # Resolve S1 API token for asset lookups
+                try:
+                    s1_resp = requests.get(
+                        f"{API_BASE_URL}/api/v1/destinations/{destination_id}/s1-api-token",
+                        headers=_get_api_headers(),
+                        timeout=10
+                    )
+                    if s1_resp.status_code == 200:
+                        s1_data = s1_resp.json()
+                        env['S1_MANAGEMENT_URL'] = s1_data.get('s1_management_url', '')
+                        env['S1_API_TOKEN'] = s1_data.get('token', '')
+                        yield "INFO: 🔗 S1 asset linking enabled (API token found)\n"
+                    else:
+                        yield "INFO: ⚠️ S1 asset linking disabled (no S1 API token on destination)\n"
+                except Exception as s1e:
+                    logger.warning(f"Could not resolve S1 API token: {s1e}")
                 yield "INFO: 🚨 Alert detonation enabled (UAM credentials found)\n"
             else:
                 yield "INFO: ⚠️ Alert detonation disabled (no UAM credentials on destination)\n"
@@ -1130,6 +1213,22 @@ def run_scenario():
                 env['UAM_SERVICE_TOKEN'] = uam_service_token
                 if uam_site_id:
                     env['UAM_SITE_ID'] = uam_site_id
+                # Resolve S1 API token for asset lookups
+                try:
+                    s1_resp = requests.get(
+                        f"{API_BASE_URL}/api/v1/destinations/{destination_id}/s1-api-token",
+                        headers=_get_api_headers(),
+                        timeout=10
+                    )
+                    if s1_resp.status_code == 200:
+                        s1_data = s1_resp.json()
+                        env['S1_MANAGEMENT_URL'] = s1_data.get('s1_management_url', '')
+                        env['S1_API_TOKEN'] = s1_data.get('token', '')
+                        yield "INFO: 🔗 S1 asset linking enabled (API token found)\n"
+                    else:
+                        yield "INFO: ⚠️ S1 asset linking disabled (no S1 API token on destination)\n"
+                except Exception as s1e:
+                    logger.warning(f"Could not resolve S1 API token: {s1e}")
                 yield "INFO: 🚨 Alert detonation enabled (UAM credentials found)\n"
             else:
                 yield "INFO: ⚠️ Alert detonation disabled (no UAM credentials on destination)\n"
