@@ -28,6 +28,10 @@ class DestinationCreate(BaseModel):
     config_write_token: Optional[str] = Field(None, description="Config API token for reading and writing parsers")
     powerquery_read_token: Optional[str] = Field(None, description="PowerQuery Log Read Access token for querying SIEM data")
     
+    # S1 Management API
+    s1_management_url: Optional[str] = Field(None, description="S1 Management API URL for asset lookups (e.g., https://demo.sentinelone.net)")
+    s1_api_token: Optional[str] = Field(None, description="S1 API Token for management API calls (Settings → Users → API Token)")
+    
     # UAM Alert Ingest (Service Account)
     uam_ingest_url: Optional[str] = Field(None, description="UAM ingest URL (e.g., https://ingest.us1.sentinelone.net)")
     uam_account_id: Optional[str] = Field(None, description="SentinelOne account ID for S1-Scope header")
@@ -48,6 +52,8 @@ class DestinationUpdate(BaseModel):
     config_api_url: Optional[str] = None
     config_write_token: Optional[str] = None
     powerquery_read_token: Optional[str] = None
+    s1_management_url: Optional[str] = None
+    s1_api_token: Optional[str] = None
     uam_ingest_url: Optional[str] = None
     uam_account_id: Optional[str] = None
     uam_site_id: Optional[str] = None
@@ -72,6 +78,8 @@ class DestinationResponse(BaseModel):
     config_api_url: Optional[str] = None  # Config API URL for parser management
     has_config_write_token: Optional[bool] = None  # True if config API token is set
     has_powerquery_read_token: Optional[bool] = None  # True if PowerQuery read token is set
+    s1_management_url: Optional[str] = None  # S1 Management API URL
+    has_s1_api_token: Optional[bool] = None  # True if S1 API token is set
     uam_ingest_url: Optional[str] = None  # UAM ingest URL
     uam_account_id: Optional[str] = None  # SentinelOne account ID
     uam_site_id: Optional[str] = None  # Optional site ID
@@ -153,6 +161,8 @@ async def create_destination(
             config_api_url=destination.config_api_url,
             config_write_token=destination.config_write_token,
             powerquery_read_token=destination.powerquery_read_token,
+            s1_management_url=destination.s1_management_url,
+            s1_api_token=destination.s1_api_token,
             uam_ingest_url=destination.uam_ingest_url,
             uam_account_id=destination.uam_account_id,
             uam_site_id=destination.uam_site_id,
@@ -290,6 +300,8 @@ async def update_destination(
             config_api_url=update.config_api_url,
             config_write_token=update.config_write_token,
             powerquery_read_token=update.powerquery_read_token,
+            s1_management_url=update.s1_management_url,
+            s1_api_token=update.s1_api_token,
             uam_ingest_url=update.uam_ingest_url,
             uam_account_id=update.uam_account_id,
             uam_site_id=update.uam_site_id,
@@ -471,4 +483,56 @@ async def get_destination_uam_token(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to decrypt UAM token"
+        )
+
+
+@router.get("/{dest_id}/s1-api-token")
+async def get_destination_s1_api_token(
+    dest_id: str,
+    session: AsyncSession = Depends(get_session),
+    auth_info: tuple = Depends(get_api_key)
+):
+    """
+    Get decrypted S1 API Token for a destination (internal use only)
+    
+    Returns the decrypted S1 API token along with the management URL
+    for making agent/asset lookups via the S1 management API
+    """
+    service = DestinationService(session)
+    destination = await service.get_destination(dest_id)
+    if not destination:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Destination '{dest_id}' not found"
+        )
+    
+    if destination.type != 'hec':
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only HEC destinations have S1 API tokens"
+        )
+    
+    if not destination.s1_api_token_encrypted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No S1 API Token found for this destination"
+        )
+    
+    if not destination.s1_management_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No S1 Management URL configured for this destination"
+        )
+    
+    try:
+        token = service.decrypt_token(destination.s1_api_token_encrypted)
+        return {
+            "token": token,
+            "s1_management_url": destination.s1_management_url,
+        }
+    except Exception as e:
+        logger.error(f"Failed to decrypt S1 API token: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to decrypt S1 API token"
         )

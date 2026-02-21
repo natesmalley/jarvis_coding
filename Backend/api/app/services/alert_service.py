@@ -194,6 +194,59 @@ class AlertService:
                 elif isinstance(item, (dict, list)):
                     self._replace_dynamic(item, time_ms)
 
+    def lookup_xdr_asset_id(
+        self,
+        s1_management_url: str,
+        api_token: str,
+        asset_name: str,
+        account_id: str,
+        site_id: Optional[str] = None,
+    ) -> Optional[str]:
+        """Look up an XDR Asset ID from the S1 management API.
+        
+        The XDR Asset ID (e.g., 'eimvmdpvax6mtmbpdbxtoaem5q') is the value
+        needed for resources[].uid to link alerts to real S1 agent assets.
+        
+        Args:
+            s1_management_url: S1 management console URL (e.g., https://demo.sentinelone.net)
+            api_token: S1 API token
+            asset_name: Asset hostname to look up (e.g., 'bridge')
+            account_id: S1 account ID
+            site_id: Optional site ID to scope the search
+            
+        Returns:
+            The XDR Asset ID string, or None if not found
+        """
+        try:
+            url = f"{s1_management_url.rstrip('/')}/web/api/v2.1/xdr/assets"
+            params = {"accountIds": account_id}
+            if site_id:
+                params["siteIds"] = site_id
+            headers = {
+                "Authorization": f"ApiToken {api_token}",
+                "Content-Type": "application/json",
+            }
+            response = requests.get(url, headers=headers, params=params, timeout=15)
+            response.raise_for_status()
+            data = response.json()
+            assets = data.get("data", [])
+            
+            # Find the real agent asset (has 'agent' field), matching by name
+            for asset in assets:
+                if asset.get("name", "").lower() == asset_name.lower() and asset.get("agent"):
+                    asset_id = asset.get("id", "")
+                    logger.info(
+                        f"XDR asset found: name={asset.get('name')} "
+                        f"asset_id={asset_id} category={asset.get('category')}"
+                    )
+                    return asset_id
+            
+            logger.warning(f"No XDR agent asset found for name={asset_name} (checked {len(assets)} assets)")
+            return None
+        except requests.exceptions.RequestException as e:
+            logger.error(f"XDR asset lookup failed for {asset_name}: {e}")
+            return None
+
     def build_scope(self, account_id: str, site_id: Optional[str] = None) -> str:
         """Build the S1-Scope header value"""
         if site_id:

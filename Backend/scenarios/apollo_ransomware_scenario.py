@@ -301,11 +301,19 @@ def send_phase_alert(
     alert["metadata"]["logged_time"] = time_ms
     alert["metadata"]["modified_time"] = time_ms
     
-    # Set user as the resource (uid must be a UUID for site-scoped alerts)
-    alert["resources"] = [{
-        "uid": str(uuid.uuid4()),
-        "name": VICTIM_PROFILE["email"]
-    }]
+    # Set resource - use XDR Asset ID if available for linking to real endpoint
+    xdr_asset_id = uam_config.get('xdr_asset_id')
+    if xdr_asset_id:
+        resource_name = uam_config.get('xdr_asset_name', VICTIM_PROFILE["email"])
+        alert["resources"] = [{
+            "uid": xdr_asset_id,
+            "name": resource_name
+        }]
+    else:
+        alert["resources"] = [{
+            "uid": str(uuid.uuid4()),
+            "name": VICTIM_PROFILE["email"]
+        }]
     
     # Apply overrides
     overrides = mapping.get("overrides", {})
@@ -673,6 +681,47 @@ def generate_apollo_ransomware_scenario(siem_context: Optional[Dict] = None) -> 
                 'uam_service_token': uam_service_token,
                 'uam_site_id': uam_site_id,
             }
+            
+            # Look up bridge XDR Asset ID for linking alerts to real endpoint
+            s1_mgmt_url = os.getenv('S1_MANAGEMENT_URL', '')
+            s1_api_token = os.getenv('S1_API_TOKEN', '')
+            if s1_mgmt_url and s1_api_token:
+                bridge_name = VICTIM_PROFILE['machine_bridge']
+                print(f"\n🔍 Looking up XDR asset '{bridge_name}' for alert linking...")
+                try:
+                    import urllib.request
+                    import urllib.parse
+                    # Use XDR assets endpoint — returns the Asset ID needed for resource UID linking
+                    params = {"accountIds": uam_account_id}
+                    if uam_site_id:
+                        params["siteIds"] = uam_site_id
+                    lookup_url = f"{s1_mgmt_url.rstrip('/')}/web/api/v2.1/xdr/assets?{urllib.parse.urlencode(params)}"
+                    req = urllib.request.Request(lookup_url, headers={
+                        "Authorization": f"ApiToken {s1_api_token}",
+                        "Content-Type": "application/json",
+                    })
+                    with urllib.request.urlopen(req, timeout=15) as resp:
+                        assets_data = json.loads(resp.read().decode())
+                        assets = assets_data.get("data", [])
+                        # Find the real agent asset (has 'agent' field), matching by name
+                        for asset in assets:
+                            if asset.get("name", "").lower() == bridge_name.lower() and asset.get("agent"):
+                                asset_id = asset.get("id", "")
+                                agent_name = asset.get("name", "")
+                                agent_uuid = asset.get("agent", {}).get("uuid", "")
+                                print(f"   ✓ XDR Asset found: {agent_name}")
+                                print(f"     Asset ID: {asset_id}")
+                                print(f"     Agent UUID: {agent_uuid}")
+                                print(f"     Category: {asset.get('category')}")
+                                uam_config['xdr_asset_id'] = asset_id
+                                uam_config['xdr_asset_name'] = agent_name
+                                break
+                        else:
+                            print(f"   ⚠ No XDR agent asset found for '{bridge_name}'")
+                            print(f"     Found {len(assets)} total assets")
+                except Exception as e:
+                    print(f"   ⚠ XDR asset lookup failed: {e}")
+            
             print("\n🚨 ALERT DETONATION ENABLED")
             print(f"   UAM Ingest: {uam_ingest_url}")
             print(f"   Account ID: {uam_account_id}")

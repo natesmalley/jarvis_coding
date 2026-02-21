@@ -24,6 +24,10 @@ class Destination(Base):
     config_write_token_encrypted = Column(Text, nullable=True)  # For putFile API
     powerquery_read_token_encrypted = Column(Text, nullable=True)  # For PowerQuery Log Read Access
     
+    # S1 Management API (for asset lookups, agent queries)
+    s1_management_url = Column(String, nullable=True)  # e.g., https://demo.sentinelone.net
+    s1_api_token_encrypted = Column(Text, nullable=True)  # Encrypted S1 API Token (for /web/api/v2.1/agents)
+    
     # UAM Alert Ingest (Service Account - separate from HEC)
     uam_ingest_url = Column(String, nullable=True)  # e.g., https://ingest.us1.sentinelone.net
     uam_account_id = Column(String, nullable=True)  # SentinelOne account ID
@@ -68,6 +72,10 @@ class Destination(Base):
             result['config_api_url'] = self.config_api_url
             result['has_config_write_token'] = bool(self.config_write_token_encrypted)
             result['has_powerquery_read_token'] = bool(self.powerquery_read_token_encrypted)
+            
+            # S1 Management API
+            result['s1_management_url'] = self.s1_management_url
+            result['has_s1_api_token'] = bool(self.s1_api_token_encrypted)
             
             # UAM Alert Ingest settings
             result['uam_ingest_url'] = self.uam_ingest_url

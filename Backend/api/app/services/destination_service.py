@@ -76,6 +76,8 @@ class DestinationService:
         config_api_url: Optional[str] = None,
         config_write_token: Optional[str] = None,
         powerquery_read_token: Optional[str] = None,
+        s1_management_url: Optional[str] = None,
+        s1_api_token: Optional[str] = None,
         uam_ingest_url: Optional[str] = None,
         uam_account_id: Optional[str] = None,
         uam_site_id: Optional[str] = None,
@@ -95,6 +97,8 @@ class DestinationService:
             config_api_url: Config API URL for parser management (e.g., https://xdr.us1.sentinelone.net)
             config_write_token: Config API token for reading and writing parsers (will be encrypted)
             powerquery_read_token: PowerQuery Log Read Access token for querying SIEM data (will be encrypted)
+            s1_management_url: S1 Management API URL for asset lookups (e.g., https://demo.sentinelone.net)
+            s1_api_token: S1 API Token for management API calls (will be encrypted)
             ip: Syslog IP (for syslog destinations)
             port: Syslog port (for syslog destinations)
             protocol: 'UDP' or 'TCP' (for syslog destinations)
@@ -137,6 +141,10 @@ class DestinationService:
                 destination.config_write_token_encrypted = self.encryption.encrypt(config_write_token)
             if powerquery_read_token:
                 destination.powerquery_read_token_encrypted = self.encryption.encrypt(powerquery_read_token)
+            if s1_management_url:
+                destination.s1_management_url = s1_management_url.rstrip('/')
+            if s1_api_token:
+                destination.s1_api_token_encrypted = self.encryption.encrypt(s1_api_token)
             if uam_ingest_url:
                 destination.uam_ingest_url = uam_ingest_url.rstrip('/')
             if uam_account_id:
@@ -185,6 +193,8 @@ class DestinationService:
         config_api_url: Optional[str] = None,
         config_write_token: Optional[str] = None,
         powerquery_read_token: Optional[str] = None,
+        s1_management_url: Optional[str] = None,
+        s1_api_token: Optional[str] = None,
         uam_ingest_url: Optional[str] = None,
         uam_account_id: Optional[str] = None,
         uam_site_id: Optional[str] = None,
@@ -212,6 +222,10 @@ class DestinationService:
                 destination.config_write_token_encrypted = self.encryption.encrypt(config_write_token)
             if powerquery_read_token:
                 destination.powerquery_read_token_encrypted = self.encryption.encrypt(powerquery_read_token)
+            if s1_management_url is not None:
+                destination.s1_management_url = s1_management_url.rstrip('/') if s1_management_url else None
+            if s1_api_token:
+                destination.s1_api_token_encrypted = self.encryption.encrypt(s1_api_token)
             if uam_ingest_url:
                 destination.uam_ingest_url = uam_ingest_url.rstrip('/')
             if uam_account_id:
