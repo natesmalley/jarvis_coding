@@ -850,6 +850,7 @@ SOURCETYPE_MAP_OVERRIDES = {
     
     # Identity and access management
     "okta_authentication": "okta_authentication-latest",
+    "okta_ocsf_logs": "okta_ocsf_logs-latest",
     "microsoft_azuread": "microsoft_azuread-latest",
     "microsoft_azure_ad": "microsoft_azure_ad_logs-latest",
     "microsoft_azure_ad_signin": "microsoft_azure_ad_signin-latest",
@@ -1051,6 +1052,7 @@ JSON_PRODUCTS = {
     "zscaler",  # JSON format for gron parser
     "microsoft_azuread",
     "okta_authentication",
+    "okta_ocsf_logs",
     # "crowdstrike_falcon",  # Returns CEF format, not JSON
     "cyberark_pas",
     "darktrace",

@@ -29,8 +29,15 @@ import sys
 import os
 import errno
 import random
+import copy
+import gzip
+import uuid
 from datetime import datetime, timezone, timedelta
-from typing import Dict, List
+from typing import Dict, List, Optional
+
+import requests
+
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Add event_generators to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'event_generators'))
@@ -38,7 +45,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'event_generato
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'event_generators', 'cloud_infrastructure'))
 
 # Import generators
-from okta_authentication import okta_authentication_log
+from okta_system_log import okta_system_log
 from microsoft_azuread import azuread_log
 from microsoft_365_collaboration import microsoft_365_collaboration_log
 
@@ -60,6 +67,171 @@ ATTACKER_PROFILE = {
     "timezone_offset": 10  # Moscow is UTC+3, Denver is UTC-7 = 10 hour difference
 }
 
+# Alert configuration for scenario phases
+# Maps scenario detection phases to existing UAM alert templates with overrides
+ALERT_PHASE_MAPPING = {
+    "mfa_fatigue": {
+        "template": "o365_brute_force_success",
+        "offset_minutes": 0,
+        "overrides": {
+            "finding_info.title": "HELIOS - Okta MFA Fatigue Attack Detected",
+            "finding_info.desc": f"15 consecutive MFA push requests detected for {JAKE_PROFILE['email']} within 15 minutes from {ATTACKER_PROFILE['ip']} ({ATTACKER_PROFILE['location']}), followed by user acceptance. MITRE ATT&CK: T1621 - Multi-Factor Authentication Request Generation.",
+            "severity_id": 5,
+            "severity": "critical",
+        }
+    },
+    "impossible_traveler": {
+        "template": "o365_noncompliant_login",
+        "offset_minutes": 1,
+        "overrides": {
+            "finding_info.title": "HELIOS - Impossible Traveler Detected",
+            "finding_info.desc": f"Login from {ATTACKER_PROFILE['location']} ({ATTACKER_PROFILE['ip']}) detected for {JAKE_PROFILE['email']} 30 minutes after Denver login. Geographic distance: 8,000+ miles. MITRE ATT&CK: T1078 - Valid Accounts.",
+            "severity_id": 5,
+            "severity": "critical",
+        }
+    },
+    "ueba_irregular_login": {
+        "template": "o365_sneaky_2fa",
+        "offset_minutes": 2,
+        "overrides": {
+            "finding_info.title": "HELIOS - UEBA Irregular Login Pattern",
+            "finding_info.desc": f"Login detected for {JAKE_PROFILE['email']} at 7:30 PM from {ATTACKER_PROFILE['ip']} - outside normal working hours (8 AM - 5 PM). Baseline deviation: 11.5 hours. Risk score: 85. MITRE ATT&CK: T1078 - Valid Accounts.",
+            "severity_id": 4,
+            "severity": "high",
+        }
+    },
+    "data_exfiltration": {
+        "template": "sharepoint_data_exfil_alert",
+        "offset_minutes": 3,
+        "overrides": {
+            "finding_info.title": "HELIOS - Irregular Data Download Activity",
+            "finding_info.desc": f"27 sensitive financial documents downloaded by {JAKE_PROFILE['email']} from {ATTACKER_PROFILE['ip']} ({ATTACKER_PROFILE['location']}) in 30 minutes - 15x normal daily average. Data volume: 4.2 GB. Sensitive data types: PII, Financial Records, Client Data. MITRE ATT&CK: T1530 - Data from Cloud Storage Object.",
+            "severity_id": 5,
+            "severity": "critical",
+        }
+    },
+}
+
+
+def load_alert_template(template_id: str) -> Optional[Dict]:
+    """Load an alert template JSON from the templates directory"""
+    candidate_dirs = [
+        os.path.join(backend_dir, 'api', 'app', 'alerts', 'templates'),  # local dev
+        os.path.join(backend_dir, 'app', 'alerts', 'templates'),          # Docker
+    ]
+    for templates_dir in candidate_dirs:
+        template_path = os.path.join(templates_dir, f"{template_id}.json")
+        if os.path.exists(template_path):
+            with open(template_path, 'r') as f:
+                return json.load(f)
+    print(f"   ⚠️  Template not found: {template_id}.json (searched {candidate_dirs})")
+    return None
+
+
+def send_phase_alert(
+    phase_name: str,
+    alert_time: datetime,
+    uam_config: dict
+) -> bool:
+    """Send alert for a specific phase with correct timing.
+
+    Standalone implementation — loads template from disk and sends
+    directly via requests + gzip. No AlertService dependency.
+    """
+    if phase_name not in ALERT_PHASE_MAPPING:
+        return False
+
+    mapping = ALERT_PHASE_MAPPING[phase_name]
+
+    # Load template
+    template = load_alert_template(mapping["template"])
+    if not template:
+        return False
+
+    alert = copy.deepcopy(template)
+
+    # Calculate alert timestamp
+    offset_time = alert_time + timedelta(minutes=mapping["offset_minutes"])
+    time_ms = int(offset_time.timestamp() * 1000)
+
+    # Inject fresh UID
+    if "finding_info" not in alert:
+        alert["finding_info"] = {}
+    alert["finding_info"]["uid"] = str(uuid.uuid4())
+
+    # Set timestamps
+    alert["time"] = time_ms
+    if "metadata" not in alert:
+        alert["metadata"] = {}
+    alert["metadata"]["logged_time"] = time_ms
+    alert["metadata"]["modified_time"] = time_ms
+
+    # Set resource to Jake's email with a consistent GUID
+    email_asset_uid = uam_config.get('email_asset_uid')
+    if not email_asset_uid:
+        email_asset_uid = str(uuid.uuid5(uuid.NAMESPACE_DNS, JAKE_PROFILE["email"]))
+        uam_config['email_asset_uid'] = email_asset_uid
+    alert["resources"] = [{
+        "uid": email_asset_uid,
+        "name": JAKE_PROFILE["email"]
+    }]
+
+    # Apply overrides
+    overrides = mapping.get("overrides", {})
+    for key, value in overrides.items():
+        if "." in key:
+            keys = key.split(".")
+            current = alert
+            for k in keys[:-1]:
+                if k not in current:
+                    current[k] = {}
+                current = current[k]
+            current[keys[-1]] = value
+        else:
+            alert[key] = value
+
+    # Send alert via UAM ingest API
+    try:
+        ingest_url = uam_config['uam_ingest_url'].rstrip('/') + '/v1/alerts'
+        scope = uam_config['uam_account_id']
+        if uam_config.get('uam_site_id'):
+            scope = f"{scope}:{uam_config['uam_site_id']}"
+
+        headers = {
+            "Authorization": f"Bearer {uam_config['uam_service_token']}",
+            "S1-Scope": scope,
+            "Content-Encoding": "gzip",
+            "Content-Type": "application/json",
+            "S1-Trace-Id": "helios-ingest-uam:alwayslog",
+        }
+
+        payload = json.dumps(alert).encode("utf-8")
+        gzipped = gzip.compress(payload)
+
+        print(f"\n      📤 Alert Details:")
+        print(f"         Template: {mapping['template']}")
+        print(f"         Title: {alert.get('finding_info', {}).get('title', 'N/A')}")
+        print(f"         User: {JAKE_PROFILE['email']}")
+        print(f"         Time: {offset_time.isoformat()} ({time_ms}ms)")
+        print(f"         URL: {ingest_url}")
+        print(f"         Scope: {scope}")
+        print(f"         Payload: {len(payload)} bytes -> {len(gzipped)} bytes (gzip)")
+
+        resp = requests.post(ingest_url, headers=headers, data=gzipped, timeout=30)
+
+        print(f"         Response: {resp.status_code} {resp.reason}")
+        if resp.content:
+            print(f"         Body: {resp.text[:200]}")
+
+        return resp.status_code == 202
+
+    except Exception as e:
+        print(f"   ✗ Alert send failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 def get_scenario_time(base_time: datetime, day: int, hour: int, minute: int = 0, second: int = 0) -> str:
     """Calculate timestamp for scenario event"""
     event_time = base_time + timedelta(days=day, hours=hour, minutes=minute, seconds=second)
@@ -80,7 +252,7 @@ def generate_normal_day_events(base_time: datetime, day: int) -> List[Dict]:
     
     # Morning login (8:30 AM)
     login_time = get_scenario_time(base_time, day, 8, 30)
-    okta_login_str = okta_authentication_log()
+    okta_login_str = okta_system_log()
     okta_login = json.loads(okta_login_str) if isinstance(okta_login_str, str) else okta_login_str
     # Customize for normal login and set published to scenario timestamp
     okta_login['published'] = login_time
@@ -96,7 +268,7 @@ def generate_normal_day_events(base_time: datetime, day: int) -> List[Dict]:
     okta_login['displayMessage'] = 'User successfully authenticated'
     okta_login['severity'] = 'INFO'
     
-    events.append(create_event(login_time, "okta_authentication", "normal_behavior", okta_login))
+    events.append(create_event(login_time, "okta_ocsf_logs", "normal_behavior", okta_login))
     
     # Azure AD sign-in
     azuread_signin_str = azuread_log()
@@ -159,7 +331,7 @@ def generate_mfa_fatigue_attack(base_time: datetime) -> List[Dict]:
     
     # IMPOSSIBLE TRAVELER: Normal Denver login at 7:00 PM
     denver_login_time = get_scenario_time(base_time, day, 19, 0)  # 7:00 PM
-    okta_denver_str = okta_authentication_log()
+    okta_denver_str = okta_system_log()
     okta_denver = json.loads(okta_denver_str) if isinstance(okta_denver_str, str) else okta_denver_str
     okta_denver['published'] = denver_login_time
     okta_denver['eventType'] = 'user.session.start'
@@ -174,7 +346,7 @@ def generate_mfa_fatigue_attack(base_time: datetime) -> List[Dict]:
     okta_denver['displayMessage'] = 'Evening login from Denver office'
     okta_denver['severity'] = 'INFO'
     
-    events.append(create_event(denver_login_time, "okta_authentication", "normal_behavior", okta_denver))
+    events.append(create_event(denver_login_time, "okta_ocsf_logs", "normal_behavior", okta_denver))
     
     # Azure AD sign-in from Denver at 7:00 PM
     azuread_denver_str = azuread_log()
@@ -197,7 +369,7 @@ def generate_mfa_fatigue_attack(base_time: datetime) -> List[Dict]:
         attempt_time = get_scenario_time(base_time, day, attack_start_hour, attack_start_minute + i)
         
         # Failed Okta MFA attempt
-        okta_mfa_str = okta_authentication_log()
+        okta_mfa_str = okta_system_log()
         okta_mfa = json.loads(okta_mfa_str) if isinstance(okta_mfa_str, str) else okta_mfa_str
         okta_mfa['published'] = attempt_time
         okta_mfa['eventType'] = 'user.mfa.challenge'
@@ -212,11 +384,11 @@ def generate_mfa_fatigue_attack(base_time: datetime) -> List[Dict]:
         okta_mfa['displayMessage'] = f'MFA push request #{i+1} - Waiting for user approval'
         okta_mfa['severity'] = 'WARN'
         
-        events.append(create_event(attempt_time, "okta_authentication", "mfa_fatigue", okta_mfa))
+        events.append(create_event(attempt_time, "okta_ocsf_logs", "mfa_fatigue", okta_mfa))
     
     # User accepts MFA (attempt #14)
     accept_time = get_scenario_time(base_time, day, attack_start_hour, attack_start_minute + 14)
-    okta_success_str = okta_authentication_log()
+    okta_success_str = okta_system_log()
     okta_success = json.loads(okta_success_str) if isinstance(okta_success_str, str) else okta_success_str
     okta_success['published'] = accept_time
     okta_success['eventType'] = 'user.mfa.challenge'
@@ -231,11 +403,11 @@ def generate_mfa_fatigue_attack(base_time: datetime) -> List[Dict]:
     okta_success['displayMessage'] = 'User approved MFA push - Access granted'
     okta_success['severity'] = 'INFO'
     
-    events.append(create_event(accept_time, "okta_authentication", "initial_access", okta_success))
+    events.append(create_event(accept_time, "okta_ocsf_logs", "initial_access", okta_success))
     
     # Session start immediately after successful MFA (30 seconds later)
     session_time = get_scenario_time(base_time, day, attack_start_hour, attack_start_minute + 14, 30)
-    okta_session_str = okta_authentication_log()
+    okta_session_str = okta_system_log()
     okta_session = json.loads(okta_session_str) if isinstance(okta_session_str, str) else okta_session_str
     okta_session['published'] = session_time
     okta_session['eventType'] = 'user.session.start'
@@ -250,12 +422,12 @@ def generate_mfa_fatigue_attack(base_time: datetime) -> List[Dict]:
     okta_session['displayMessage'] = 'Session established after MFA'
     okta_session['severity'] = 'INFO'
     
-    events.append(create_event(session_time, "okta_authentication", "initial_access", okta_session))
+    events.append(create_event(session_time, "okta_ocsf_logs", "initial_access", okta_session))
     print(f"   ✓ MFA accepted after 15 attempts")
     
     # Attacker tries to access Okta Admin Console - BLOCKED (1 minute later)
     admin_attempt_time = get_scenario_time(base_time, day, attack_start_hour, attack_start_minute + 15, 30)
-    okta_admin_str = okta_authentication_log()
+    okta_admin_str = okta_system_log()
     okta_admin = json.loads(okta_admin_str) if isinstance(okta_admin_str, str) else okta_admin_str
     okta_admin['published'] = admin_attempt_time
     okta_admin['eventType'] = 'user.session.access_admin_app'
@@ -271,7 +443,7 @@ def generate_mfa_fatigue_attack(base_time: datetime) -> List[Dict]:
     okta_admin['displayMessage'] = 'User attempted to access Okta admin console but was denied'
     okta_admin['severity'] = 'WARN'
     
-    events.append(create_event(admin_attempt_time, "okta_authentication", "initial_access", okta_admin))
+    events.append(create_event(admin_attempt_time, "okta_ocsf_logs", "initial_access", okta_admin))
     print(f"   ✓ Failed attempt to access Okta admin console from Moscow")
     
     # Azure AD sign-in from Russia
@@ -600,6 +772,33 @@ def generate_finance_mfa_fatigue_scenario():
     # Start scenario 8 days ago
     base_time = datetime.now(timezone.utc) - timedelta(days=8)
     
+    # Initialize alert detonation from env vars
+    alerts_enabled = os.getenv('SCENARIO_ALERTS_ENABLED', 'false').lower() == 'true'
+    uam_config = None
+    
+    if alerts_enabled:
+        uam_ingest_url = os.getenv('UAM_INGEST_URL', '')
+        uam_account_id = os.getenv('UAM_ACCOUNT_ID', '')
+        uam_service_token = os.getenv('UAM_SERVICE_TOKEN', '')
+        uam_site_id = os.getenv('UAM_SITE_ID', '')
+        
+        if uam_ingest_url and uam_account_id and uam_service_token:
+            uam_config = {
+                'uam_ingest_url': uam_ingest_url,
+                'uam_account_id': uam_account_id,
+                'uam_service_token': uam_service_token,
+                'uam_site_id': uam_site_id,
+            }
+            print("\n🚨 ALERT DETONATION ENABLED")
+            print(f"   UAM Ingest: {uam_ingest_url}")
+            print(f"   Account ID: {uam_account_id}")
+            if uam_site_id:
+                print(f"   Site ID: {uam_site_id}")
+            print("=" * 80)
+        else:
+            print("⚠️  SCENARIO_ALERTS_ENABLED=true but UAM credentials missing")
+            alerts_enabled = False
+    
     all_events = []
     
     # Phase 1: Normal Behavior Baseline (Days 1-7)
@@ -636,6 +835,22 @@ def generate_finance_mfa_fatigue_scenario():
     detection_events = generate_soar_detections(base_time)
     all_events.extend(detection_events)
     print(f"\nTotal detection/response events: {len(detection_events)}")
+    
+    # Send UAM alerts for each detection phase
+    if alerts_enabled and uam_config:
+        # Detection time = Day 8, 8:15 PM (same as SOAR detections)
+        detection_time = base_time + timedelta(days=7, hours=20, minutes=15)
+        print(f"\n🔔 SENDING UAM ALERTS")
+        alert_phases = [
+            ("mfa_fatigue", "MFA Fatigue Attack"),
+            ("impossible_traveler", "Impossible Traveler"),
+            ("ueba_irregular_login", "UEBA Irregular Login"),
+            ("data_exfiltration", "Data Exfiltration"),
+        ]
+        for alert_key, alert_desc in alert_phases:
+            print(f"   📤 {alert_desc}...", end=" ")
+            success = send_phase_alert(alert_key, detection_time, uam_config)
+            print(f"{'✓' if success else '✗'}")
     
     # Sort all events by timestamp
     all_events.sort(key=lambda x: x['timestamp'])

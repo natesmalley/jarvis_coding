@@ -87,9 +87,33 @@
                         }
                     },
                     {
+                        "copy": {
+                            "from": "unmapped.TimeStamp",
+                            "to": "metadata.original_time"
+                        }
+                    },
+                    {
+                        "copy": {
+                            "from": "unmapped.UserId",
+                            "to": "user.email_addr"
+                        }
+                    },
+                    {
+                        "copy": {
+                            "from": "unmapped.UserId",
+                            "to": "user.uid"
+                        }
+                    },
+                    {
                         "rename": {
                             "from": "unmapped.UserId",
                             "to": "actor.user.email_addr"
+                        }
+                    },
+                    {
+                        "copy": {
+                            "from": "unmapped.Operation",
+                            "to": "status_detail"
                         }
                     },
                     {
@@ -105,9 +129,21 @@
                         }
                     },
                     {
+                        "copy": {
+                            "from": "unmapped.ObjectId",
+                            "to": "process.file.path"
+                        }
+                    },
+                    {
                         "rename": {
                             "from": "unmapped.ObjectId",
                             "to": "file.path"
+                        }
+                    },
+                    {
+                        "copy": {
+                            "from": "unmapped.FileName",
+                            "to": "process.file.name"
                         }
                     },
                     {
@@ -117,7 +153,31 @@
                         }
                     },
                     {
+                        "copy": {
+                            "from": "unmapped.FileSize",
+                            "to": "process.file.size"
+                        }
+                    },
+                    {
                         "rename": {
+                            "from": "unmapped.FileSize",
+                            "to": "file.size"
+                        }
+                    },
+                    {
+                        "rename": {
+                            "from": "unmapped.EventType",
+                            "to": "event.type"
+                        }
+                    },
+                    {
+                        "copy": {
+                            "from": "unmapped.TargetUser",
+                            "to": "unmapped.target_user"
+                        }
+                    },
+                    {
+                        "copy": {
                             "from": "unmapped.TargetUser",
                             "to": "user.email_addr"
                         }
