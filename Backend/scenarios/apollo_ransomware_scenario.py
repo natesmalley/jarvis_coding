@@ -152,25 +152,60 @@ ALERT_PHASE_MAPPING = {
     "📬 PHASE 2: Email Interaction": {
         "template": "proofpoint_email_alert",
         "offset_minutes": 2,  # 2 min after delivery (user clicks link)
+        "target_machine": "email",
         "overrides": {
-            "finding_info.title": "Malicious Email Link Clicked",
+            "finding_info.title": "HELIOS - Malicious Email Link Clicked",
             "finding_info.desc": f"User {VICTIM_PROFILE['email']} clicked malicious link in phishing email from {ATTACKER_PROFILE['sender_email']}"
         }
     },
     "📤 PHASE 4: Data Exfiltration": {
         "template": "sharepoint_data_exfil_alert",
         "offset_minutes": 25,  # After last document download (base+24:30)
+        "target_machine": "email",
         "overrides": {
-            "finding_info.title": "Data Exfiltration from SharePoint",
+            "finding_info.title": "HELIOS - Data Exfiltration from SharePoint",
             "finding_info.desc": f"User {VICTIM_PROFILE['email']} downloaded sensitive documents including Personnel Records and Command Codes"
         }
     },
     "rdp_download": {
         "template": "o365_rdp_sharepoint_access",
         "offset_minutes": 35,  # After RDP file download event (base+25)
+        "target_machine": "email",
         "overrides": {
-            "finding_info.title": "OneDrive RDP Files Downloaded",
+            "finding_info.title": "HELIOS - OneDrive RDP Files Downloaded",
             "finding_info.desc": f"User {VICTIM_PROFILE['email']} downloaded RDP files from SharePoint - potential lateral movement preparation"
+        }
+    },
+    "wel_hidden_schtask_bridge": {
+        "template": "wel_hidden_scheduled_task",
+        "offset_minutes": 8,  # After PowerShell spawns and creates persistence task on bridge
+        "target_machine": "bridge",
+        "overrides": {
+            "finding_info.desc": f"Hidden scheduled task 'WindowsUpdate' created on {VICTIM_PROFILE['machine_bridge']} by {VICTIM_PROFILE['domain']}\\{VICTIM_PROFILE['username']} to execute {ATTACKER_PROFILE['malware_name']}. This persistence mechanism allows the attacker to maintain access even after system reboots."
+        }
+    },
+    "wel_hidden_schtask_enterprise": {
+        "template": "wel_hidden_scheduled_task",
+        "offset_minutes": 40,  # After lateral movement to Enterprise
+        "target_machine": "enterprise",
+        "overrides": {
+            "finding_info.desc": f"Hidden scheduled task created on {VICTIM_PROFILE['machine_enterprise']} Domain Controller by {VICTIM_PROFILE['domain']}\\{VICTIM_PROFILE['username']} to execute {ATTACKER_PROFILE['malware_name']}. Lateral movement persistence established on critical infrastructure."
+        }
+    },
+    "wel_brute_force_enterprise": {
+        "template": "wel_brute_force_success",
+        "offset_minutes": 30,  # After credential dump and brute force attempts
+        "target_machine": "enterprise",
+        "overrides": {
+            "finding_info.desc": f"Successful brute force attack detected on {VICTIM_PROFILE['machine_enterprise']}. Multiple failed logon attempts from {VICTIM_PROFILE['machine_bridge']} ({VICTIM_PROFILE['client_ip']}) followed by successful authentication using stolen credentials from Mimikatz dump."
+        }
+    },
+    "wel_ad_admin_group_enterprise": {
+        "template": "wel_ad_global_admin_group",
+        "offset_minutes": 45,  # After gaining access to Enterprise DC
+        "target_machine": "enterprise",
+        "overrides": {
+            "finding_info.desc": f"Security-enabled global admin group created on {VICTIM_PROFILE['machine_enterprise']} Domain Controller by {VICTIM_PROFILE['domain']}\\{VICTIM_PROFILE['username']}. This may indicate privilege escalation after lateral movement from {VICTIM_PROFILE['machine_bridge']}."
         }
     }
 }
@@ -254,13 +289,18 @@ def create_event(timestamp: str, source: str, phase: str, event_data: dict) -> D
 
 def load_alert_template(template_id: str) -> Optional[Dict]:
     """Load an alert template JSON from the templates directory"""
-    templates_dir = os.path.join(backend_dir, 'api', 'app', 'alerts', 'templates')
-    template_path = os.path.join(templates_dir, f"{template_id}.json")
-    if not os.path.exists(template_path):
-        print(f"   ⚠️  Template not found: {template_path}")
-        return None
-    with open(template_path, 'r') as f:
-        return json.load(f)
+    # Try multiple paths: local dev layout and Docker container layout
+    candidate_dirs = [
+        os.path.join(backend_dir, 'api', 'app', 'alerts', 'templates'),  # local dev
+        os.path.join(backend_dir, 'app', 'alerts', 'templates'),          # Docker (/app/app/alerts/templates)
+    ]
+    for templates_dir in candidate_dirs:
+        template_path = os.path.join(templates_dir, f"{template_id}.json")
+        if os.path.exists(template_path):
+            with open(template_path, 'r') as f:
+                return json.load(f)
+    print(f"   ⚠️  Template not found: {template_id}.json (searched {candidate_dirs})")
+    return None
 
 
 def send_phase_alert(
@@ -301,19 +341,32 @@ def send_phase_alert(
     alert["metadata"]["logged_time"] = time_ms
     alert["metadata"]["modified_time"] = time_ms
     
-    # Set resource - use XDR Asset ID if available for linking to real endpoint
-    xdr_asset_id = uam_config.get('xdr_asset_id')
-    if xdr_asset_id:
-        resource_name = uam_config.get('xdr_asset_name', VICTIM_PROFILE["email"])
+    # Set resource - use XDR Asset ID for endpoint alerts, shared GUID for email/user alerts
+    target_machine = mapping.get("target_machine", "bridge")
+    if target_machine == "email":
+        # Proofpoint/M365 alerts link to the user email with a consistent GUID
+        email_asset_uid = uam_config.get('email_asset_uid')
+        if not email_asset_uid:
+            email_asset_uid = str(uuid.uuid5(uuid.NAMESPACE_DNS, VICTIM_PROFILE["email"]))
+            uam_config['email_asset_uid'] = email_asset_uid
         alert["resources"] = [{
-            "uid": xdr_asset_id,
-            "name": resource_name
-        }]
-    else:
-        alert["resources"] = [{
-            "uid": str(uuid.uuid4()),
+            "uid": email_asset_uid,
             "name": VICTIM_PROFILE["email"]
         }]
+    elif target_machine == "enterprise":
+        xdr_asset_id = uam_config.get('xdr_asset_id_enterprise')
+        xdr_asset_name = uam_config.get('xdr_asset_name_enterprise', VICTIM_PROFILE["machine_enterprise"])
+        if xdr_asset_id:
+            alert["resources"] = [{"uid": xdr_asset_id, "name": xdr_asset_name}]
+        else:
+            alert["resources"] = [{"uid": str(uuid.uuid4()), "name": VICTIM_PROFILE["machine_enterprise"]}]
+    else:
+        xdr_asset_id = uam_config.get('xdr_asset_id_bridge')
+        xdr_asset_name = uam_config.get('xdr_asset_name_bridge', VICTIM_PROFILE["machine_bridge"])
+        if xdr_asset_id:
+            alert["resources"] = [{"uid": xdr_asset_id, "name": xdr_asset_name}]
+        else:
+            alert["resources"] = [{"uid": str(uuid.uuid4()), "name": VICTIM_PROFILE["machine_bridge"]}]
     
     # Apply overrides
     overrides = mapping.get("overrides", {})
@@ -682,16 +735,16 @@ def generate_apollo_ransomware_scenario(siem_context: Optional[Dict] = None) -> 
                 'uam_site_id': uam_site_id,
             }
             
-            # Look up bridge XDR Asset ID for linking alerts to real endpoint
+            # Look up Bridge and Enterprise XDR Asset IDs for linking alerts to real endpoints
             s1_mgmt_url = os.getenv('S1_MANAGEMENT_URL', '')
             s1_api_token = os.getenv('S1_API_TOKEN', '')
             if s1_mgmt_url and s1_api_token:
                 bridge_name = VICTIM_PROFILE['machine_bridge']
-                print(f"\n🔍 Looking up XDR asset '{bridge_name}' for alert linking...")
+                enterprise_name = VICTIM_PROFILE['machine_enterprise']
+                print(f"\n🔍 Looking up XDR assets for alert linking...")
                 try:
                     import urllib.request
                     import urllib.parse
-                    # Use XDR assets endpoint — returns the Asset ID needed for resource UID linking
                     params = {"accountIds": uam_account_id}
                     if uam_site_id:
                         params["siteIds"] = uam_site_id
@@ -703,22 +756,27 @@ def generate_apollo_ransomware_scenario(siem_context: Optional[Dict] = None) -> 
                     with urllib.request.urlopen(req, timeout=15) as resp:
                         assets_data = json.loads(resp.read().decode())
                         assets = assets_data.get("data", [])
-                        # Find the real agent asset (has 'agent' field), matching by name
+                        # Find real agent assets (have 'agent' field) for both machines
                         for asset in assets:
-                            if asset.get("name", "").lower() == bridge_name.lower() and asset.get("agent"):
-                                asset_id = asset.get("id", "")
-                                agent_name = asset.get("name", "")
-                                agent_uuid = asset.get("agent", {}).get("uuid", "")
-                                print(f"   ✓ XDR Asset found: {agent_name}")
-                                print(f"     Asset ID: {asset_id}")
-                                print(f"     Agent UUID: {agent_uuid}")
-                                print(f"     Category: {asset.get('category')}")
-                                uam_config['xdr_asset_id'] = asset_id
-                                uam_config['xdr_asset_name'] = agent_name
-                                break
-                        else:
+                            if not asset.get("agent"):
+                                continue
+                            name = asset.get("name", "").lower()
+                            asset_id = asset.get("id", "")
+                            agent_uuid = asset.get("agent", {}).get("uuid", "")
+                            if name == bridge_name.lower():
+                                print(f"   ✓ Bridge asset: {asset.get('name')} → {asset_id}")
+                                uam_config['xdr_asset_id_bridge'] = asset_id
+                                uam_config['xdr_asset_name_bridge'] = asset.get("name", "")
+                            elif name == enterprise_name.lower():
+                                print(f"   ✓ Enterprise asset: {asset.get('name')} → {asset_id}")
+                                uam_config['xdr_asset_id_enterprise'] = asset_id
+                                uam_config['xdr_asset_name_enterprise'] = asset.get("name", "")
+                        
+                        if not uam_config.get('xdr_asset_id_bridge'):
                             print(f"   ⚠ No XDR agent asset found for '{bridge_name}'")
-                            print(f"     Found {len(assets)} total assets")
+                        if not uam_config.get('xdr_asset_id_enterprise'):
+                            print(f"   ⚠ No XDR agent asset found for '{enterprise_name}'")
+                        print(f"     Scanned {len(assets)} total assets")
                 except Exception as e:
                     print(f"   ⚠ XDR asset lookup failed: {e}")
             
@@ -774,6 +832,20 @@ def generate_apollo_ransomware_scenario(siem_context: Optional[Dict] = None) -> 
         if alerts_enabled and phase_name == "📤 PHASE 4: Data Exfiltration":
             print(f"   📤 Sending RDP download alert...", end=" ")
             success = send_phase_alert("rdp_download", phase_base_time, uam_config)
+            print(f"{'✓' if success else '✗'}")
+    
+    # Send standalone WEL alerts (not tied to a specific event generation phase)
+    if alerts_enabled:
+        print(f"\n🔔 SENDING WEL ALERTS")
+        wel_alerts = [
+            ("wel_hidden_schtask_bridge", "Hidden Scheduled Task → Bridge"),
+            ("wel_hidden_schtask_enterprise", "Hidden Scheduled Task → Enterprise"),
+            ("wel_brute_force_enterprise", "Brute Force Success → Enterprise"),
+            ("wel_ad_admin_group_enterprise", "AD Global Admin Group → Enterprise"),
+        ]
+        for alert_key, alert_desc in wel_alerts:
+            print(f"   📤 {alert_desc}...", end=" ")
+            success = send_phase_alert(alert_key, base_time, uam_config)
             print(f"{'✓' if success else '✗'}")
     
     all_events.sort(key=lambda x: x["timestamp"])
