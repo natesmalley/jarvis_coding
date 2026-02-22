@@ -307,6 +307,10 @@
                 <div class="nav-tab-icon">🚨</div>
                 <div class="nav-tab-label">Alerts</div>
             </button>
+            <button type="button" data-target="ti-section" class="nav-tab">
+                <div class="nav-tab-icon">🛡️</div>
+                <div class="nav-tab-label">TI</div>
+            </button>
             <button type="button" data-target="settings-section" class="nav-tab">
                 <div class="nav-tab-icon">⚙️</div>
                 <div class="nav-tab-label">Settings</div>
@@ -968,6 +972,255 @@
         </div>
     </div>
 
+    <!-- THREAT INTELLIGENCE SECTION -->
+    <div id="ti-section" class="grid grid-cols-1 lg:grid-cols-12 gap-6" style="display:none;">
+        <!-- LEFT: IOC Type & Quick Config -->
+        <div class="lg:col-span-3">
+            <div class="flow-panel space-y-4">
+                <span class="flow-label">① IOC Type</span>
+                <div class="input-group">
+                    <label for="ti-ioc-type" class="text-sm font-semibold text-[#c8b3e8]">Type</label>
+                    <select id="ti-ioc-type" required>
+                        <option value="DNS">DNS</option>
+                        <option value="IPV4">IPV4</option>
+                        <option value="IPV6">IPV6</option>
+                        <option value="URL">URL</option>
+                        <option value="SHA256">SHA256</option>
+                        <option value="SHA1">SHA1</option>
+                        <option value="MD5">MD5</option>
+                        <option value="Domain">Domain</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label for="ti-ioc-method" class="text-sm font-semibold text-[#c8b3e8]">Method</label>
+                    <select id="ti-ioc-method">
+                        <option value="EQUALS" selected>EQUALS</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label for="ti-ioc-value" class="text-sm font-semibold text-[#c8b3e8]">IOC Value</label>
+                    <input type="text" id="ti-ioc-value" placeholder="e.g. 1.2.3.4 or evil.com" required>
+                </div>
+
+                <div class="p-2 bg-[#241d3a] rounded-lg border border-[#3c325c]">
+                    <p class="text-xs text-[#8b7a9f]">
+                        <span class="text-[#a78bfa]">ⓘ</span> IOCs are sent to the S1 private TI repository via the <strong class="text-[#c8b3e8]">Management API</strong>. They match against incoming OCSF XDR data for third-party detection.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- MIDDLE: IOC Details & Output -->
+        <div class="lg:col-span-6">
+            <div class="flow-panel space-y-6">
+                <span class="flow-label">② IOC Details</span>
+
+                <form id="ti-form" class="space-y-6">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="input-group">
+                            <label for="ti-source" class="text-sm font-semibold text-[#c8b3e8]">Source</label>
+                            <input type="text" id="ti-source" value="HELIOS" placeholder="Source name">
+                        </div>
+                        <div class="input-group">
+                            <label for="ti-creator" class="text-sm font-semibold text-[#c8b3e8]">Creator</label>
+                            <input type="text" id="ti-creator" value="HELIOS" placeholder="Creator name">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="input-group">
+                            <label for="ti-name" class="text-sm font-semibold text-[#c8b3e8]">Name (Optional)</label>
+                            <input type="text" id="ti-name" placeholder="IOC display name">
+                        </div>
+                        <div class="input-group">
+                            <label for="ti-severity" class="text-sm font-semibold text-[#c8b3e8]">Severity (0-100)</label>
+                            <input type="number" id="ti-severity" min="0" max="100" placeholder="e.g. 80">
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="ti-description" class="text-sm font-semibold text-[#c8b3e8]">Description (Optional)</label>
+                        <input type="text" id="ti-description" placeholder="IOC description">
+                    </div>
+
+                    <details class="bg-[#241d3a] rounded-lg p-3 border border-[#3c325c]">
+                        <summary class="cursor-pointer text-sm font-semibold text-[#c8b3e8]">Advanced Fields (Optional)</summary>
+                        <div class="mt-3 space-y-3 text-sm">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="input-group">
+                                    <label for="ti-external-id" class="text-sm font-semibold text-[#c8b3e8]">External ID</label>
+                                    <input type="text" id="ti-external-id" placeholder="External reference ID">
+                                </div>
+                                <div class="input-group">
+                                    <label for="ti-risk-score" class="text-sm font-semibold text-[#c8b3e8]">Original Risk Score</label>
+                                    <input type="number" id="ti-risk-score" placeholder="e.g. 90">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="input-group">
+                                    <label for="ti-valid-until" class="text-sm font-semibold text-[#c8b3e8]">Valid Until</label>
+                                    <input type="datetime-local" id="ti-valid-until">
+                                    <p class="text-xs text-[#8b7a9f] mt-1">Default: 90 days from now</p>
+                                </div>
+                                <div class="input-group">
+                                    <label for="ti-pattern-type" class="text-sm font-semibold text-[#c8b3e8]">Pattern Type</label>
+                                    <select id="ti-pattern-type">
+                                        <option value="">None</option>
+                                        <option value="STIX">STIX</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label for="ti-pattern" class="text-sm font-semibold text-[#c8b3e8]">Pattern</label>
+                                <input type="text" id="ti-pattern" placeholder="Detection pattern">
+                            </div>
+                            <div class="input-group">
+                                <label for="ti-metadata" class="text-sm font-semibold text-[#c8b3e8]">Metadata</label>
+                                <input type="text" id="ti-metadata" placeholder="Additional metadata">
+                            </div>
+                            <div class="input-group">
+                                <label for="ti-reference" class="text-sm font-semibold text-[#c8b3e8]">References (comma-separated)</label>
+                                <input type="text" id="ti-reference" placeholder="https://ref1.com, https://ref2.com">
+                            </div>
+                            <div class="input-group">
+                                <label for="ti-labels" class="text-sm font-semibold text-[#c8b3e8]">Labels (comma-separated)</label>
+                                <input type="text" id="ti-labels" placeholder="malicious, phishing">
+                            </div>
+                            <div class="input-group">
+                                <label for="ti-category" class="text-sm font-semibold text-[#c8b3e8]">Categories (comma-separated)</label>
+                                <input type="text" id="ti-category" placeholder="malware, c2">
+                            </div>
+                            <div class="input-group">
+                                <label for="ti-malware-names" class="text-sm font-semibold text-[#c8b3e8]">Malware Names (comma-separated)</label>
+                                <input type="text" id="ti-malware-names" placeholder="Emotet, TrickBot">
+                            </div>
+                            <div class="input-group">
+                                <label for="ti-threat-actors" class="text-sm font-semibold text-[#c8b3e8]">Threat Actors (comma-separated)</label>
+                                <input type="text" id="ti-threat-actors" placeholder="APT29, Lazarus">
+                            </div>
+                            <div class="input-group">
+                                <label for="ti-threat-actor-types" class="text-sm font-semibold text-[#c8b3e8]">Threat Actor Types</label>
+                                <select id="ti-threat-actor-types" multiple style="min-height:80px;">
+                                    <option value="Nation-state">Nation-state</option>
+                                    <option value="Criminal">Criminal</option>
+                                    <option value="Hacktivist">Hacktivist</option>
+                                    <option value="Insider">Insider</option>
+                                    <option value="APT">APT</option>
+                                    <option value="Script kiddies">Script kiddies</option>
+                                </select>
+                                <p class="text-xs text-[#8b7a9f] mt-1">Hold Ctrl/Cmd to select multiple</p>
+                            </div>
+                            <div class="input-group">
+                                <label for="ti-intrusion-sets" class="text-sm font-semibold text-[#c8b3e8]">Intrusion Sets (comma-separated)</label>
+                                <input type="text" id="ti-intrusion-sets" placeholder="APT29, Cozy Bear">
+                            </div>
+                            <div class="input-group">
+                                <label for="ti-campaign-names" class="text-sm font-semibold text-[#c8b3e8]">Campaign Names (comma-separated)</label>
+                                <input type="text" id="ti-campaign-names" placeholder="SolarWinds, Operation Aurora">
+                            </div>
+                            <div class="input-group">
+                                <label for="ti-mitre-tactic" class="text-sm font-semibold text-[#c8b3e8]">MITRE Tactics (comma-separated)</label>
+                                <input type="text" id="ti-mitre-tactic" placeholder="TA0001, TA0002">
+                            </div>
+                        </div>
+                    </details>
+
+                    <details class="bg-[#241d3a] rounded-lg p-3 border border-[#3c325c]">
+                        <summary class="cursor-pointer text-sm font-semibold text-[#c8b3e8]">Custom IOC JSON (Advanced)</summary>
+                        <div class="mt-3 space-y-3 text-sm">
+                            <p class="text-xs text-[#b8a0d2]">Paste raw IOC JSON array to send directly. This bypasses the form fields above.</p>
+                            <textarea id="ti-custom-json" rows="10" class="w-full bg-[#3c325c] text-[#f3e8ff] border-none rounded-lg p-3 font-mono text-xs" placeholder='[{"type":"IPV4","value":"1.2.3.4","method":"EQUALS","source":"HELIOS","creator":"HELIOS"}]'></textarea>
+                        </div>
+                    </details>
+
+                    <div class="flex gap-3">
+                        <button type="submit" id="ti-send-btn" class="btn flex-1">
+                            Send IOC
+                        </button>
+                        <button type="button" id="ti-send-custom-btn" class="btn" style="width:auto; padding:0.6rem 1.2rem; background:#3c325c;">
+                            Send Custom JSON
+                        </button>
+                    </div>
+                </form>
+
+                <div>
+                    <h3 class="text-lg font-bold mb-3 text-[#f3e8ff]">TI Output</h3>
+                    <div id="ti-output-box" style="background-color: #1a1629; border-radius: 0.75rem; padding: 1.5rem; min-height: 200px; max-height: 500px; overflow-y: auto; border: 1px solid #3c325c; font-family: monospace; white-space: pre-wrap; word-wrap: break-word; box-shadow: inset 0 2px 5px rgba(0,0,0,0.3); font-size: 0.875rem; line-height: 1.5;">
+                        <!-- TI output will appear here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Destination -->
+        <div class="lg:col-span-3">
+            <div class="flow-panel space-y-4">
+                <span class="flow-label">③ Destination</span>
+                <div class="input-group">
+                    <label for="ti-destination-select" class="text-sm font-semibold text-[#c8b3e8]">Select Destination</label>
+                    <select id="ti-destination-select" name="ti-destination-select" required>
+                        <option value="" disabled selected>Loading destinations...</option>
+                    </select>
+                </div>
+
+                <div id="ti-dest-info" class="p-3 bg-[#241d3a] rounded-lg border border-[#3c325c] space-y-2" style="display:none;">
+                    <div class="space-y-1 text-xs">
+                        <div><span class="font-semibold text-[#c8b3e8]">Management URL:</span> <span class="text-[#f3e8ff]" id="ti-dest-mgmt-url"></span></div>
+                        <div><span class="font-semibold text-[#c8b3e8]">Account ID:</span> <span class="text-[#f3e8ff]" id="ti-dest-account-id"></span></div>
+                        <div><span class="font-semibold text-[#c8b3e8]">Site ID:</span> <span class="text-[#f3e8ff]" id="ti-dest-site-id"></span></div>
+                        <div><span class="font-semibold text-[#c8b3e8]">S1 API Token:</span> <span class="text-[#f3e8ff]" id="ti-dest-token-status"></span></div>
+                    </div>
+                </div>
+
+                <div id="ti-dest-warning" class="p-3 bg-red-900/20 rounded-lg border border-red-700/50" style="display:none;">
+                    <p class="text-xs text-red-300" id="ti-dest-warning-text"></p>
+                </div>
+
+                <button type="button" id="ti-list-btn" class="btn w-full" style="background:#3c325c;">
+                    List IOCs
+                </button>
+
+                <details class="bg-[#241d3a] rounded-lg p-3 border border-[#3c325c]">
+                    <summary class="cursor-pointer text-sm font-semibold text-[#c8b3e8]">List Filters</summary>
+                    <div class="mt-3 space-y-2 text-sm">
+                        <div class="input-group">
+                            <label for="ti-list-type" class="text-xs font-semibold text-[#c8b3e8]">Type</label>
+                            <select id="ti-list-type">
+                                <option value="">All Types</option>
+                                <option value="DNS">DNS</option>
+                                <option value="IPV4">IPV4</option>
+                                <option value="IPV6">IPV6</option>
+                                <option value="URL">URL</option>
+                                <option value="SHA256">SHA256</option>
+                                <option value="SHA1">SHA1</option>
+                                <option value="MD5">MD5</option>
+                                <option value="Domain">Domain</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="ti-list-value" class="text-xs font-semibold text-[#c8b3e8]">Value (contains)</label>
+                            <input type="text" id="ti-list-value" placeholder="e.g. 1.2.3">
+                        </div>
+                        <div class="input-group">
+                            <label for="ti-list-source" class="text-xs font-semibold text-[#c8b3e8]">Source (contains)</label>
+                            <input type="text" id="ti-list-source" placeholder="e.g. HELIOS">
+                        </div>
+                        <div class="input-group">
+                            <label for="ti-list-limit" class="text-xs font-semibold text-[#c8b3e8]">Limit</label>
+                            <input type="number" id="ti-list-limit" value="25" min="1" max="1000">
+                        </div>
+                    </div>
+                </details>
+
+                <div class="p-2 bg-[#241d3a] rounded-lg border border-[#3c325c]">
+                    <p class="text-xs text-[#8b7a9f]">
+                        <span class="text-[#a78bfa]">ⓘ</span> TI uses the <strong class="text-[#c8b3e8]">S1 Management API</strong> (ApiToken auth). Configure S1 Management URL &amp; API Token in <strong class="text-[#c8b3e8]">Settings → Edit Destination</strong>.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
             <div id="settings-section" class="card space-y-4" style="display:none;">
                 <h2 class="text-2xl font-bold text-[#f3e8ff]">Settings</h2>
                 <div class="flex flex-wrap gap-2">
@@ -1342,6 +1595,7 @@
             'upload-section': document.getElementById('upload-section'),
             'correlation-section': document.getElementById('correlation-section'),
             'alerts-section': document.getElementById('alerts-section'),
+            'ti-section': document.getElementById('ti-section'),
             'settings-section': document.getElementById('settings-section')
         };
         
@@ -3634,6 +3888,405 @@
         // Initialize alert templates and destinations
         fetchAlertTemplates();
         refreshAlertDestinations();
+
+        // =============================================================================
+        // THREAT INTELLIGENCE (S1 Management API)
+        // =============================================================================
+
+        const tiForm = document.getElementById('ti-form');
+        const tiSendBtn = document.getElementById('ti-send-btn');
+        const tiSendCustomBtn = document.getElementById('ti-send-custom-btn');
+        const tiOutputBox = document.getElementById('ti-output-box');
+        const tiDestSelect = document.getElementById('ti-destination-select');
+        const tiDestInfo = document.getElementById('ti-dest-info');
+        const tiDestWarning = document.getElementById('ti-dest-warning');
+
+        let tiDestinations = [];
+
+        // Helper: parse comma-separated string into array (or null if empty)
+        function parseCSV(val) {
+            if (!val || !val.trim()) return null;
+            return val.split(',').map(s => s.trim()).filter(s => s.length > 0);
+        }
+
+        // Populate TI destination selector
+        async function refreshTiDestinations() {
+            try {
+                const res = await fetch('/destinations');
+                const data = await res.json();
+                const allDests = data.destinations || [];
+                tiDestinations = allDests.filter(d => d.type === 'hec');
+
+                tiDestSelect.innerHTML = '';
+                if (tiDestinations.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.value = '';
+                    opt.textContent = 'No HEC destinations configured';
+                    opt.disabled = true;
+                    opt.selected = true;
+                    tiDestSelect.appendChild(opt);
+                } else {
+                    const placeholder = document.createElement('option');
+                    placeholder.value = '';
+                    placeholder.textContent = 'Select a destination...';
+                    placeholder.disabled = true;
+                    placeholder.selected = true;
+                    tiDestSelect.appendChild(placeholder);
+
+                    tiDestinations.forEach(d => {
+                        const opt = document.createElement('option');
+                        opt.value = d.id;
+                        const s1Status = d.has_s1_api_token ? '✓ S1 API' : '⚠ No S1 API';
+                        opt.textContent = `${d.name} [${s1Status}]`;
+                        tiDestSelect.appendChild(opt);
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to fetch destinations for TI:', err);
+                tiDestSelect.innerHTML = '<option disabled selected>Error loading destinations</option>';
+            }
+        }
+
+        // Handle TI destination selection
+        tiDestSelect.addEventListener('change', () => {
+            const destId = tiDestSelect.value;
+            const dest = tiDestinations.find(d => d.id === destId);
+            if (!dest) {
+                tiDestInfo.style.display = 'none';
+                tiDestWarning.style.display = 'none';
+                return;
+            }
+
+            document.getElementById('ti-dest-mgmt-url').textContent = dest.s1_management_url || '—';
+            document.getElementById('ti-dest-account-id').textContent = dest.uam_account_id || '—';
+            document.getElementById('ti-dest-site-id').textContent = dest.uam_site_id || '(none)';
+            document.getElementById('ti-dest-token-status').textContent = dest.has_s1_api_token ? '✓ Configured' : '✗ Not set';
+
+            tiDestInfo.style.display = '';
+
+            if (!dest.has_s1_api_token || !dest.s1_management_url) {
+                const missing = [];
+                if (!dest.s1_management_url) missing.push('S1 Management URL');
+                if (!dest.has_s1_api_token) missing.push('S1 API Token');
+                document.getElementById('ti-dest-warning-text').textContent =
+                    `Missing: ${missing.join(', ')}. Go to Settings → Edit Destination to configure.`;
+                tiDestWarning.style.display = '';
+            } else {
+                tiDestWarning.style.display = 'none';
+            }
+        });
+
+        // IOC type/value validation
+        function validateIocValue(type, value) {
+            const ipv4Re = /^(\d{1,3}\.){3}\d{1,3}$/;
+            const ipv6Re = /^[0-9a-fA-F:]+$/;
+            const md5Re = /^[0-9a-fA-F]{32}$/;
+            const sha1Re = /^[0-9a-fA-F]{40}$/;
+            const sha256Re = /^[0-9a-fA-F]{64}$/;
+            const urlRe = /^https?:\/\//i;
+            switch (type) {
+                case 'IPV4':
+                    if (!ipv4Re.test(value)) return `Value "${value}" doesn't look like an IPv4 address (e.g. 1.2.3.4)`;
+                    break;
+                case 'IPV6':
+                    if (!ipv6Re.test(value) || !value.includes(':')) return `Value "${value}" doesn't look like an IPv6 address`;
+                    break;
+                case 'MD5':
+                    if (!md5Re.test(value)) return `Value "${value}" doesn't look like an MD5 hash (32 hex chars)`;
+                    break;
+                case 'SHA1':
+                    if (!sha1Re.test(value)) return `Value "${value}" doesn't look like a SHA1 hash (40 hex chars)`;
+                    break;
+                case 'SHA256':
+                    if (!sha256Re.test(value)) return `Value "${value}" doesn't look like a SHA256 hash (64 hex chars)`;
+                    break;
+                case 'URL':
+                    if (!urlRe.test(value)) return `Value "${value}" doesn't look like a URL (must start with http:// or https://)`;
+                    break;
+                case 'DNS':
+                case 'Domain':
+                    if (ipv4Re.test(value)) return `Value "${value}" is an IP address — use IPV4 type instead of ${type}`;
+                    if (!value.includes('.')) return `Value "${value}" doesn't look like a domain name`;
+                    break;
+            }
+            return null;
+        }
+
+        // Send structured IOC from form
+        tiForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const destId = tiDestSelect.value;
+            if (!destId) { alert('Please select a destination'); return; }
+
+            const iocType = document.getElementById('ti-ioc-type').value;
+            const iocValue = document.getElementById('ti-ioc-value').value.trim();
+            if (!iocValue) { alert('Please enter an IOC value'); return; }
+
+            const valErr = validateIocValue(iocType, iocValue);
+            if (valErr) { alert('Type mismatch: ' + valErr); return; }
+
+            const ioc = {
+                type: iocType,
+                value: iocValue,
+                method: document.getElementById('ti-ioc-method').value,
+                source: document.getElementById('ti-source').value.trim() || 'HELIOS',
+                creator: document.getElementById('ti-creator').value.trim() || 'HELIOS',
+            };
+
+            // Optional fields
+            const name = document.getElementById('ti-name').value.trim();
+            if (name) ioc.name = name;
+
+            const description = document.getElementById('ti-description').value.trim();
+            if (description) ioc.description = description;
+
+            const severity = document.getElementById('ti-severity').value;
+            if (severity !== '') ioc.severity = parseInt(severity, 10);
+
+            const externalId = document.getElementById('ti-external-id').value.trim();
+            if (externalId) ioc.external_id = externalId;
+
+            const riskScore = document.getElementById('ti-risk-score').value;
+            if (riskScore !== '') ioc.original_risk_score = parseInt(riskScore, 10);
+
+            const validUntil = document.getElementById('ti-valid-until').value;
+            if (validUntil) ioc.valid_until = new Date(validUntil).toISOString();
+
+            const patternType = document.getElementById('ti-pattern-type').value;
+            if (patternType) ioc.pattern_type = patternType;
+
+            const pattern = document.getElementById('ti-pattern').value.trim();
+            if (pattern) ioc.pattern = pattern;
+
+            const metadata = document.getElementById('ti-metadata').value.trim();
+            if (metadata) ioc.metadata = metadata;
+
+            const reference = parseCSV(document.getElementById('ti-reference').value);
+            if (reference) ioc.reference = reference;
+
+            const labels = parseCSV(document.getElementById('ti-labels').value);
+            if (labels) ioc.labels = labels;
+
+            const category = parseCSV(document.getElementById('ti-category').value);
+            if (category) ioc.category = category;
+
+            const malwareNames = parseCSV(document.getElementById('ti-malware-names').value);
+            if (malwareNames) ioc.malware_names = malwareNames;
+
+            const threatActors = parseCSV(document.getElementById('ti-threat-actors').value);
+            if (threatActors) ioc.threat_actors = threatActors;
+
+            const threatActorTypesEl = document.getElementById('ti-threat-actor-types');
+            const selectedTypes = Array.from(threatActorTypesEl.selectedOptions).map(o => o.value);
+            if (selectedTypes.length > 0) ioc.threat_actor_types = selectedTypes;
+
+            const intrusionSets = parseCSV(document.getElementById('ti-intrusion-sets').value);
+            if (intrusionSets) ioc.intrusion_sets = intrusionSets;
+
+            const campaignNames = parseCSV(document.getElementById('ti-campaign-names').value);
+            if (campaignNames) ioc.campaign_names = campaignNames;
+
+            const mitreTactic = parseCSV(document.getElementById('ti-mitre-tactic').value);
+            if (mitreTactic) ioc.mitre_tactic = mitreTactic;
+
+            tiSendBtn.disabled = true;
+            tiSendBtn.innerText = 'Sending...';
+
+            const destName = tiDestinations.find(d => d.id === destId)?.name || destId;
+            tiOutputBox.innerText = `━━━ Threat Intelligence IOC Send ━━━\n`;
+            tiOutputBox.innerText += `Destination:     ${destName}\n`;
+            tiOutputBox.innerText += `IOC Type:        ${iocType}\n`;
+            tiOutputBox.innerText += `IOC Value:       ${iocValue}\n`;
+            tiOutputBox.innerText += `Source:          ${ioc.source}\n`;
+            tiOutputBox.innerText += `\nSending IOC to S1 TI repository...\n\n`;
+
+            try {
+                const res = await fetch('/threat-intel/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        destination_id: destId,
+                        iocs: [ioc]
+                    })
+                });
+
+                const data = await res.json();
+
+                if (data.error) {
+                    tiOutputBox.innerText += `❌ Error: ${data.error}\n`;
+                    if (data.detail) tiOutputBox.innerText += `Detail: ${data.detail}\n`;
+                } else if (data.success) {
+                    tiOutputBox.innerText += `✅ IOC sent successfully! Status: ${data.status}\n`;
+                    tiOutputBox.innerText += `IOCs sent: ${data.ioc_count || 1}\n`;
+                    if (data.data && Object.keys(data.data).length > 0) {
+                        tiOutputBox.innerText += `\nResponse:\n${JSON.stringify(data.data, null, 2)}\n`;
+                    }
+                } else {
+                    tiOutputBox.innerText += `❌ Failed: ${data.error || 'Unknown error'}\n`;
+                    if (data.detail) tiOutputBox.innerText += `Detail: ${data.detail}\n`;
+                }
+            } catch (err) {
+                console.error('TI send error:', err);
+                tiOutputBox.innerText += `\n❌ ${err.message}\n`;
+            } finally {
+                tiSendBtn.disabled = false;
+                tiSendBtn.innerText = 'Send IOC';
+            }
+        });
+
+        // Send custom IOC JSON
+        tiSendCustomBtn.addEventListener('click', async () => {
+            const customJsonText = document.getElementById('ti-custom-json').value.trim();
+            const destId = tiDestSelect.value;
+
+            if (!customJsonText) { alert('Please paste IOC JSON in the Custom IOC JSON section'); return; }
+            if (!destId) { alert('Please select a destination'); return; }
+
+            let iocsJson;
+            try {
+                iocsJson = JSON.parse(customJsonText);
+                if (!Array.isArray(iocsJson)) iocsJson = [iocsJson];
+            } catch (parseErr) {
+                alert('Invalid JSON: ' + parseErr.message);
+                return;
+            }
+
+            tiSendCustomBtn.disabled = true;
+            tiSendCustomBtn.innerText = 'Sending...';
+
+            const destName = tiDestinations.find(d => d.id === destId)?.name || destId;
+            tiOutputBox.innerText = `━━━ Threat Intelligence Custom JSON Send ━━━\n`;
+            tiOutputBox.innerText += `Destination:     ${destName}\n`;
+            tiOutputBox.innerText += `IOC count:       ${iocsJson.length}\n`;
+            tiOutputBox.innerText += `Payload size:    ${customJsonText.length} chars\n`;
+            tiOutputBox.innerText += `\nSending IOCs to S1 TI repository...\n\n`;
+
+            try {
+                const res = await fetch('/threat-intel/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        destination_id: destId,
+                        iocs_json: iocsJson
+                    })
+                });
+
+                const data = await res.json();
+
+                if (data.error) {
+                    tiOutputBox.innerText += `❌ Error: ${data.error}\n`;
+                    if (data.detail) tiOutputBox.innerText += `Detail: ${data.detail}\n`;
+                } else if (data.success) {
+                    tiOutputBox.innerText += `✅ IOCs sent successfully! Status: ${data.status}\n`;
+                    tiOutputBox.innerText += `IOCs sent: ${data.ioc_count || iocsJson.length}\n`;
+                    if (data.data && Object.keys(data.data).length > 0) {
+                        tiOutputBox.innerText += `\nResponse:\n${JSON.stringify(data.data, null, 2)}\n`;
+                    }
+                } else {
+                    tiOutputBox.innerText += `❌ Failed: ${data.error || 'Unknown error'}\n`;
+                    if (data.detail) tiOutputBox.innerText += `Detail: ${data.detail}\n`;
+                }
+            } catch (err) {
+                console.error('TI custom send error:', err);
+                tiOutputBox.innerText += `\n❌ ${err.message}\n`;
+            } finally {
+                tiSendCustomBtn.disabled = false;
+                tiSendCustomBtn.innerText = 'Send Custom JSON';
+            }
+        });
+
+        // List IOCs from S1 TI API
+        const tiListBtn = document.getElementById('ti-list-btn');
+        tiListBtn.addEventListener('click', async () => {
+            const destId = tiDestSelect.value;
+            if (!destId) { alert('Please select a destination'); return; }
+
+            tiListBtn.disabled = true;
+            tiListBtn.innerText = 'Loading...';
+
+            const destName = tiDestinations.find(d => d.id === destId)?.name || destId;
+            const filterType = document.getElementById('ti-list-type').value;
+            const filterValue = document.getElementById('ti-list-value').value.trim();
+            const filterSource = document.getElementById('ti-list-source').value.trim();
+            const filterLimit = parseInt(document.getElementById('ti-list-limit').value, 10) || 25;
+
+            tiOutputBox.innerText = `━━━ Threat Intelligence IOC List ━━━\n`;
+            tiOutputBox.innerText += `Destination:     ${destName}\n`;
+            if (filterType) tiOutputBox.innerText += `Filter Type:     ${filterType}\n`;
+            if (filterValue) tiOutputBox.innerText += `Filter Value:    ${filterValue}\n`;
+            if (filterSource) tiOutputBox.innerText += `Filter Source:   ${filterSource}\n`;
+            tiOutputBox.innerText += `Limit:           ${filterLimit}\n`;
+            tiOutputBox.innerText += `\nFetching IOCs...\n\n`;
+
+            try {
+                const payload = { destination_id: destId, limit: filterLimit };
+                if (filterType) payload.ioc_type = filterType;
+                if (filterValue) payload.value = filterValue;
+                if (filterSource) payload.source = filterSource;
+
+                const res = await fetch('/threat-intel/list', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+
+                if (data.error) {
+                    tiOutputBox.innerText += `❌ Error: ${data.error}\n`;
+                    if (data.detail) tiOutputBox.innerText += `Detail: ${data.detail}\n`;
+                } else if (data.success) {
+                    const iocs = data.data || [];
+                    const pagination = data.pagination || {};
+                    tiOutputBox.innerText += `✅ Found ${iocs.length} IOC(s)\n`;
+                    if (pagination.totalItems !== undefined) {
+                        tiOutputBox.innerText += `Total:           ${pagination.totalItems}\n`;
+                    }
+                    tiOutputBox.innerText += `\n`;
+
+                    if (iocs.length === 0) {
+                        tiOutputBox.innerText += `(no IOCs found)\n`;
+                    } else {
+                        iocs.forEach((ioc, i) => {
+                            tiOutputBox.innerText += `── IOC ${i + 1} ──\n`;
+                            tiOutputBox.innerText += `  Type:        ${ioc.type || '—'}\n`;
+                            tiOutputBox.innerText += `  Value:       ${ioc.value || '—'}\n`;
+                            tiOutputBox.innerText += `  Method:      ${ioc.method || '—'}\n`;
+                            tiOutputBox.innerText += `  Source:      ${ioc.source || '—'}\n`;
+                            tiOutputBox.innerText += `  Creator:     ${ioc.creator || '—'}\n`;
+                            tiOutputBox.innerText += `  Scope:       ${ioc.scope || '—'} (${ioc.scopeId || '—'})\n`;
+                            tiOutputBox.innerText += `  Severity:    ${ioc.severity !== undefined ? ioc.severity : '—'}\n`;
+                            if (ioc.name) tiOutputBox.innerText += `  Name:        ${ioc.name}\n`;
+                            if (ioc.description) tiOutputBox.innerText += `  Description: ${ioc.description}\n`;
+                            tiOutputBox.innerText += `  Enabled:     ${ioc.enabled}\n`;
+                            tiOutputBox.innerText += `  Created:     ${ioc.creationTime || '—'}\n`;
+                            tiOutputBox.innerText += `  Valid Until:  ${ioc.validUntil || '—'}\n`;
+                            tiOutputBox.innerText += `  UUID:        ${ioc.uuid || '—'}\n`;
+                            if (ioc.externalId) tiOutputBox.innerText += `  External ID: ${ioc.externalId}\n`;
+                            if (ioc.reference && ioc.reference.length) tiOutputBox.innerText += `  References:  ${ioc.reference.join(', ')}\n`;
+                            if (ioc.threatActors && ioc.threatActors.length) tiOutputBox.innerText += `  Actors:      ${ioc.threatActors.join(', ')}\n`;
+                            if (ioc.malwareNames && ioc.malwareNames.length) tiOutputBox.innerText += `  Malware:     ${ioc.malwareNames.join(', ')}\n`;
+                            if (ioc.mitreTactic && ioc.mitreTactic.length) tiOutputBox.innerText += `  MITRE:       ${ioc.mitreTactic.join(', ')}\n`;
+                            if (ioc.labels && ioc.labels.length) tiOutputBox.innerText += `  Labels:      ${ioc.labels.join(', ')}\n`;
+                            if (ioc.category && ioc.category.length) tiOutputBox.innerText += `  Categories:  ${ioc.category.join(', ')}\n`;
+                            tiOutputBox.innerText += `\n`;
+                        });
+                    }
+                } else {
+                    tiOutputBox.innerText += `❌ Failed: ${data.error || 'Unknown error'}\n`;
+                }
+            } catch (err) {
+                console.error('TI list error:', err);
+                tiOutputBox.innerText += `\n❌ ${err.message}\n`;
+            } finally {
+                tiListBtn.disabled = false;
+                tiListBtn.innerText = 'List IOCs';
+            }
+        });
+
+        // Initialize TI destinations
+        refreshTiDestinations();
 
         })();
     });
