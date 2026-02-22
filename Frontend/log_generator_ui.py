@@ -2362,6 +2362,198 @@ def send_custom_alert():
         return jsonify({'error': str(e)}), 500
 
 
+# =============================================================================
+# THREAT INTELLIGENCE ENDPOINTS
+# =============================================================================
+
+@app.route('/threat-intel/types', methods=['GET'])
+def get_ti_types():
+    """Get supported IOC types"""
+    try:
+        resp = requests.get(
+            f"{API_BASE_URL}/api/v1/threat-intel/types",
+            headers=_get_api_headers(),
+            timeout=10
+        )
+        if resp.status_code == 200:
+            return jsonify(resp.json().get('data', {}))
+        else:
+            return jsonify({'types': [], 'methods': []})
+    except Exception as e:
+        logger.error(f"Failed to fetch TI types: {e}")
+        return jsonify({'types': [], 'methods': []})
+
+
+@app.route('/threat-intel/list', methods=['POST'])
+def list_threat_intel():
+    """List IOCs from SentinelOne TI API via destination credentials"""
+    try:
+        data = request.get_json(silent=True) or {}
+        destination_id = data.get('destination_id')
+
+        if not destination_id:
+            return jsonify({'error': 'No destination_id provided'}), 400
+
+        # Resolve S1 management URL from destination
+        s1_resp = requests.get(
+            f"{API_BASE_URL}/api/v1/destinations/{destination_id}/s1-api-token",
+            headers=_get_api_headers(),
+            timeout=10
+        )
+        if s1_resp.status_code != 200:
+            return jsonify({'error': 'No S1 API Token configured for this destination.'}), 400
+        s1_data = s1_resp.json()
+        s1_mgmt_url = s1_data.get('s1_management_url', '')
+
+        if not s1_mgmt_url:
+            return jsonify({'error': 'S1 Management URL missing'}), 400
+
+        # Try UAM service token (Bearer) — works for multi-scope users
+        # Fall back to S1 API token (ApiToken) if service token not available
+        uam_resp = requests.get(
+            f"{API_BASE_URL}/api/v1/destinations/{destination_id}/uam-token",
+            headers=_get_api_headers(),
+            timeout=10
+        )
+        if uam_resp.status_code == 200:
+            uam_data = uam_resp.json()
+            api_token = uam_data.get('token', '')
+            auth_type = 'Bearer'
+        else:
+            api_token = s1_data.get('token', '')
+            auth_type = 'ApiToken'
+
+        if not api_token:
+            return jsonify({'error': 'No token available (tried UAM service token and S1 API token)'}), 400
+
+        payload = {
+            's1_management_url': s1_mgmt_url,
+            'api_token': api_token,
+            'auth_type': auth_type,
+            'ioc_type': data.get('ioc_type'),
+            'value': data.get('value'),
+            'source': data.get('source'),
+            'creator': data.get('creator'),
+            'limit': data.get('limit', 100),
+            'cursor': data.get('cursor'),
+        }
+
+        headers = _get_api_headers()
+        headers['Content-Type'] = 'application/json'
+
+        resp = requests.post(
+            f"{API_BASE_URL}/api/v1/threat-intel/list",
+            headers=headers,
+            json=payload,
+            timeout=30
+        )
+
+        if resp.status_code == 200:
+            return jsonify(resp.json().get('data', {}))
+        else:
+            error_msg = resp.text
+            try:
+                error_msg = resp.json().get('detail', resp.text)
+            except Exception:
+                pass
+            return jsonify({'error': error_msg}), resp.status_code
+    except Exception as e:
+        logger.error(f"Failed to list TI IOCs: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/threat-intel/send', methods=['POST'])
+def send_threat_intel():
+    """Send IOCs to SentinelOne TI API via destination credentials"""
+    try:
+        data = request.get_json(silent=True) or {}
+        destination_id = data.pop('destination_id', None)
+
+        if not destination_id:
+            return jsonify({'error': 'No destination_id provided'}), 400
+
+        # Resolve S1 management URL
+        s1_resp = requests.get(
+            f"{API_BASE_URL}/api/v1/destinations/{destination_id}/s1-api-token",
+            headers=_get_api_headers(),
+            timeout=10
+        )
+        if s1_resp.status_code != 200:
+            return jsonify({'error': 'No S1 API Token configured for this destination. Go to Settings → Edit Destination.'}), 400
+        s1_data = s1_resp.json()
+        s1_mgmt_url = s1_data.get('s1_management_url', '')
+
+        if not s1_mgmt_url:
+            return jsonify({'error': 'S1 Management URL missing'}), 400
+
+        # Try UAM service token (Bearer) first, fall back to S1 API token (ApiToken)
+        uam_resp = requests.get(
+            f"{API_BASE_URL}/api/v1/destinations/{destination_id}/uam-token",
+            headers=_get_api_headers(),
+            timeout=10
+        )
+        if uam_resp.status_code == 200:
+            uam_data = uam_resp.json()
+            api_token = uam_data.get('token', '')
+            auth_type = 'Bearer'
+        else:
+            api_token = s1_data.get('token', '')
+            auth_type = 'ApiToken'
+
+        if not api_token:
+            return jsonify({'error': 'No token available (tried UAM service token and S1 API token)'}), 400
+
+        # Get account/site IDs from destination
+        dest_resp = requests.get(
+            f"{API_BASE_URL}/api/v1/destinations/{destination_id}",
+            headers=_get_api_headers(),
+            timeout=10
+        )
+        if dest_resp.status_code != 200:
+            return jsonify({'error': 'Failed to fetch destination details'}), 400
+        dest = dest_resp.json()
+
+        # Build the backend request
+        payload = {
+            's1_management_url': s1_mgmt_url,
+            'api_token': api_token,
+            'auth_type': auth_type,
+            'account_id': dest.get('uam_account_id'),
+            'site_id': dest.get('uam_site_id'),
+        }
+
+        # Check if this is a custom JSON send or structured IOC send
+        if 'iocs_json' in data:
+            payload['iocs_json'] = data['iocs_json']
+            endpoint = 'send-custom'
+        else:
+            payload['iocs'] = data.get('iocs', [])
+            endpoint = 'send'
+
+        headers = _get_api_headers()
+        headers['Content-Type'] = 'application/json'
+
+        resp = requests.post(
+            f"{API_BASE_URL}/api/v1/threat-intel/{endpoint}",
+            headers=headers,
+            json=payload,
+            timeout=60
+        )
+
+        if resp.status_code == 200:
+            return jsonify(resp.json().get('data', {}))
+        else:
+            error_msg = resp.text
+            try:
+                error_msg = resp.json().get('detail', resp.text)
+            except Exception:
+                pass
+            return jsonify({'error': error_msg}), resp.status_code
+    except Exception as e:
+        logger.error(f"Failed to send TI IOCs: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/alerts/resolve-uam/<dest_id>', methods=['GET'])
 def resolve_uam_credentials(dest_id):
     """Resolve UAM credentials (token, account_id, site_id, ingest_url) from a destination"""
