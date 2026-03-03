@@ -341,16 +341,12 @@ def send_phase_alert(
     alert["metadata"]["logged_time"] = time_ms
     alert["metadata"]["modified_time"] = time_ms
     
-    # Set resource - use XDR Asset ID for endpoint alerts, shared GUID for email/user alerts
+    # Set resource - use XDR Asset ID for endpoint alerts, fresh UUID for email/user alerts
     target_machine = mapping.get("target_machine", "bridge")
     if target_machine == "email":
-        # Proofpoint/M365 alerts link to the user email with a consistent GUID
-        email_asset_uid = uam_config.get('email_asset_uid')
-        if not email_asset_uid:
-            email_asset_uid = str(uuid.uuid5(uuid.NAMESPACE_DNS, VICTIM_PROFILE["email"]))
-            uam_config['email_asset_uid'] = email_asset_uid
+        # Fresh UUID each time — S1 UAM silently drops site-scoped alerts with static resource UIDs
         alert["resources"] = [{
-            "uid": email_asset_uid,
+            "uid": str(uuid.uuid4()),
             "name": VICTIM_PROFILE["email"]
         }]
     elif target_machine == "enterprise":
