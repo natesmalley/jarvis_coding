@@ -41,6 +41,8 @@ class CorrelationRunRequest(BaseModel):
     tag_trace: bool = True
     workers: int = 10
     overwrite_parser: bool = False
+    suppress_alerts: bool = False
+    strip_helios_prefix: bool = False
 
 # Initialize scenario service
 scenario_service = ScenarioService()
@@ -321,6 +323,8 @@ async def run_correlation_scenario(
             tag_phase=request.tag_phase,
             tag_trace=request.tag_trace,
             overwrite_parser=request.overwrite_parser,
+            suppress_alerts=request.suppress_alerts,
+            strip_helios_prefix=request.strip_helios_prefix,
             background_tasks=background_tasks
         )
         

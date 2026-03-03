@@ -795,6 +795,21 @@
                         <p class="text-xs text-[#b8a0d2]">If checked, will overwrite existing parsers in the destination SIEM instead of skipping them. Use with caution.</p>
                     </div>
                 </details>
+                <details>
+                    <summary class="cursor-pointer text-sm font-semibold text-[#c8b3e8]">Alert Options</summary>
+                    <div class="mt-3 space-y-2 text-sm">
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" id="correlation-suppress-alerts">
+                            <span class="text-[#f3e8ff]">Suppress alerts</span>
+                        </label>
+                        <p class="text-xs text-[#b8a0d2]">Skip sending UAM alerts even if credentials are configured on the destination.</p>
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" id="correlation-strip-helios-prefix">
+                            <span class="text-[#f3e8ff]">Strip <code>HELIOS -</code> prefix from alert titles</span>
+                        </label>
+                        <p class="text-xs text-[#b8a0d2]">Remove the "HELIOS - " prefix from alert titles before sending to S1.</p>
+                    </div>
+                </details>
 
                 <div class="flex gap-3">
                     <button type="button" id="run-correlation-scenario-btn" class="btn flex-1" disabled>
@@ -3487,6 +3502,8 @@
             const tagPhase = document.getElementById('correlation-tag-phase').checked;
             const tagTrace = document.getElementById('correlation-tag-trace').checked;
             const overwriteParser = document.getElementById('correlation-overwrite-parser').checked;
+            const suppressAlerts = document.getElementById('correlation-suppress-alerts').checked;
+            const stripHeliosPrefix = document.getElementById('correlation-strip-helios-prefix').checked;
             let traceId = correlationTraceIdInput.value.trim();
             
             if (tagTrace && !traceId) {
@@ -3519,6 +3536,8 @@
                         tag_trace: tagTrace,
                         trace_id: traceId,
                         overwrite_parser: overwriteParser,
+                        suppress_alerts: suppressAlerts,
+                        strip_helios_prefix: stripHeliosPrefix,
                         hec_token: localToken
                     })
                 });

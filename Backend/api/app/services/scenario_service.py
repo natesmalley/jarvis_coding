@@ -292,6 +292,8 @@ class ScenarioService:
         speed: str = "fast", 
         dry_run: bool = False,
         overwrite_parser: bool = False,
+        suppress_alerts: bool = False,
+        strip_helios_prefix: bool = False,
         background_tasks=None
     ) -> str:
         """Start correlation scenario execution with SIEM context and trace ID support"""
@@ -309,6 +311,8 @@ class ScenarioService:
             "tag_phase": tag_phase,
             "tag_trace": tag_trace,
             "overwrite_parser": overwrite_parser,
+            "suppress_alerts": suppress_alerts,
+            "strip_helios_prefix": strip_helios_prefix,
             "progress": 0
         }
         
@@ -320,7 +324,9 @@ class ScenarioService:
                 siem_context,
                 trace_id,
                 tag_phase,
-                tag_trace
+                tag_trace,
+                suppress_alerts,
+                strip_helios_prefix
             )
         
         return execution_id
@@ -332,7 +338,9 @@ class ScenarioService:
         siem_context: Dict[str, Any],
         trace_id: Optional[str] = None,
         tag_phase: bool = True,
-        tag_trace: bool = True
+        tag_trace: bool = True,
+        suppress_alerts: bool = False,
+        strip_helios_prefix: bool = False
     ):
         """Execute correlation scenario with SIEM context and trace ID support"""
         import sys
@@ -357,7 +365,11 @@ class ScenarioService:
             
             # Import and run the scenario
             module = __import__(scenario_id)
-            scenario_result = module.generate_apollo_ransomware_scenario(siem_context=siem_context)
+            scenario_result = module.generate_apollo_ransomware_scenario(
+                siem_context=siem_context,
+                suppress_alerts=suppress_alerts,
+                strip_helios_prefix=strip_helios_prefix,
+            )
             
             # Update execution status
             if execution_id in self.running_scenarios:
