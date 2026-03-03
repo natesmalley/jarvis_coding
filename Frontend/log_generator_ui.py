@@ -612,6 +612,8 @@ def run_correlation_scenario():
     trace_id = (data.get('trace_id') or '').strip()
     local_token = data.get('hec_token')
     overwrite_parser = data.get('overwrite_parser', False)
+    suppress_alerts = data.get('suppress_alerts', False)
+    strip_helios_prefix = data.get('strip_helios_prefix', False)
     
     if not scenario_id:
         return jsonify({'error': 'scenario_id is required'}), 400
@@ -815,7 +817,14 @@ def run_correlation_scenario():
                         yield "INFO: ⚠️ S1 asset linking disabled (no S1 API token on destination)\n"
                 except Exception as s1e:
                     logger.warning(f"Could not resolve S1 API token: {s1e}")
-                yield "INFO: 🚨 Alert detonation enabled (UAM credentials found)\n"
+                if suppress_alerts:
+                    env['SCENARIO_SUPPRESS_ALERTS'] = 'true'
+                    yield "INFO: 🔇 Alert detonation suppressed by user\n"
+                else:
+                    yield "INFO: 🚨 Alert detonation enabled (UAM credentials found)\n"
+                if strip_helios_prefix:
+                    env['SCENARIO_STRIP_HELIOS_PREFIX'] = 'true'
+                    yield "INFO: ✂️ HELIOS prefix will be stripped from alert titles\n"
             else:
                 yield "INFO: ⚠️ Alert detonation disabled (no UAM credentials on destination)\n"
             

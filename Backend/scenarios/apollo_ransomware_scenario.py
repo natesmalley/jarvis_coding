@@ -306,7 +306,8 @@ def load_alert_template(template_id: str) -> Optional[Dict]:
 def send_phase_alert(
     phase_name: str,
     base_time: datetime,
-    uam_config: dict
+    uam_config: dict,
+    strip_helios_prefix: bool = False
 ) -> bool:
     """Send alert for a specific phase with correct timing.
     
@@ -341,16 +342,12 @@ def send_phase_alert(
     alert["metadata"]["logged_time"] = time_ms
     alert["metadata"]["modified_time"] = time_ms
     
-    # Set resource - use XDR Asset ID for endpoint alerts, shared GUID for email/user alerts
+    # Set resource - use XDR Asset ID for endpoint alerts, fresh UUID for email/user alerts
     target_machine = mapping.get("target_machine", "bridge")
     if target_machine == "email":
-        # Proofpoint/M365 alerts link to the user email with a consistent GUID
-        email_asset_uid = uam_config.get('email_asset_uid')
-        if not email_asset_uid:
-            email_asset_uid = str(uuid.uuid5(uuid.NAMESPACE_DNS, VICTIM_PROFILE["email"]))
-            uam_config['email_asset_uid'] = email_asset_uid
+        # Fresh UUID each time — S1 UAM silently drops site-scoped alerts with static resource UIDs
         alert["resources"] = [{
-            "uid": email_asset_uid,
+            "uid": str(uuid.uuid4()),
             "name": VICTIM_PROFILE["email"]
         }]
     elif target_machine == "enterprise":
@@ -381,6 +378,12 @@ def send_phase_alert(
             current[keys[-1]] = value
         else:
             alert[key] = value
+    
+    # Strip "HELIOS - " prefix from alert title if requested
+    if strip_helios_prefix:
+        title = alert.get("finding_info", {}).get("title", "")
+        if title.startswith("HELIOS - "):
+            alert["finding_info"]["title"] = title[len("HELIOS - "):]
     
     # Send alert via UAM ingest API
     try:
@@ -667,7 +670,11 @@ def generate_m365_sharepoint_exfil(base_time: datetime) -> List[Dict]:
     return events
 
 
-def generate_apollo_ransomware_scenario(siem_context: Optional[Dict] = None) -> Dict:
+def generate_apollo_ransomware_scenario(
+    siem_context: Optional[Dict] = None,
+    suppress_alerts: Optional[bool] = None,
+    strip_helios_prefix: Optional[bool] = None,
+) -> Dict:
     """Generate the complete Apollo ransomware scenario (Proofpoint + M365 only)
     
     Args:
@@ -675,7 +682,14 @@ def generate_apollo_ransomware_scenario(siem_context: Optional[Dict] = None) -> 
                       Expected format: {"results": [...], "anchors": {...}}
                       If provided, timestamps are calculated relative to existing EDR/WEL data.
                       If None, falls back to offset from current time.
+        suppress_alerts: If True, skip sending UAM alerts. Env fallback: SCENARIO_SUPPRESS_ALERTS.
+        strip_helios_prefix: If True, remove "HELIOS - " prefix from alert titles. Env fallback: SCENARIO_STRIP_HELIOS_PREFIX.
     """
+    # Resolve options from args or env vars
+    if suppress_alerts is None:
+        suppress_alerts = os.getenv('SCENARIO_SUPPRESS_ALERTS', 'false').lower() == 'true'
+    if strip_helios_prefix is None:
+        strip_helios_prefix = os.getenv('SCENARIO_STRIP_HELIOS_PREFIX', 'false').lower() == 'true'
     
     # Determine base time based on SIEM context or fallback
     use_correlation = False
@@ -718,7 +732,7 @@ def generate_apollo_ransomware_scenario(siem_context: Optional[Dict] = None) -> 
     print("=" * 80 + "\n")
     
     # Initialize alert detonation from env vars
-    alerts_enabled = os.getenv('SCENARIO_ALERTS_ENABLED', 'false').lower() == 'true'
+    alerts_enabled = (not suppress_alerts) and os.getenv('SCENARIO_ALERTS_ENABLED', 'false').lower() == 'true'
     uam_config = None
     
     if alerts_enabled:
@@ -783,6 +797,8 @@ def generate_apollo_ransomware_scenario(siem_context: Optional[Dict] = None) -> 
             print("\n🚨 ALERT DETONATION ENABLED")
             print(f"   UAM Ingest: {uam_ingest_url}")
             print(f"   Account ID: {uam_account_id}")
+            if strip_helios_prefix:
+                print(f"   Strip HELIOS prefix: Yes")
             print("=" * 80)
         else:
             print("⚠️  SCENARIO_ALERTS_ENABLED=true but UAM credentials missing")
@@ -825,13 +841,13 @@ def generate_apollo_ransomware_scenario(siem_context: Optional[Dict] = None) -> 
         # Send corresponding alert if enabled and phase has alert mapping
         if alerts_enabled and phase_name in ALERT_PHASE_MAPPING:
             print(f"   📤 Sending alert for {phase_name}...", end=" ")
-            success = send_phase_alert(phase_name, phase_base_time, uam_config)
+            success = send_phase_alert(phase_name, phase_base_time, uam_config, strip_helios_prefix=strip_helios_prefix)
             print(f"{'✓' if success else '✗'}")
         
         # Send RDP alert after data exfiltration phase
         if alerts_enabled and phase_name == "📤 PHASE 4: Data Exfiltration":
             print(f"   📤 Sending RDP download alert...", end=" ")
-            success = send_phase_alert("rdp_download", phase_base_time, uam_config)
+            success = send_phase_alert("rdp_download", phase_base_time, uam_config, strip_helios_prefix=strip_helios_prefix)
             print(f"{'✓' if success else '✗'}")
     
     # Send standalone WEL alerts (not tied to a specific event generation phase)
@@ -845,7 +861,7 @@ def generate_apollo_ransomware_scenario(siem_context: Optional[Dict] = None) -> 
         ]
         for alert_key, alert_desc in wel_alerts:
             print(f"   📤 {alert_desc}...", end=" ")
-            success = send_phase_alert(alert_key, base_time, uam_config)
+            success = send_phase_alert(alert_key, base_time, uam_config, strip_helios_prefix=strip_helios_prefix)
             print(f"{'✓' if success else '✗'}")
     
     all_events.sort(key=lambda x: x["timestamp"])
