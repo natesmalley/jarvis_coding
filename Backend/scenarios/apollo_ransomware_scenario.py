@@ -28,6 +28,7 @@ Key Correlation Points:
 
 import json
 import os
+import random
 import sys
 import uuid
 import copy
@@ -608,11 +609,221 @@ def generate_m365_sharepoint_bruteforce(base_time: datetime) -> List[Dict]:
     return events
 
 
+### ── Baseline & Exfiltration-day file lists ──────────────────────────────────
+
+# Normal files jeanluc works with every day (baseline pool)
+BASELINE_FILES = [
+    # Reports & memos
+    ("Weekly-Status-Report.docx", "/sites/Command/Shared Documents/Reports/"),
+    ("Mission-Briefing-Notes.docx", "/sites/Command/Shared Documents/Briefings/"),
+    ("Staff-Meeting-Agenda.docx", "/sites/Command/Shared Documents/Meetings/"),
+    ("Crew-Rotation-Schedule.xlsx", "/sites/Operations/Shared Documents/Scheduling/"),
+    ("Duty-Roster-Alpha-Shift.xlsx", "/sites/Operations/Shared Documents/Scheduling/"),
+    ("Bridge-Operations-Manual.pdf", "/sites/Command/Shared Documents/Manuals/"),
+    ("Diplomatic-Protocol-Guide.pdf", "/sites/Command/Shared Documents/Protocols/"),
+    ("Quarterly-Readiness-Review.pptx", "/sites/Command/Shared Documents/Reviews/"),
+    ("Away-Team-Checklist.docx", "/sites/Operations/Shared Documents/Procedures/"),
+    ("First-Contact-Procedures.pdf", "/sites/Command/Shared Documents/Protocols/"),
+    # Engineering docs
+    ("Warp-Core-Diagnostic-Log.xlsx", "/sites/Engineering/Shared Documents/Diagnostics/"),
+    ("Shield-Calibration-Report.xlsx", "/sites/Engineering/Shared Documents/Reports/"),
+    ("Deflector-Array-Specs.pdf", "/sites/Engineering/Shared Documents/Specifications/"),
+    ("Holodeck-Maintenance-Schedule.xlsx", "/sites/Engineering/Shared Documents/Maintenance/"),
+    # Science & medical
+    ("Stellar-Cartography-Update.pptx", "/sites/Science/Shared Documents/Cartography/"),
+    ("Sensor-Array-Analysis.xlsx", "/sites/Science/Shared Documents/Analysis/"),
+    ("Crew-Wellness-Summary.docx", "/sites/Medical/Shared Documents/Summaries/"),
+    ("Medical-Supply-Inventory.xlsx", "/sites/Medical/Shared Documents/Inventory/"),
+    # Admin & HR
+    ("Shore-Leave-Requests.xlsx", "/sites/HR/Shared Documents/Leave/"),
+    ("Training-Completion-Log.xlsx", "/sites/HR/Shared Documents/Training/"),
+    ("Comm-Badge-Assignments.xlsx", "/sites/Operations/Shared Documents/Equipment/"),
+    ("Replicator-Usage-Report.xlsx", "/sites/Operations/Shared Documents/Reports/"),
+    ("Transporter-Log-Summary.docx", "/sites/Operations/Shared Documents/Logs/"),
+    ("Security-Drill-Schedule.docx", "/sites/Security/Shared Documents/Drills/"),
+    ("Phaser-Range-Scores.xlsx", "/sites/Security/Shared Documents/Training/"),
+    ("Cargo-Bay-Manifest.xlsx", "/sites/Operations/Shared Documents/Cargo/"),
+    ("Subspace-Comm-Log.docx", "/sites/Operations/Shared Documents/Comms/"),
+    ("Navigation-Waypoints.xlsx", "/sites/Operations/Shared Documents/Navigation/"),
+    ("Environmental-Controls-Report.docx", "/sites/Engineering/Shared Documents/Reports/"),
+    ("Turbolift-Maintenance-Log.xlsx", "/sites/Engineering/Shared Documents/Maintenance/"),
+]
+
+# Normal operations for baseline (weighted toward reads)
+BASELINE_OPERATIONS = [
+    "FileAccessed", "FileAccessed", "FileAccessed", "FileAccessed",
+    "FileDownloaded", "FileDownloaded", "FileDownloaded",
+    "FileUploaded", "FileUploaded",
+    "FileModified",
+]
+
+# Extra files for the massive exfil-day download burst (on top of the sensitive docs)
+EXFIL_DAY_EXTRA_FILES = [
+    ("Starfleet-Org-Chart-2026.xlsx", "/sites/HR/Shared Documents/Organization/"),
+    ("Officer-Performance-Reviews.docx", "/sites/HR/Shared Documents/Reviews/"),
+    ("Crew-Background-Checks.xlsx", "/sites/HR/Shared Documents/Personnel/"),
+    ("Promotion-Board-Results.docx", "/sites/HR/Shared Documents/Personnel/"),
+    ("Salary-Grade-Matrix.xlsx", "/sites/HR/Shared Documents/Compensation/"),
+    ("Benefits-Enrollment-Data.xlsx", "/sites/HR/Shared Documents/Benefits/"),
+    ("Disciplinary-Action-Log.docx", "/sites/HR/Shared Documents/Personnel/"),
+    ("Transfer-Request-Queue.xlsx", "/sites/HR/Shared Documents/Transfers/"),
+    ("Academy-Transcripts-Batch.pdf", "/sites/HR/Shared Documents/Education/"),
+    ("Retirement-Eligibility-List.xlsx", "/sites/HR/Shared Documents/Personnel/"),
+    ("Weapons-Inventory-NCC1701D.xlsx", "/sites/Security/Shared Documents/Inventory/"),
+    ("Security-Clearance-Roster.xlsx", "/sites/Security/Shared Documents/Clearances/"),
+    ("Tactical-Systems-Specs.pdf", "/sites/Security/Shared Documents/Specifications/"),
+    ("Incident-Response-Playbook.docx", "/sites/Security/Shared Documents/Procedures/"),
+    ("Brig-Detention-Records.xlsx", "/sites/Security/Shared Documents/Records/"),
+    ("Access-Control-Matrix.xlsx", "/sites/Security/Shared Documents/Access/"),
+    ("Perimeter-Defense-Config.pdf", "/sites/Security/Shared Documents/Configuration/"),
+    ("Threat-Assessment-Q1-2026.docx", "/sites/Security/Shared Documents/Assessments/"),
+    ("Shield-Frequency-Table.xlsx", "/sites/Engineering/Shared Documents/Shields/"),
+    ("Warp-Drive-Maintenance-Hist.xlsx", "/sites/Engineering/Shared Documents/Maintenance/"),
+    ("Power-Distribution-Schema.pdf", "/sites/Engineering/Shared Documents/Schematics/"),
+    ("Propulsion-Test-Results.xlsx", "/sites/Engineering/Shared Documents/Testing/"),
+    ("Hull-Integrity-Report.docx", "/sites/Engineering/Shared Documents/Reports/"),
+    ("Torpedo-Complement-Status.xlsx", "/sites/Engineering/Shared Documents/Weapons/"),
+    ("Life-Support-Diagnostics.xlsx", "/sites/Engineering/Shared Documents/Diagnostics/"),
+    ("Navigational-Deflector-Logs.xlsx", "/sites/Engineering/Shared Documents/Logs/"),
+    ("Antimatter-Containment-Specs.pdf", "/sites/Engineering/Shared Documents/Specifications/"),
+    ("EPS-Conduit-Layout.pdf", "/sites/Engineering/Shared Documents/Schematics/"),
+    ("Jefferies-Tube-Map.pdf", "/sites/Engineering/Shared Documents/Schematics/"),
+    ("Command-Authorization-Codes.docx", "/sites/Operations/Shared Documents/Classified/"),
+    ("Self-Destruct-Sequences.docx", "/sites/Operations/Shared Documents/Classified/"),
+    ("Emergency-Protocol-Override.docx", "/sites/Operations/Shared Documents/Classified/"),
+    ("Fleet-Communication-Keys.xlsx", "/sites/Operations/Shared Documents/Classified/"),
+    ("Starbase-Docking-Credentials.xlsx", "/sites/Operations/Shared Documents/Logistics/"),
+    ("Supply-Chain-Contracts.xlsx", "/sites/Operations/Shared Documents/Procurement/"),
+    ("Mission-Archive-Index.xlsx", "/sites/Operations/Shared Documents/Archives/"),
+    ("Tactical-Mission-Plans.docx", "/sites/Operations/Shared Documents/Missions/"),
+    ("Diplomatic-Contact-Database.xlsx", "/sites/Command/Shared Documents/Diplomacy/"),
+    ("Treaty-Negotiation-Notes.docx", "/sites/Command/Shared Documents/Diplomacy/"),
+    ("Federation-Intel-Briefing.docx", "/sites/Command/Shared Documents/Intelligence/"),
+    ("Romulan-Neutral-Zone-Map.pdf", "/sites/Command/Shared Documents/Intelligence/"),
+    ("Klingon-Alliance-Status.docx", "/sites/Command/Shared Documents/Intelligence/"),
+    ("Borg-Encounter-Analysis.docx", "/sites/Command/Shared Documents/Intelligence/"),
+    ("Cardassian-Border-Patrol.xlsx", "/sites/Command/Shared Documents/Intelligence/"),
+    ("Ferengi-Trade-Agreements.xlsx", "/sites/Command/Shared Documents/Diplomacy/"),
+    ("Bajoran-Liaison-Reports.docx", "/sites/Command/Shared Documents/Diplomacy/"),
+    ("Dominion-Threat-Assessment.pdf", "/sites/Command/Shared Documents/Intelligence/"),
+    ("Science-Lab-Allocations.xlsx", "/sites/Science/Shared Documents/Administration/"),
+    ("Xenobiology-Research-Data.xlsx", "/sites/Science/Shared Documents/Research/"),
+    ("Astrophysics-Survey-Results.xlsx", "/sites/Science/Shared Documents/Surveys/"),
+    ("Subspace-Anomaly-Catalog.xlsx", "/sites/Science/Shared Documents/Anomalies/"),
+    ("Medical-Research-Trials.xlsx", "/sites/Medical/Shared Documents/Research/"),
+    ("Pharmaceutical-Inventory.xlsx", "/sites/Medical/Shared Documents/Inventory/"),
+    ("Crew-Medical-Records-Full.xlsx", "/sites/Medical/Shared Documents/Records/"),
+    ("Quarantine-Protocols.docx", "/sites/Medical/Shared Documents/Protocols/"),
+    ("Sickbay-Equipment-Status.xlsx", "/sites/Medical/Shared Documents/Equipment/"),
+    ("Counselor-Session-Notes.docx", "/sites/Medical/Shared Documents/Counseling/"),
+    ("Genetic-Research-Data.xlsx", "/sites/Medical/Shared Documents/Research/"),
+    ("Biohazard-Containment-Plan.pdf", "/sites/Medical/Shared Documents/Safety/"),
+    ("Ten-Forward-Menu-Schedule.xlsx", "/sites/Operations/Shared Documents/Morale/"),
+    ("Recreational-Facilities-Log.xlsx", "/sites/Operations/Shared Documents/Morale/"),
+    ("Shuttle-Bay-Operations.xlsx", "/sites/Operations/Shared Documents/Shuttlecraft/"),
+    ("Runabout-Flight-Logs.xlsx", "/sites/Operations/Shared Documents/Shuttlecraft/"),
+    ("Docking-Bay-Schedule.xlsx", "/sites/Operations/Shared Documents/Logistics/"),
+    ("Refit-Schedule-2026.xlsx", "/sites/Engineering/Shared Documents/Planning/"),
+    ("Computer-Core-Diagnostics.xlsx", "/sites/Engineering/Shared Documents/Diagnostics/"),
+    ("Isolinear-Chip-Inventory.xlsx", "/sites/Engineering/Shared Documents/Inventory/"),
+    ("Sensor-Palette-Calibration.xlsx", "/sites/Science/Shared Documents/Calibration/"),
+    ("Long-Range-Scan-Results.xlsx", "/sites/Science/Shared Documents/Scans/"),
+    ("Nebula-Survey-Data.xlsx", "/sites/Science/Shared Documents/Surveys/"),
+    ("Planet-Classification-DB.xlsx", "/sites/Science/Shared Documents/Classification/"),
+    ("First-Contact-Candidates.docx", "/sites/Science/Shared Documents/First-Contact/"),
+    ("Archaeological-Survey-Findings.docx", "/sites/Science/Shared Documents/Archaeology/"),
+    ("Temporal-Anomaly-Reports.xlsx", "/sites/Science/Shared Documents/Anomalies/"),
+    ("Holodeck-Program-Library.xlsx", "/sites/Operations/Shared Documents/Recreation/"),
+    ("Crew-Quarters-Assignments.xlsx", "/sites/Operations/Shared Documents/Housing/"),
+    ("Visitor-Quarters-Log.xlsx", "/sites/Operations/Shared Documents/Housing/"),
+    ("Enlisted-Evaluation-Forms.xlsx", "/sites/HR/Shared Documents/Evaluations/"),
+    ("Officer-Fitness-Reports.docx", "/sites/HR/Shared Documents/Evaluations/"),
+    ("Recruitment-Pipeline.xlsx", "/sites/HR/Shared Documents/Recruitment/"),
+    ("Cadet-Training-Progress.xlsx", "/sites/HR/Shared Documents/Training/"),
+    ("Uniform-Requisition-Log.xlsx", "/sites/Operations/Shared Documents/Logistics/"),
+    ("Emergency-Ration-Stores.xlsx", "/sites/Operations/Shared Documents/Supplies/"),
+    ("Deuterium-Fuel-Reserves.xlsx", "/sites/Engineering/Shared Documents/Resources/"),
+    ("Dilithium-Crystal-Status.xlsx", "/sites/Engineering/Shared Documents/Resources/"),
+    ("Structural-Integrity-Audit.xlsx", "/sites/Engineering/Shared Documents/Audits/"),
+    ("Communications-Array-Status.xlsx", "/sites/Operations/Shared Documents/Comms/"),
+    ("Tractor-Beam-Calibration.xlsx", "/sites/Engineering/Shared Documents/Calibration/"),
+    ("Photon-Torpedo-Inventory.xlsx", "/sites/Security/Shared Documents/Ordnance/"),
+    ("Phaser-Bank-Diagnostics.xlsx", "/sites/Security/Shared Documents/Diagnostics/"),
+    ("Classified-Mission-Logs.docx", "/sites/Command/Shared Documents/Classified/"),
+    ("Captain-Ready-Room-Notes.docx", "/sites/Command/Shared Documents/Personal/"),
+    ("Flag-Officer-Correspondence.docx", "/sites/Command/Shared Documents/Correspondence/"),
+    ("Court-Martial-Proceedings.docx", "/sites/HR/Shared Documents/Legal/"),
+    ("JAG-Case-Files.xlsx", "/sites/HR/Shared Documents/Legal/"),
+    ("Prime-Directive-Case-Studies.docx", "/sites/Command/Shared Documents/Regulations/"),
+    ("Emergency-Evacuation-Plan.pdf", "/sites/Security/Shared Documents/Emergency/"),
+    ("Battle-Stations-Roster.xlsx", "/sites/Security/Shared Documents/Tactical/"),
+    ("Red-Alert-Procedures.docx", "/sites/Security/Shared Documents/Procedures/"),
+    ("Damage-Control-Teams.xlsx", "/sites/Engineering/Shared Documents/Emergency/"),
+    ("Repair-Parts-Requisition.xlsx", "/sites/Engineering/Shared Documents/Supplies/"),
+    ("Stellar-Phenomena-Database.xlsx", "/sites/Science/Shared Documents/Database/"),
+    ("Exoplanet-Survey-Data.xlsx", "/sites/Science/Shared Documents/Surveys/"),
+    ("Warp-Field-Geometry-Data.xlsx", "/sites/Engineering/Shared Documents/Research/"),
+    ("Crew-Psych-Evaluations.xlsx", "/sites/Medical/Shared Documents/Evaluations/"),
+    ("Transporter-Buffer-Logs.xlsx", "/sites/Engineering/Shared Documents/Logs/"),
+    ("Subspace-Relay-Network.pdf", "/sites/Operations/Shared Documents/Infrastructure/"),
+    ("Starfleet-Command-Directives.docx", "/sites/Command/Shared Documents/Directives/"),
+    ("Intelligence-Asset-Registry.xlsx", "/sites/Command/Shared Documents/Intelligence/"),
+]
+
+
+def generate_m365_baseline_activity(base_time: datetime, baseline_days: int = 14, files_per_day: int = 10) -> List[Dict]:
+    """Generate normal SharePoint file activity for N days before the attack.
+    
+    Creates a realistic baseline of ~files_per_day file operations per day,
+    spread across business hours (08:00-18:00), for the days leading up to
+    the exfiltration event.  This makes the 10× spike on the exfil day
+    clearly anomalous.
+    """
+    events = []
+    rng = random.Random(42)  # deterministic so reruns produce same events
+
+    for day_offset in range(baseline_days, 0, -1):
+        day_start = base_time - timedelta(days=day_offset)
+        # Pick a random subset of files for this day
+        day_files = rng.sample(BASELINE_FILES, min(files_per_day, len(BASELINE_FILES)))
+
+        for idx, (file_name, file_path) in enumerate(day_files):
+            # Spread events across business hours (08:00 – 18:00)
+            hour = 8 + int((10 * idx) / len(day_files))
+            minute = rng.randint(0, 59)
+            second = rng.randint(0, 59)
+            event_dt = day_start.replace(hour=hour, minute=minute, second=second, microsecond=0)
+            event_ts = event_dt.isoformat()
+
+            operation = rng.choice(BASELINE_OPERATIONS)
+
+            m365_evt = microsoft_365_collaboration_log()
+            m365_evt['TimeStamp'] = event_ts
+            m365_evt['UserId'] = VICTIM_PROFILE['email']
+            m365_evt['ClientIP'] = VICTIM_PROFILE['client_ip']
+            m365_evt['Operation'] = operation
+            m365_evt['Workload'] = 'SharePoint'
+            m365_evt['ObjectId'] = f"{file_path}{file_name}"
+            m365_evt['FileName'] = file_name
+            m365_evt['SiteUrl'] = f"https://starfleet.sharepoint.com{file_path.rsplit('/', 2)[0]}"
+            m365_evt['Details'] = f"User {VICTIM_PROFILE['email']} {operation.lower()} {file_name}"
+            m365_evt['RequestedBy'] = VICTIM_PROFILE['name']
+            m365_evt['user.email_addr'] = VICTIM_PROFILE['email']
+            events.append(create_event(event_ts, "microsoft_365_collaboration", "baseline_activity", m365_evt))
+
+    return events
+
+
 def generate_m365_sharepoint_exfil(base_time: datetime) -> List[Dict]:
-    """Generate M365 events for SharePoint data exfiltration (successful access after finding open site)"""
+    """Generate M365 events for SharePoint data exfiltration (successful access after finding open site).
+    
+    On the exfil day the attacker downloads ~120 files — the original
+    sensitive documents plus a large bulk sweep of everything they can
+    reach, creating a 10× spike over the normal ~10 files/day baseline.
+    """
     events = []
     
-    # Attacker finds accessible SharePoint site and downloads sensitive docs - ~20 min after compromise
+    # ── Original sensitive documents (high-value targets) ─────────────
     sensitive_docs = [
         ("Starfleet-Personnel-Records.xlsx", "/sites/HR/Shared Documents/Personnel/"),
         ("Command-Codes-Q1-2026.docx", "/sites/Operations/Shared Documents/Classified/"),
@@ -652,8 +863,36 @@ def generate_m365_sharepoint_exfil(base_time: datetime) -> List[Dict]:
         m365_download['RequestedBy'] = VICTIM_PROFILE['name']
         events.append(create_event(download_time, "microsoft_365_collaboration", "sharepoint_exfil", m365_download))
     
-    # Add RDP file download event - 5 minutes after exfil starts
-    rdp_time = get_scenario_time(base_time, 25, 0)
+    # ── Bulk file sweep (~115 additional downloads to reach ~120 total) ──
+    # The attacker methodically downloads everything they can access,
+    # creating a massive spike compared to the normal ~10 files/day.
+    rng = random.Random(99)  # deterministic
+    bulk_files = EXFIL_DAY_EXTRA_FILES[:]
+    rng.shuffle(bulk_files)
+
+    # Start bulk sweep right after the sensitive docs (~minute 26)
+    for j, (file_name, file_path) in enumerate(bulk_files):
+        # Spread ~115 downloads over roughly 60 minutes (26→86 min offset)
+        minute_offset = 26 + int((60 * j) / len(bulk_files))
+        second_offset = rng.randint(0, 45)
+        dl_time = get_scenario_time(base_time, minute_offset, second_offset)
+
+        m365_bulk = microsoft_365_collaboration_log()
+        m365_bulk['TimeStamp'] = dl_time
+        m365_bulk['UserId'] = VICTIM_PROFILE['email']
+        m365_bulk['ClientIP'] = VICTIM_PROFILE['client_ip']
+        m365_bulk['Operation'] = 'FileDownloaded'
+        m365_bulk['Workload'] = 'SharePoint'
+        m365_bulk['ObjectId'] = f"{file_path}{file_name}"
+        m365_bulk['FileName'] = file_name
+        m365_bulk['SiteUrl'] = f"https://starfleet.sharepoint.com{file_path.rsplit('/', 2)[0]}"
+        m365_bulk['Details'] = f"User {VICTIM_PROFILE['email']} downloaded {file_name}"
+        m365_bulk['RequestedBy'] = VICTIM_PROFILE['name']
+        m365_bulk['user.email_addr'] = VICTIM_PROFILE['email']
+        events.append(create_event(dl_time, "microsoft_365_collaboration", "sharepoint_exfil", m365_bulk))
+
+    # ── RDP file download (lateral movement prep) ─────────────────────
+    rdp_time = get_scenario_time(base_time, 90, 0)
     m365_rdp = microsoft_365_collaboration_log()
     m365_rdp['TimeStamp'] = rdp_time
     m365_rdp['UserId'] = VICTIM_PROFILE['email']
@@ -806,7 +1045,21 @@ def generate_apollo_ransomware_scenario(
     
     all_events = []
     
-    # Build phases with appropriate base times
+    # ── PHASE 0: Baseline activity (14 days of normal file ops) ────────
+    # Uses the exfil phase time (or base_time) as the anchor so baseline
+    # days count backward from the attack day.
+    baseline_anchor = base_time
+    if use_correlation and phase_times:
+        baseline_anchor = phase_times.get("sharepoint_exfil", base_time)
+    
+    print(f"\n📂 PHASE 0: Baseline SharePoint Activity")
+    print(f"   14 days × ~10 files/day of normal activity before attack")
+    print(f"   Anchor (exfil day): {baseline_anchor.isoformat()}")
+    baseline_events = generate_m365_baseline_activity(baseline_anchor)
+    all_events.extend(baseline_events)
+    print(f"   ✓ Generated {len(baseline_events)} baseline events")
+    
+    # Build attack phases with appropriate base times
     if use_correlation and phase_times:
         phases = [
             ("📧 PHASE 1: Phishing Email Delivery", generate_proofpoint_phishing_delivery, 
@@ -815,8 +1068,8 @@ def generate_apollo_ransomware_scenario(
              "User opens email and downloads TestBook.xlsm", phase_times.get("email_interaction", base_time)),
             ("🔍 PHASE 3: SharePoint Recon", generate_m365_sharepoint_bruteforce, 
              "Failed access attempts to restricted SharePoint sites", phase_times.get("sharepoint_bruteforce", base_time)),
-            ("📤 PHASE 4: Data Exfiltration", generate_m365_sharepoint_exfil, 
-             "Downloading sensitive documents from SharePoint", phase_times.get("sharepoint_exfil", base_time)),
+            ("📤 PHASE 4: Data Exfiltration (~120 files)", generate_m365_sharepoint_exfil, 
+             "Massive file download spike — sensitive docs + bulk sweep", phase_times.get("sharepoint_exfil", base_time)),
         ]
     else:
         phases = [
@@ -826,8 +1079,8 @@ def generate_apollo_ransomware_scenario(
              "User opens email and downloads TestBook.xlsm", base_time),
             ("🔍 PHASE 3: SharePoint Recon", generate_m365_sharepoint_bruteforce, 
              "Failed access attempts to restricted SharePoint sites", base_time),
-            ("📤 PHASE 4: Data Exfiltration", generate_m365_sharepoint_exfil, 
-             "Downloading sensitive documents from SharePoint", base_time),
+            ("📤 PHASE 4: Data Exfiltration (~120 files)", generate_m365_sharepoint_exfil, 
+             "Massive file download spike — sensitive docs + bulk sweep", base_time),
         ]
     
     for phase_name, generator_func, description, phase_base_time in phases:
@@ -839,13 +1092,15 @@ def generate_apollo_ransomware_scenario(
         print(f"   ✓ Generated {len(phase_events)} events")
         
         # Send corresponding alert if enabled and phase has alert mapping
-        if alerts_enabled and phase_name in ALERT_PHASE_MAPPING:
+        # (strip the file-count annotation for alert lookup)
+        phase_alert_key = phase_name.split(" (~")[0] if " (~" in phase_name else phase_name
+        if alerts_enabled and phase_alert_key in ALERT_PHASE_MAPPING:
             print(f"   📤 Sending alert for {phase_name}...", end=" ")
-            success = send_phase_alert(phase_name, phase_base_time, uam_config, strip_helios_prefix=strip_helios_prefix)
+            success = send_phase_alert(phase_alert_key, phase_base_time, uam_config, strip_helios_prefix=strip_helios_prefix)
             print(f"{'✓' if success else '✗'}")
         
         # Send RDP alert after data exfiltration phase
-        if alerts_enabled and phase_name == "📤 PHASE 4: Data Exfiltration":
+        if alerts_enabled and "PHASE 4: Data Exfiltration" in phase_name:
             print(f"   📤 Sending RDP download alert...", end=" ")
             success = send_phase_alert("rdp_download", phase_base_time, uam_config, strip_helios_prefix=strip_helios_prefix)
             print(f"{'✓' if success else '✗'}")
@@ -902,20 +1157,26 @@ def generate_apollo_ransomware_scenario(
             {"phase": 15, "step": "SharePoint Data Exfil", "log_source": "M365", "event_type": "FileDownloaded", "description": f"User {VICTIM_PROFILE['email']} downloaded sensitive documents from SharePoint - data exfiltration", "generated": True},
         ],
         "generated_phases": [
+            {"name": "Baseline Activity (14 days)", "source": "microsoft_365", "events": len([e for e in all_events if e["phase"] == "baseline_activity"])},
             {"name": "Phishing Delivery", "source": "proofpoint", "events": len([e for e in all_events if e["phase"] == "phishing_delivery"])},
             {"name": "Email Interaction", "source": "microsoft_365", "events": len([e for e in all_events if e["phase"] in ["email_interaction", "file_access"]])},
             {"name": "SharePoint Recon", "source": "microsoft_365", "events": len([e for e in all_events if e["phase"] == "sharepoint_bruteforce"])},
-            {"name": "Data Exfiltration", "source": "microsoft_365", "events": len([e for e in all_events if e["phase"] in ["sharepoint_access", "sharepoint_exfil"]])},
+            {"name": "Data Exfiltration (~120 files)", "source": "microsoft_365", "events": len([e for e in all_events if e["phase"] in ["sharepoint_access", "sharepoint_exfil"]])},
         ],
         "events": all_events,
     }
+    
+    baseline_count = len([e for e in all_events if e['phase'] == 'baseline_activity'])
+    exfil_count = len([e for e in all_events if e['phase'] in ['sharepoint_access', 'sharepoint_exfil']])
     
     print("\n" + "=" * 80)
     print("📊 SCENARIO SUMMARY")
     print("=" * 80)
     print(f"Total Events: {len(all_events)}")
+    print(f"  - Baseline (14 days × ~10/day): {baseline_count}")
     print(f"  - Proofpoint: {len([e for e in all_events if e['source'] == 'proofpoint'])}")
-    print(f"  - M365: {len([e for e in all_events if 'microsoft' in e['source']])}")
+    print(f"  - M365 (attack day): {len([e for e in all_events if 'microsoft' in e['source']]) - baseline_count}")
+    print(f"  - Exfil day file ops: {exfil_count} (vs ~10/day baseline = {exfil_count // max(baseline_count // 14, 1)}× spike)")
     print("=" * 80)
     
     return scenario
