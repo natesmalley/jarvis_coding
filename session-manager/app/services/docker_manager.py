@@ -112,28 +112,11 @@ class DockerManager:
                 'managed_by': 'session_manager'
             }
             
-            # Mount Backend directories for event generators and parsers
-            import os
-            # Use host path - session manager needs to specify paths accessible by Docker daemon
-            # This should be configured via environment variable for portability
-            workspace_path = os.environ.get('WORKSPACE_PATH', '/Users/nathanial.smalley/tech_summit_jarvis/jarvis_coding')
-            backend_path = os.path.join(workspace_path, 'Backend')
-            
-            event_gen_path = os.path.join(backend_path, 'event_generators')
-            parsers_path = os.path.join(backend_path, 'parsers')
-            scenarios_path = os.path.join(backend_path, 'scenarios')
-            
-            # Build volumes dict
+            # Use code baked into the Docker image (built from main branch)
+            # Only mount a named volume for persistent database storage per session
             volumes_dict = {
-                event_gen_path: {'bind': '/event_generators', 'mode': 'ro'},
-                parsers_path: {'bind': '/parsers', 'mode': 'ro'}
+                f'jarvis-{session_id}-data': {'bind': '/app/data', 'mode': 'rw'}
             }
-            if os.path.exists(scenarios_path):
-                volumes_dict[scenarios_path] = {'bind': '/scenarios', 'mode': 'ro'}
-            
-            # Add a named volume for persistent database storage per session
-            # This ensures destinations persist across container restarts
-            volumes_dict[f'jarvis-{session_id}-data'] = {'bind': '/app/data', 'mode': 'rw'}
                 
             backend = self.client.containers.run(
                 settings.backend_image,
@@ -176,18 +159,9 @@ class DockerManager:
                 'managed_by': 'session_manager'
             }
             
-            # Mount Backend directory for frontend to access event generators
-            import os
-            # Use host path - session manager needs to specify paths accessible by Docker daemon
-            # This should be configured via environment variable for portability  
-            workspace_path = os.environ.get('WORKSPACE_PATH', '/Users/nathanial.smalley/tech_summit_jarvis/jarvis_coding')
-            backend_path = os.path.join(workspace_path, 'Backend')
-            frontend_path = os.path.join(workspace_path, 'Frontend')
-            
-            # Share the same data volume between frontend and backend for persistence
+            # Use code baked into the Docker image (built from main branch)
+            # Only mount shared data volume for persistence
             frontend_volumes = {
-                backend_path: {'bind': '/app/Backend', 'mode': 'ro'},
-                frontend_path: {'bind': '/app/Frontend', 'mode': 'ro'},
                 f'jarvis-{session_id}-data': {'bind': '/app/shared-data', 'mode': 'rw'}
             }
             
