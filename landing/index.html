@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jarvis - Tech Summit 2024</title>
+    <title>HELIOS</title>
     <style>
         * {
             margin: 0;
@@ -138,19 +138,19 @@
 </head>
 <body>
     <div class="container">
-        <img src="image_2.png" alt="Tech Summit Banner" style="width: 100%; max-width: 400px; height: auto; margin-bottom: 1.5rem; border-radius: 10px;">
+        <img src="image_2.png" alt="HELIOS Banner" style="width: 100%; max-width: 400px; height: auto; margin-bottom: 1.5rem; border-radius: 10px;">
         <h1 style="display: flex; align-items: center; justify-content: center; gap: 1rem;">
-            <img src="image.png" alt="Jarvis Logo" style="width: 50px; height: 50px; object-fit: contain;">
-            Jarvis
+            <img src="image.png" alt="HELIOS Logo" style="width: 50px; height: 50px; object-fit: contain;">
+            HELIOS
         </h1>
-        <div class="subtitle">Tech Summit 2025 - Personal Instance</div>
+        <div class="subtitle">Personal Instance</div>
         
         <div id="status" class="status">
-            <div id="statusText">Click below to get your personal Jarvis instance</div>
+            <div id="statusText">Click below to get your personal HELIOS instance</div>
         </div>
         
         <button id="launchBtn" class="btn" onclick="launchInstance()">
-            Get My Jarvis Instance
+            Get My HELIOS Instance
         </button>
         
         <div id="message"></div>
@@ -223,7 +223,7 @@
                 const userToken = generateToken();
                 
                 // Create session
-                statusDiv.innerHTML = 'Creating your personal Jarvis instance...';
+                statusDiv.innerHTML = 'Creating your personal HELIOS instance...';
                 
                 const response = await fetch('/api/sessions', {
                     method: 'POST',
@@ -255,7 +255,7 @@
                 
                 messageDiv.innerHTML = `
                     <div class="success">
-                        <div>Your personal Jarvis instance is ready!</div>
+                        <div>Your personal HELIOS instance is ready!</div>
                         <div class="links">
                             <a href="/session/${session.session_id}/frontend/" target="_blank">Open Frontend</a>
                             <a href="/session/${session.session_id}/backend/docs" target="_blank">API Docs</a>
@@ -294,8 +294,8 @@
         }
         
         function resetUI() {
-            document.getElementById('statusText').innerHTML = 'Click below to get your personal Jarvis instance';
-            document.getElementById('launchBtn').textContent = 'Get My Jarvis Instance';
+            document.getElementById('statusText').innerHTML = 'Click below to get your personal HELIOS instance';
+            document.getElementById('launchBtn').textContent = 'Get My HELIOS Instance';
             document.getElementById('launchBtn').onclick = launchInstance;
             document.getElementById('message').innerHTML = '';
         }
