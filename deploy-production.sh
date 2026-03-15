@@ -37,10 +37,10 @@ echo "🔨 Step 1: Building Docker Images..."
 echo "-------------------------------------"
 
 echo "Building backend image..."
-docker build -f backend-prod.Dockerfile -t jarvis-backend-prod:latest .
+docker build -f Backend/api/Dockerfile -t jarvis-backend:latest .
 
 echo "Building frontend image..."
-docker build -f frontend-prod.Dockerfile -t jarvis-frontend:prod .
+docker build -f Frontend/Dockerfile -t jarvis-frontend:latest .
 
 echo "Building session manager..."
 cd session-manager

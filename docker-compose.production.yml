@@ -20,8 +20,8 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - BACKEND_IMAGE=jarvis-backend-prod:latest
-      - FRONTEND_IMAGE=jarvis-frontend:prod
+      - BACKEND_IMAGE=jarvis-backend:latest
+      - FRONTEND_IMAGE=jarvis-frontend:latest
       - MAX_TOTAL_SESSIONS=150
       - SESSION_TTL_HOURS=24
       - PORT_RANGE_START=10000

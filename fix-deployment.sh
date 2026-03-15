@@ -24,8 +24,8 @@ docker run -d --name session-manager \
   --network jarvis-shared \
   -p 9001:9000 \
   -e REDIS_HOST=redis \
-  -e BACKEND_IMAGE=jarvis-backend-prod:latest \
-  -e FRONTEND_IMAGE=jarvis-frontend:prod \
+  -e BACKEND_IMAGE=jarvis-backend:latest \
+  -e FRONTEND_IMAGE=jarvis-frontend:latest \
   -v /var/run/docker.sock:/var/run/docker.sock \
   session-manager:latest
 

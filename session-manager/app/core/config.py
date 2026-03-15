@@ -62,9 +62,9 @@ class Settings(BaseSettings):
     frontend_cpu_limit: str = "0.5"
     frontend_memory_limit: str = "1G"
     
-    # Container Images
-    backend_image: str = "jarvis-backend-prod:latest"
-    frontend_image: str = "jarvis-frontend:prod"
+    # Container Images (use main branch frontend/backend)
+    backend_image: str = "jarvis-backend:latest"
+    frontend_image: str = "jarvis-frontend:latest"
     
     # Monitoring
     enable_metrics: bool = True

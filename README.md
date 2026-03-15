@@ -79,10 +79,10 @@ docker network create jarvis-shared
 
 ```bash
 # Build backend with user permissions fix (CRITICAL: includes jarvis user creation)
-docker build -f backend-prod.Dockerfile -t jarvis-backend-prod:latest .
+docker build -f Backend/api/Dockerfile -t jarvis-backend:latest .
 
-# Build frontend production image (includes DELETE endpoint fix)
-docker build -f frontend-prod.Dockerfile -t jarvis-frontend:prod .
+# Build frontend image
+docker build -f Frontend/Dockerfile -t jarvis-frontend:latest .
 
 # Build session manager
 cd session-manager
@@ -103,7 +103,7 @@ docker run -d --name redis \
 docker run -d --name session-manager \
   -p 9001:9000 \
   -e REDIS_HOST=host.docker.internal \
-  -e BACKEND_IMAGE=jarvis-backend-prod:latest \
+  -e BACKEND_IMAGE=jarvis-backend:latest \
   -v /var/run/docker.sock:/var/run/docker.sock \
   --network bridge \
   session-manager:latest
@@ -305,8 +305,8 @@ REDIS_PORT=6379               # Redis port
 REDIS_DB=0                    # Redis database number
 
 # Docker Configuration
-BACKEND_IMAGE=jarvis-backend-prod:latest  # Backend container image
-FRONTEND_IMAGE=jarvis-frontend:prod       # Frontend container image
+BACKEND_IMAGE=jarvis-backend:latest  # Backend container image
+FRONTEND_IMAGE=jarvis-frontend:latest       # Frontend container image
 
 # Session Limits
 MAX_TOTAL_SESSIONS=150        # Maximum concurrent sessions
@@ -381,7 +381,7 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "<ASK_NATE>")
 
 2. **Backend Container User Permissions**
    - **Problem**: entrypoint.sh expected `jarvis:jarvis` user but Dockerfile didn't create it
-   - **Solution**: Added user creation and `gosu` installation in backend-prod.Dockerfile
+   - **Solution**: Added user creation in Backend/api/Dockerfile
    - **Result**: Backend containers start successfully
 
 3. **Destination Persistence**
@@ -416,7 +416,7 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "<ASK_NATE>")
 #### 1. Backend Container Fails: "invalid user: jarvis:jarvis"
 
 **Issue**: Backend Dockerfile missing user creation
-**Solution**: Ensure you're using `jarvis-backend-prod:latest` image built from updated Dockerfile:
+**Solution**: Ensure you're using `jarvis-backend:latest` image built from updated Dockerfile:
 
 ```dockerfile
 # Create jarvis user (required in Dockerfile)
@@ -435,7 +435,7 @@ docker logs jarvis-{session_id}-backend
 
 # Verify image is correct
 docker ps | grep backend | awk '{print $2}'
-# Should show: jarvis-backend-prod:latest
+# Should show: jarvis-backend:latest
 
 # Restart session manager with correct image
 docker restart session-manager
@@ -556,8 +556,8 @@ docker exec redis redis-cli FLUSHALL
 docker restart redis session-manager
 
 # 4. Pre-warm Docker images on all nodes
-docker pull jarvis-backend-prod:latest
-docker pull jarvis-frontend:prod
+docker pull jarvis-backend:latest
+docker pull jarvis-frontend:latest
 
 # 5. Test session creation
 for i in {1..5}; do
@@ -818,8 +818,8 @@ tar -czf /backups/$DATE/configs.tar.gz \
 
 # Backup container images
 docker save -o /backups/$DATE/images.tar \
-  jarvis-backend-prod:latest \
-  jarvis-frontend:prod \
+  jarvis-backend:latest \
+  jarvis-frontend:latest \
   session-manager:latest
 ```
 
@@ -841,8 +841,8 @@ docker save -o /backups/$DATE/images.tar \
 /session-manager/app/routers/admin.py        # Admin endpoints
 
 # Docker Images
-/backend-prod.Dockerfile                     # Backend container definition
-/frontend-prod.Dockerfile                    # Frontend container definition
+/Backend/api/Dockerfile                      # Backend container definition
+/Frontend/Dockerfile                         # Frontend container definition
 /session-manager/Dockerfile                  # Session manager build
 
 # Landing Page
