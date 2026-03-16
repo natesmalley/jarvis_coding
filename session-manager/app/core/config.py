@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     # Session Configuration
     session_ttl_hours: int = 24
     max_sessions_per_user: int = 5
-    max_total_sessions: int = 150  # For Tech Summit
+    max_total_sessions: int = 100  # 16 CPU / 32GB RAM / 186GB disk
     session_cleanup_interval_minutes: int = 5
     
     # Port Allocation
@@ -57,10 +57,11 @@ class Settings(BaseSettings):
     port_range_end: int = 20000
     
     # Container Resources (per session)
-    backend_cpu_limit: str = "1.5"
-    backend_memory_limit: str = "2G"
-    frontend_cpu_limit: str = "0.5"
-    frontend_memory_limit: str = "1G"
+    # Actual usage: backend ~110MB, frontend ~70MB
+    backend_cpu_limit: str = "0.5"
+    backend_memory_limit: str = "512M"
+    frontend_cpu_limit: str = "0.25"
+    frontend_memory_limit: str = "256M"
     
     # Container Images (use main branch frontend/backend)
     backend_image: str = "jarvis-backend:latest"
