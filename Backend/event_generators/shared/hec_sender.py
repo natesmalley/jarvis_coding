@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Send logs from vendor_product generators to SentinelOne AI SIEM (Splunk‑HEC) one‑by‑one."""
-import argparse, json, os, time, random, requests, importlib, sys
+import argparse, json, os, time, random, requests, importlib, sys, uuid
 import gzip, io, threading, queue
 from datetime import datetime
 from typing import Callable, Tuple, Optional
@@ -794,7 +794,11 @@ def _send_batch(lines: list, is_json: bool, product: str):
     # Use fast compression (level 1) for high throughput - trades compression ratio for speed
     # Level 1 is ~10x faster than default level 9, with only ~10% larger output
     gz = gzip.compress(body, compresslevel=1)
-    headers = {**headers_auth, "Content-Type": "text/plain", "Content-Encoding": "gzip"}
+    # Add headers based on endpoint type
+    if is_json:
+        headers = {**headers_auth, "Content-Type": "text/plain", "Content-Encoding": "gzip"}
+    else:
+        headers = {**headers_auth, "Content-Type": "text/plain", "Content-Encoding": "gzip", "X-Splunk-Request-Channel": str(uuid.uuid4())}
     
     if is_json:
         # JSON products to /event endpoint
